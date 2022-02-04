@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cd core
+echo ">> Running \"cargo fmt --all\" in $(pwd)"
+cargo fmt --all
+cd ../ui
+echo ">> Running \"pnpm format\" in $(pwd)"
+pnpm format
+cd ..

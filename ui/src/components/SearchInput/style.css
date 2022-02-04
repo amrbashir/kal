@@ -1,0 +1,17 @@
+#search_input {
+  appearance: none;
+  background-color: var(--bg-color);
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+  border: none;
+  border-radius: 10px;
+  padding: 1rem;
+  font-size: larger;
+  color: white;
+  overflow: hidden;
+}
+
+#search_input ::placeholder {
+  color: #6b6b6b;
+}
