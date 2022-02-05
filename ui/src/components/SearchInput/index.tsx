@@ -5,8 +5,7 @@ const SearchInput: Component = () => {
   const [searchQuery, setSearchQuery] = createSignal("");
 
   function search(query: string) {
-    if (!query) return;
-    window.ipc.postMessage(`[IPC::search]${query}`);
+    window.KAL.ipc.send("search", query);
   }
 
   return (

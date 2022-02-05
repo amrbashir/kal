@@ -6,8 +6,8 @@ use wry::{
         event::Event,
         event_loop::EventLoop,
         platform::windows::WindowBuilderExtWindows,
+        window::Window,
         window::WindowBuilder,
-        window::{Window, WindowId},
     },
     webview::{WebView, WebViewBuilder},
 };
@@ -22,37 +22,73 @@ fn custom_protocol_callback(request: &Request) -> wry::Result<Response> {
 }
 
 thread_local! {
-  static WEBVIEWS: RefCell< HashMap<WindowId, WebView>> = RefCell::new(HashMap::new());
+  static WEBVIEWS: RefCell< HashMap<u8, WebView>> = RefCell::new(HashMap::new());
 }
 
-fn ipc_callback(_window: &Window, request: String) {
-    if request.starts_with("[IPC::search]") {
-        let query = request.replace("[IPC::search]", "");
+const SEARCH_INPUT_WINDOW_ID: u8 = 1;
+const SEARCH_RESULTS_WINDOW_ID: u8 = 2;
+
+const KAL_IPC_SCRIPT: &'static str = r#"
+      window.KAL = {
+        ipc: {
+          send: (eventName, ...payload) => {
+            window.ipc.postMessage(`${eventName}::${JSON.stringify(payload)}`);
+          },
+          __event_handlers: {},
+          on: function (eventName, event_handler) {
+            if (typeof this.__event_handlers[eventName] == 'undefined') this.__event_handlers[eventName] = []
+            this.__event_handlers[eventName].push(event_handler);
+          }
+        }
+      }
+    "#;
+
+/// Emits an event to a window. It runs the event handlers
+/// registred by calling `window.KAL.ipc.on()`
+fn emit_event(window_id: u8, event_name: &str, payload: &impl Serialize) {
+    WEBVIEWS.with(|webviews| {
+        let webviews = webviews.borrow();
+        if let Some(wv) = webviews.get(&window_id) {
+            if wv
+                .evaluate_script(
+                    format!(
+                        r#"
+                      (function(){{
+                        window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
+                          console.log('{}');
+                          handler(JSON.parse('{}'));
+                        }});
+                      }})()
+                      "#,
+                        event_name,
+                        serde_json::to_string(payload).unwrap_or("[]".into()),
+                        serde_json::to_string(payload).unwrap_or("[]".into()),
+                    )
+                    .as_str(),
+                )
+                .is_err()
+            {
+                println!("[ERROR][IPC]: failed to emit `{}` event", event_name);
+            };
+        } else {
+            println!("[ERROR][IPC]: Failed to find the window for the event");
+        }
+    });
+}
+
+/// Handles an event sent by a window through `window.KAL.ipc.send()`
+fn handle_ui_event(event_name: &str, payload: Vec<&str>) {
+    if event_name == "search" {
         emit_event(
-            "search-results",
+            SEARCH_RESULTS_WINDOW_ID,
+            "results",
             &vec![
                 "next item is the query",
-                query.as_str(),
+                payload[0],
                 "previous item is the query",
             ],
         );
     }
-}
-
-fn emit_event(event: &str, payload: &impl Serialize) {
-    WEBVIEWS.with(|webviews| {
-        let webviews = webviews.borrow();
-        for (_, wv) in webviews.iter() {
-            let _ = wv.evaluate_script(
-                format!(
-                    "console.log('[EVENT::{}]{}')",
-                    event,
-                    serde_json::to_string(payload).unwrap_or_default()
-                )
-                .as_str(),
-            );
-        }
-    });
 }
 
 fn main() {
@@ -80,6 +116,7 @@ fn main() {
     #[allow(unused_mut)]
     let mut search_input_webivew_builder = WebViewBuilder::new(search_input_window)
         .unwrap()
+        .with_initialization_script(KAL_IPC_SCRIPT)
         .with_url(search_input_url)
         .unwrap()
         .with_ipc_handler(ipc_callback)
@@ -105,6 +142,7 @@ fn main() {
     #[allow(unused_mut)]
     let mut search_results_webivew_builder = WebViewBuilder::new(search_results_window)
         .unwrap()
+        .with_initialization_script(KAL_IPC_SCRIPT)
         .with_url(search_results_url)
         .unwrap()
         .with_ipc_handler(ipc_callback)
@@ -118,13 +156,10 @@ fn main() {
 
     let search_results_webivew = search_results_webivew_builder.build().unwrap();
 
-    let search_input_webview_id = search_input_webivew.window().id();
-    let search_results_webview_id = search_results_webivew.window().id();
-
     WEBVIEWS.with(|webviews| {
         let mut webviews = webviews.borrow_mut();
-        webviews.insert(search_input_webview_id, search_input_webivew);
-        webviews.insert(search_results_webview_id, search_results_webivew);
+        webviews.insert(SEARCH_INPUT_WINDOW_ID, search_input_webivew);
+        webviews.insert(SEARCH_RESULTS_WINDOW_ID, search_results_webivew);
     });
 
     event_loop.run(move |event, _event_loop, _control_flow| {
@@ -136,4 +171,30 @@ fn main() {
         }
         {}
     });
+}
+
+fn ipc_callback(_window: &Window, request: String) {
+    let mut s = request.split("::");
+    if let Some(event_name) = s.next() {
+        if let Some(payload_str) = s.next() {
+            if let Ok(payload) = serde_json::from_str::<Vec<&str>>(payload_str) {
+                handle_ui_event(event_name, payload);
+            } else {
+                println!(
+                    "[ERROR][IPC]: failed to parse `payload` from `{}`",
+                    payload_str
+                );
+            }
+        } else {
+            println!(
+                "[ERROR][IPC]: failed to parse `payload_str` from `{}`",
+                request
+            );
+        }
+    } else {
+        println!(
+            "[ERROR][IPC]: failed to parse `event_name` from `{}`",
+            request
+        );
+    }
 }

@@ -9,8 +9,8 @@ const App: Component = () => {
   return (
     <>
       <Routes>
-        <Route path="SearchInput" element={<SearchInput />} />
-        <Route path="SearchResults" element={<SearchResults />} />
+        <Route path="/SearchInput" element={<SearchInput />} />
+        <Route path="/SearchResults" element={<SearchResults />} />
       </Routes>
     </>
   );
