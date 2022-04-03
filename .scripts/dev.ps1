@@ -1,20 +1,20 @@
 # "pnpm dev" (vite dev server) process info
 $pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "pnpm"
 $pnpmDevInfo.Arguments = "dev"
-$pnpmDevInfo.WorkingDirectory = "$PSScriptRoot/../ui"
+$pnpmDevInfo.WorkingDirectory = "$PSScriptRoot/.."
 $pnpmDev = New-Object System.Diagnostics.Process
 $pnpmDev.StartInfo = $pnpmDevInfo
 
 # "cargo run" process info
 $cargoRunInfo = New-Object System.Diagnostics.ProcessStartInfo "cargo"
 $cargoRunInfo.Arguments = "run"
-$cargoRunInfo.WorkingDirectory = "$PSScriptRoot/../core"
+$cargoRunInfo.WorkingDirectory = "$PSScriptRoot/.."
 $cargoRun = New-Object System.Diagnostics.Process
 $cargoRun.StartInfo = $cargoRunInfo
 
 # file watcher for the rust code
 $fileWatcher = New-Object System.IO.FileSystemWatcher
-$fileWatcher.Path = "$PSScriptRoot/../core/src"
+$fileWatcher.Path = "$PSScriptRoot/../src/core"
 $fileWatcher.Filter = "*"
 $fileWatcher.IncludeSubdirectories = $true
 function RestartCargoRun {
