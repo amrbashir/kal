@@ -1,59 +1,219 @@
-mod ipc;
+#[path = "../common_types/mod.rs"]
+mod common_types;
+mod fuzzy_sort;
+mod plugin;
+mod plugins;
 
-use ipc::{emit_event, handle_ipc, KAL_IPC_SCRIPT};
+use common_types::{IPCEvent, SearchResultItem};
+use fuzzy_sort::fuzzy_sort;
+use plugin::Plugin;
+use plugins::app_launcher::AppLauncherPlugin;
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
-use std::{cell::RefCell, collections::HashMap};
-use wry::application::event::{Event, WindowEvent};
-use wry::application::event_loop::ControlFlow;
+use serde::Serialize;
+use std::{
+    cell::RefCell,
+    sync::atomic::{AtomicU8, Ordering},
+};
 #[cfg(not(debug_assertions))]
 use wry::http::ResponseBuilder;
 use wry::{
     application::{
         dpi::{LogicalPosition, LogicalSize},
-        event_loop::EventLoop,
+        event::{Event, WindowEvent},
+        event_loop::{ControlFlow, EventLoop},
         platform::windows::WindowBuilderExtWindows,
-        window::{Window, WindowBuilder},
+        window::{WindowBuilder, WindowId},
     },
     webview::{WebView, WebViewBuilder},
 };
-
-thread_local! {
-  static WEBVIEWS: RefCell< HashMap<u8, WebView>> = RefCell::new(HashMap::new());
-}
-
-const SEARCH_INPUT_WINDOW_ID: u8 = 1;
-const SEARCH_RESULTS_WINDOW_ID: u8 = 2;
 
 #[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "dist"]
 struct Asset;
 
-/// Handles events sent by a window through `window.KAL.ipc.send()`
-fn on_ipc_event(_window: &Window, event_name: &str, payload: Vec<&str>) {
-    if event_name == "search" {
-        emit_event(
-            SEARCH_RESULTS_WINDOW_ID,
-            "results",
-            &vec![
-                "next item is the query",
-                payload[0],
-                "previous item is the query",
-            ],
-        );
-    }
+struct AppState {
+    search_input_webview: WebView,
+    search_results_webview: WebView,
+    plugins: Vec<Box<dyn Plugin>>,
+    current_results: Vec<SearchResultItem>,
+    current_selection: AtomicU8,
 }
 
-fn create_webview<T>(
+enum AppEvent {
+    /// An Ipc event from the webview
+    Ipc(WindowId, String),
+}
+
+fn main() {
+    let event_loop = EventLoop::<AppEvent>::with_user_event();
+
+    let app_state = RefCell::new(AppState {
+        search_input_webview: create_webview("SearchInput", 600, 60, 600, 300, &event_loop),
+        search_results_webview: create_webview("SearchResults", 600, 400, 600, 370, &event_loop),
+        plugins: vec![AppLauncherPlugin::new()],
+        current_results: Vec::new(),
+        current_selection: AtomicU8::new(0),
+    });
+
+    // refresh plugins
+    for plugin in &mut app_state.borrow_mut().plugins {
+        plugin.refresh();
+    }
+
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::WindowEvent { event, .. } => match event {
+            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+            _ => {}
+        },
+
+        Event::UserEvent(event) => match event {
+            AppEvent::Ipc(_window_id, request) => {
+                let mut s = request.split("::");
+                let event: IPCEvent = s.next().unwrap_or_default().into();
+                let payload_str = s.next().unwrap_or_default();
+                let payload: Vec<&str> =
+                    serde_json::from_str::<Vec<&str>>(payload_str).unwrap_or_default();
+
+                match event {
+                    IPCEvent::Search => {
+                        let mut app_state = app_state.borrow_mut();
+
+                        app_state.current_selection.store(0, Ordering::Relaxed);
+
+                        let mut results = Vec::new();
+                        for plugin in &app_state.plugins {
+                            results.extend_from_slice(plugin.results(payload[0]));
+                        }
+
+                        let sorted_results = fuzzy_sort(payload[0], results);
+
+                        emit_event(
+                            &app_state.search_results_webview,
+                            IPCEvent::Results.into(),
+                            &sorted_results,
+                        );
+
+                        app_state.current_results = sorted_results;
+                    }
+
+                    IPCEvent::Execute => {
+                        let app_state = app_state.borrow();
+                        let item = &app_state.current_results
+                            [app_state.current_selection.load(Ordering::Relaxed) as usize];
+
+                        app_state
+                            .plugins
+                            .iter()
+                            .filter(|p| p.name() == item.plugin_name)
+                            .collect::<Vec<&Box<dyn Plugin>>>()
+                            .first()
+                            .expect(
+                                format!("Failed to find the {} plugin!", item.plugin_name).as_str(),
+                            )
+                            .execute(item);
+                    }
+
+                    IPCEvent::ClearResults => {
+                        app_state
+                            .borrow_mut()
+                            .current_selection
+                            .store(0, Ordering::Relaxed);
+                        emit_event(
+                            &app_state.borrow().search_results_webview,
+                            IPCEvent::ClearResults.into(),
+                            &"",
+                        );
+                    }
+
+                    IPCEvent::SelectNextResult => {
+                        let app_state = app_state.borrow_mut();
+                        let results_len = app_state.current_results.len();
+                        let current_selection = app_state.current_selection.load(Ordering::Relaxed);
+                        let next_selection;
+                        if current_selection == results_len as u8 - 1 {
+                            next_selection = 0;
+                        } else {
+                            next_selection = current_selection + 1;
+                        }
+
+                        emit_event(
+                            &app_state.search_results_webview,
+                            IPCEvent::SelectNextResult.into(),
+                            &next_selection,
+                        );
+
+                        app_state
+                            .current_selection
+                            .store(next_selection, Ordering::Relaxed);
+                    }
+
+                    IPCEvent::SelectPreviousResult => {
+                        let app_state = app_state.borrow_mut();
+                        let results_len = app_state.current_results.len() as u8;
+                        let current_selection = app_state.current_selection.load(Ordering::Relaxed);
+                        let next_selection;
+                        if current_selection == 0 {
+                            next_selection = results_len - 1;
+                        } else {
+                            next_selection = 0;
+                        }
+
+                        emit_event(
+                            &app_state.search_results_webview,
+                            IPCEvent::SelectNextResult.into(),
+                            &next_selection,
+                        );
+
+                        app_state
+                            .current_selection
+                            .store(next_selection, Ordering::Relaxed);
+                    }
+                    _ => {}
+                }
+            }
+        },
+        _ => {}
+    });
+}
+
+/// Emits an event to a window
+///
+/// This invokes the js handlers registred through `window.KAL.ipc.on()`
+pub fn emit_event(webview: &WebView, event: &str, payload: &impl Serialize) {
+    if webview
+        .evaluate_script(
+            format!(
+                r#"
+                (function(){{
+                  window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
+                    handler({});
+                  }});
+                }})()
+              "#,
+                event,
+                serialize_to_javascript::Serialized::new(
+                    &serde_json::value::to_raw_value(payload).unwrap_or_default(),
+                    &serialize_to_javascript::Options::default()
+                ),
+            )
+            .as_str(),
+        )
+        .is_err()
+    {
+        println!("[ERROR][IPC]: failed to emit `{}` event", event);
+    };
+}
+
+fn create_webview(
     url: &str,
     width: u32,
     height: u32,
     x: u32,
     y: u32,
-    id: u8,
-    event_loop: &EventLoop<T>,
-) {
+    event_loop: &EventLoop<AppEvent>,
+) -> WebView {
     #[cfg(debug_assertions)]
     let url = format!("http://localhost:9010/{}", url);
     #[cfg(not(debug_assertions))]
@@ -67,16 +227,40 @@ fn create_webview<T>(
         .with_skip_taskbar(true)
         .with_transparent(true)
         .build(event_loop)
-        .unwrap();
+        .expect(format!("Failed to build {} window!", url).as_str());
+    let proxy = event_loop.create_proxy();
     #[allow(unused_mut)]
     let mut webview_builder = WebViewBuilder::new(window)
         .unwrap()
         .with_transparent(true)
-        .with_initialization_script(KAL_IPC_SCRIPT)
+        .with_initialization_script(
+            r#"
+                  Object.defineProperty(window, "KAL", {
+                    value: {
+                      ipc: {
+                        send: (eventName, ...payload) => {
+                          window.ipc.postMessage(`${eventName}::${JSON.stringify(payload)}`);
+                        },
+                        __event_handlers: {},
+                        on: function (eventName, event_handler) {
+                          if (typeof this.__event_handlers[eventName] == "undefined")
+                            this.__event_handlers[eventName] = [];
+                          this.__event_handlers[eventName].push(event_handler);
+                        },
+                      },
+                    },
+                  });
+                "#,
+        )
         .with_url(&url)
         .unwrap()
-        .with_ipc_handler(|w, r| handle_ipc(w, r, on_ipc_event));
-
+        .with_ipc_handler(move |w, r| {
+            let _ = proxy.send_event(AppEvent::Ipc(w.id(), r));
+        });
+    #[cfg(debug_assertions)]
+    {
+        webview_builder = webview_builder.with_devtools(true)
+    }
     #[cfg(not(debug_assertions))]
     {
         webview_builder = webview_builder.with_custom_protocol("kal".into(), move |request| {
@@ -106,41 +290,7 @@ fn create_webview<T>(
                 .body(data.to_vec())
         })
     }
-    let webview = webview_builder.build().unwrap();
-
-    WEBVIEWS.with(|webviews| {
-        let mut webviews = webviews.borrow_mut();
-        webviews.insert(id, webview);
-    });
-}
-
-fn main() {
-    let event_loop = EventLoop::new();
-
-    create_webview(
-        "SearchInput",
-        600,
-        60,
-        600,
-        300,
-        SEARCH_INPUT_WINDOW_ID,
-        &event_loop,
-    );
-    create_webview(
-        "SearchResults",
-        600,
-        400,
-        600,
-        370,
-        SEARCH_RESULTS_WINDOW_ID,
-        &event_loop,
-    );
-
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent { event, .. } => match event {
-            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            _ => {}
-        },
-        _ => {}
-    });
+    webview_builder
+        .build()
+        .expect(format!("Failed to build {} webview!", url).as_str())
 }
