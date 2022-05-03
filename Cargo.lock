@@ -1407,7 +1407,8 @@ dependencies = [
 [[package]]
 name = "tao"
 version = "0.7.0"
-source = "git+https://github.com/tauri-apps/tao?branch=fix/windows/set-size-overflow#5847432c1a87aa2a5168f108df2769a558635e73"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b6a3359088d4c4735a13f933202f4ecd91f5991b41a8eb757f2449c044ce925"
 dependencies = [
  "bitflags",
  "cairo-rs",
