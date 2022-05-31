@@ -1,6 +1,6 @@
 # kal
 
-Keyboard-driven app launcher.
+Keyboard-driven app launcher and productivity tool..
 
 ## Development
 

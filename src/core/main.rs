@@ -11,18 +11,15 @@ use plugins::app_launcher::AppLauncherPlugin;
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
 use serde::Serialize;
-use std::{
-    cell::RefCell,
-    sync::atomic::{AtomicU8, Ordering},
-};
+use std::cell::RefCell;
 #[cfg(not(debug_assertions))]
 use wry::http::ResponseBuilder;
 use wry::{
     application::{
         dpi::{LogicalPosition, LogicalSize},
-        event::{Event, WindowEvent},
+        event::{DeviceEvent, ElementState, Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
-        platform::windows::WindowBuilderExtWindows,
+        keyboard::KeyCode,
         window::{WindowBuilder, WindowId},
     },
     webview::{WebView, WebViewBuilder},
@@ -34,74 +31,135 @@ use wry::{
 struct Asset;
 
 struct AppState {
-    search_input_webview: WebView,
-    search_results_webview: WebView,
+    main_window: WebView,
     plugins: Vec<Box<dyn Plugin>>,
     current_results: Vec<SearchResultItem>,
-    current_selection: AtomicU8,
+    alt_key_pressed: bool,
 }
 
 enum AppEvent {
     /// An Ipc event from the webview
     Ipc(WindowId, String),
+    /// Describes an event from a [`WebView`]
+    WebviewEvent {
+        event: WebviewEvent,
+        window_id: WindowId,
+    },
+}
+
+enum WebviewEvent {
+    /// The webview gained or lost focus
+    ///
+    /// Currently, it is only used on Windows
+    Focus(bool),
 }
 
 fn main() {
     let event_loop = EventLoop::<AppEvent>::with_user_event();
 
     let app_state = RefCell::new(AppState {
-        search_input_webview: create_webview("SearchInput", 600, 60, 600, 300, &event_loop),
-        search_results_webview: create_webview("SearchResults", 600, 400, 600, 370, &event_loop),
+        main_window: create_webview_window("/main-window", 600, 460, 600, 300, &event_loop),
         plugins: vec![AppLauncherPlugin::new()],
         current_results: Vec::new(),
-        current_selection: AtomicU8::new(0),
+        alt_key_pressed: false,
     });
 
-    // refresh plugins
     for plugin in &mut app_state.borrow_mut().plugins {
         plugin.refresh();
     }
 
     event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent { event, .. } => match event {
-            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+        Event::DeviceEvent { event, .. } => match event {
+            DeviceEvent::Key(k) => {
+                let mut app_state = app_state.borrow_mut();
+                if k.physical_key == KeyCode::AltLeft {
+                    app_state.alt_key_pressed = if k.state == ElementState::Pressed {
+                        true
+                    } else {
+                        false
+                    };
+                }
+
+                if k.physical_key == KeyCode::Space
+                    && k.state == ElementState::Pressed
+                    && app_state.alt_key_pressed
+                {
+                    let window = app_state.main_window.window();
+                    if window.is_visible() {
+                        window.set_minimized(true);
+                        window.set_visible(false);
+                    } else {
+                        window.set_visible(true);
+                        window.set_minimized(false);
+                        window.set_focus();
+                        emit_event(&app_state.main_window, IPCEvent::FocusInput.into(), &"");
+                    }
+                }
+            }
             _ => {}
         },
+        #[allow(unused)]
+        Event::WindowEvent {
+            event, window_id, ..
+        } => match event {
+            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+            WindowEvent::Focused(f) => {
+                let app_state = app_state.borrow();
+                if window_id == app_state.main_window.window().id() && f {
+                    app_state.main_window.focus();
+                }
 
+                #[cfg(any(target_os = "linux", target_os = "macos"))]
+                {
+                    // when main window loses focus
+                    if window_id == app_state.main_window.window().id() && !f {
+                        app_state.main_window.window().set_visible(false);
+                    }
+                }
+            }
+            _ => {}
+        },
         Event::UserEvent(event) => match event {
+            AppEvent::WebviewEvent { event, window_id } => match event {
+                WebviewEvent::Focus(f) => {
+                    let app_state = app_state.borrow();
+                    // when main window loses focus
+                    if window_id == app_state.main_window.window().id() && !f {
+                        app_state.main_window.window().set_visible(false);
+                    }
+                }
+            },
             AppEvent::Ipc(_window_id, request) => {
                 let mut s = request.split("::");
                 let event: IPCEvent = s.next().unwrap_or_default().into();
                 let payload_str = s.next().unwrap_or_default();
-                let payload: Vec<&str> =
-                    serde_json::from_str::<Vec<&str>>(payload_str).unwrap_or_default();
 
                 match event {
                     IPCEvent::Search => {
-                        let mut app_state = app_state.borrow_mut();
+                        let query = serde_json::from_str::<Vec<&str>>(payload_str).unwrap()[0];
 
-                        app_state.current_selection.store(0, Ordering::Relaxed);
+                        let mut app_state = app_state.borrow_mut();
 
                         let mut results = Vec::new();
                         for plugin in &app_state.plugins {
-                            results.extend_from_slice(plugin.results(payload[0]));
+                            results.extend_from_slice(plugin.results(query));
                         }
 
-                        let sorted_results = fuzzy_sort(payload[0], results);
+                        let sorted_results = fuzzy_sort(query, results);
 
                         emit_event(
-                            &app_state.search_results_webview,
+                            &app_state.main_window,
                             IPCEvent::Results.into(),
                             &sorted_results,
                         );
 
                         app_state.current_results = sorted_results;
                     }
-
                     IPCEvent::Execute => {
+                        let index = serde_json::from_str::<Vec<usize>>(payload_str).unwrap()[0];
+
                         let app_state = app_state.borrow();
-                        let item = &app_state.current_results
-                            [app_state.current_selection.load(Ordering::Relaxed) as usize];
+                        let item = &app_state.current_results[index];
 
                         app_state
                             .plugins
@@ -114,61 +172,8 @@ fn main() {
                             )
                             .execute(item);
                     }
-
                     IPCEvent::ClearResults => {
-                        app_state
-                            .borrow_mut()
-                            .current_selection
-                            .store(0, Ordering::Relaxed);
-                        emit_event(
-                            &app_state.borrow().search_results_webview,
-                            IPCEvent::ClearResults.into(),
-                            &"",
-                        );
-                    }
-
-                    IPCEvent::SelectNextResult => {
-                        let app_state = app_state.borrow_mut();
-                        let results_len = app_state.current_results.len();
-                        let current_selection = app_state.current_selection.load(Ordering::Relaxed);
-                        let next_selection;
-                        if current_selection == results_len as u8 - 1 {
-                            next_selection = 0;
-                        } else {
-                            next_selection = current_selection + 1;
-                        }
-
-                        emit_event(
-                            &app_state.search_results_webview,
-                            IPCEvent::SelectNextResult.into(),
-                            &next_selection,
-                        );
-
-                        app_state
-                            .current_selection
-                            .store(next_selection, Ordering::Relaxed);
-                    }
-
-                    IPCEvent::SelectPreviousResult => {
-                        let app_state = app_state.borrow_mut();
-                        let results_len = app_state.current_results.len() as u8;
-                        let current_selection = app_state.current_selection.load(Ordering::Relaxed);
-                        let next_selection;
-                        if current_selection == 0 {
-                            next_selection = results_len - 1;
-                        } else {
-                            next_selection = 0;
-                        }
-
-                        emit_event(
-                            &app_state.search_results_webview,
-                            IPCEvent::SelectNextResult.into(),
-                            &next_selection,
-                        );
-
-                        app_state
-                            .current_selection
-                            .store(next_selection, Ordering::Relaxed);
+                        app_state.borrow_mut().current_results = Vec::new();
                     }
                     _ => {}
                 }
@@ -206,7 +211,7 @@ pub fn emit_event(webview: &WebView, event: &str, payload: &impl Serialize) {
     };
 }
 
-fn create_webview(
+fn create_webview_window(
     url: &str,
     width: u32,
     height: u32,
@@ -214,20 +219,31 @@ fn create_webview(
     y: u32,
     event_loop: &EventLoop<AppEvent>,
 ) -> WebView {
-    #[cfg(debug_assertions)]
-    let url = format!("http://localhost:9010/{}", url);
-    #[cfg(not(debug_assertions))]
-    let url = format!("kal://localhost/{}/", url);
+    #[cfg(target_os = "linux")]
+    use wry::application::platform::unix::WindowBuilderExtWindows;
+    #[cfg(target_os = "windows")]
+    use wry::application::platform::windows::WindowBuilderExtWindows;
 
-    let window = WindowBuilder::new()
+    #[cfg(debug_assertions)]
+    let url = format!("http://localhost:9010{}", url);
+    #[cfg(not(debug_assertions))]
+    let url = format!("kal://localhost/{}", url);
+
+    let mut window_builder = WindowBuilder::new()
         .with_inner_size(LogicalSize::<u32>::new(width, height))
         .with_position(LogicalPosition::<u32>::new(x, y))
         .with_decorations(false)
         .with_resizable(false)
-        .with_skip_taskbar(true)
+        .with_visible(false);
+    #[cfg(any(target_os = "linux", target_os = "windows",))]
+    {
+        window_builder = window_builder.with_skip_taskbar(true);
+    }
+    let window = window_builder
         .with_transparent(true)
         .build(event_loop)
         .expect(format!("Failed to build {} window!", url).as_str());
+
     let proxy = event_loop.create_proxy();
     #[allow(unused_mut)]
     let mut webview_builder = WebViewBuilder::new(window)
@@ -290,7 +306,41 @@ fn create_webview(
                 .body(data.to_vec())
         })
     }
-    webview_builder
+    let webview = webview_builder
         .build()
-        .expect(format!("Failed to build {} webview!", url).as_str())
+        .expect(format!("Failed to build {} webview!", url).as_str());
+
+    #[cfg(target_os = "windows")]
+    {
+        use wry::webview::WebviewExtWindows;
+        let mut token = unsafe { std::mem::zeroed() };
+        let controller = webview.controller();
+        let window_id = webview.window().id();
+        unsafe {
+            let proxy = event_loop.create_proxy();
+            let _ = controller.GotFocus(
+                webview2_com::FocusChangedEventHandler::create(Box::new(move |_, _| {
+                    let _ = proxy.send_event(AppEvent::WebviewEvent {
+                        event: WebviewEvent::Focus(true),
+                        window_id,
+                    });
+                    Ok(())
+                })),
+                &mut token,
+            );
+            let proxy = event_loop.create_proxy();
+            let _ = controller.LostFocus(
+                webview2_com::FocusChangedEventHandler::create(Box::new(move |_, _| {
+                    let _ = proxy.send_event(AppEvent::WebviewEvent {
+                        event: WebviewEvent::Focus(false),
+                        window_id,
+                    });
+                    Ok(())
+                })),
+                &mut token,
+            );
+        }
+    }
+
+    webview
 }

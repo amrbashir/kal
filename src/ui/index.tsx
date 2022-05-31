@@ -4,15 +4,15 @@ import { lazy } from "solid-js";
 import "solid-styled-jsx";
 import "./style.css";
 
-const SearchInput = lazy(() => import("./routes/SearchInput"));
-const SearchResults = lazy(() => import("./routes/SearchResults"));
+const MainWindow = lazy(() => import("./routes/main_window"));
+// const SettingsWindow = lazy(() => import("./routes/settings_window"));
 
 render(
   () => (
     <Router>
       <Routes>
-        <Route path="/SearchInput" element={<SearchInput />} />
-        <Route path="/SearchResults" element={<SearchResults />} />
+        <Route path="/main-window" element={<MainWindow />} />
+        {/* <Route path="/settings-window" element={<SettingsWindow />} /> */}
       </Routes>
     </Router>
   ),

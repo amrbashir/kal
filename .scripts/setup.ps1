@@ -1,3 +1,3 @@
-git config core.hooksPath .git-hooks
+git config core.hooksPath .githooks
 pnpm i
 cargo update

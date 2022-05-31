@@ -3,9 +3,8 @@ pub enum IPCEvent {
     Search,
     Results,
     Execute,
-    SelectNextResult,
-    SelectPreviousResult,
     ClearResults,
+    FocusInput,
 }
 
 impl From<IPCEvent> for &str {
@@ -14,9 +13,8 @@ impl From<IPCEvent> for &str {
             IPCEvent::Search => "search",
             IPCEvent::Results => "results",
             IPCEvent::Execute => "execute",
-            IPCEvent::SelectNextResult => "select-next-result",
-            IPCEvent::SelectPreviousResult => "select-previous-result",
             IPCEvent::ClearResults => "clear-results",
+            IPCEvent::FocusInput => "focus-input",
         }
     }
 }
@@ -27,9 +25,8 @@ impl From<&str> for IPCEvent {
             "search" => IPCEvent::Search,
             "results" => IPCEvent::Results,
             "execute" => IPCEvent::Execute,
-            "select-next-result" => IPCEvent::SelectNextResult,
-            "select-previous-result" => IPCEvent::SelectPreviousResult,
             "clear-results" => IPCEvent::ClearResults,
+            "focus-input" => IPCEvent::FocusInput,
             _ => unreachable!(),
         }
     }

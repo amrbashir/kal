@@ -1,12 +1,12 @@
 [package]
 name = "kal"
-version = "0.1.0"
+version = "0.0.0"
 description = "Keyboard-driven app launcher and productivity tool."
 authors = [ "Amr Bashir <amr.bashir2015@gmail.com>" ]
 repository = "https://github.com/amrbashir/kal"
 license = "MIT"
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.61"
 
 [[bin]]
 name = "kal"
@@ -20,6 +20,9 @@ rust-embed="6.3"
 serialize-to-javascript = "0.1"
 fuzzy-matcher = "0.3"
 
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.13"
+
 [target.'cfg(target_os = "windows")'.dependencies.windows-sys]
-version = "0.35"
+version = "0.36"
 features = ["Win32_UI_Shell", "Win32_Foundation"]
