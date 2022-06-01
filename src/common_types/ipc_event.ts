@@ -4,4 +4,5 @@ export enum IPCEvent {
   Execute = "execute",
   ClearResults = "clear-results",
   FocusInput = "focus-input",
+  HideMainWindow = "hide-main-window",
 }

@@ -5,6 +5,7 @@ pub enum IPCEvent {
     Execute,
     ClearResults,
     FocusInput,
+    HideMainWindow,
 }
 
 impl From<IPCEvent> for &str {
@@ -15,6 +16,7 @@ impl From<IPCEvent> for &str {
             IPCEvent::Execute => "execute",
             IPCEvent::ClearResults => "clear-results",
             IPCEvent::FocusInput => "focus-input",
+            IPCEvent::HideMainWindow => "hide-main-window",
         }
     }
 }
@@ -27,6 +29,7 @@ impl From<&str> for IPCEvent {
             "execute" => IPCEvent::Execute,
             "clear-results" => IPCEvent::ClearResults,
             "focus-input" => IPCEvent::FocusInput,
+            "hide-main-window" => IPCEvent::HideMainWindow,
             _ => unreachable!(),
         }
     }

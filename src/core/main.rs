@@ -1,10 +1,12 @@
 #[path = "../common_types/mod.rs"]
 mod common_types;
+mod config;
 mod fuzzy_sort;
 mod plugin;
 mod plugins;
 
 use common_types::{IPCEvent, SearchResultItem};
+use config::{Config, CONFIG_FILE_NAME};
 use fuzzy_sort::fuzzy_sort;
 use plugin::Plugin;
 use plugins::app_launcher::AppLauncherPlugin;
@@ -19,7 +21,6 @@ use wry::{
         dpi::{LogicalPosition, LogicalSize},
         event::{DeviceEvent, ElementState, Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
-        keyboard::KeyCode,
         window::{WindowBuilder, WindowId},
     },
     webview::{WebView, WebViewBuilder},
@@ -34,7 +35,7 @@ struct AppState {
     main_window: WebView,
     plugins: Vec<Box<dyn Plugin>>,
     current_results: Vec<SearchResultItem>,
-    alt_key_pressed: bool,
+    modifier_pressed: bool,
 }
 
 enum AppEvent {
@@ -51,17 +52,58 @@ enum WebviewEvent {
     /// The webview gained or lost focus
     ///
     /// Currently, it is only used on Windows
+    #[cfg(target_os = "windows")]
     Focus(bool),
 }
 
 fn main() {
+    let mut config_path = dirs_next::data_local_dir().unwrap();
+    config_path.push("kal");
+    config_path.push(CONFIG_FILE_NAME);
+    let config = Config::load_from_path(config_path);
+
     let event_loop = EventLoop::<AppEvent>::with_user_event();
 
+    let monitor = event_loop
+        .primary_monitor()
+        .expect("Failed to get primary monitor.");
+    let (m_size, m_pos) = (monitor.size(), monitor.position());
+
+    let main_window = create_webview_window(
+        "/main-window",
+        config.window_width,
+        config.input_height,
+        m_pos.x + (m_size.width as i32 / 2 - config.window_width as i32 / 2),
+        m_pos.y + (m_size.height as i32 / 4),
+        false,
+        false,
+        false,
+        true,
+        true,
+        &event_loop,
+    );
+    // disable minimize animation on Windows, so it can feel snappy when hiding or showing it.
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::Graphics::Dwm::{
+            DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED,
+        };
+        use wry::application::platform::windows::WindowExtWindows;
+        unsafe {
+            DwmSetWindowAttribute(
+                main_window.window().hwnd() as _,
+                DWMWA_TRANSITIONS_FORCEDISABLED,
+                &1 as *const _ as _,
+                4,
+            );
+        }
+    }
+
     let app_state = RefCell::new(AppState {
-        main_window: create_webview_window("/main-window", 600, 460, 600, 300, &event_loop),
+        main_window,
         plugins: vec![AppLauncherPlugin::new()],
         current_results: Vec::new(),
-        alt_key_pressed: false,
+        modifier_pressed: false,
     });
 
     for plugin in &mut app_state.borrow_mut().plugins {
@@ -72,26 +114,29 @@ fn main() {
         Event::DeviceEvent { event, .. } => match event {
             DeviceEvent::Key(k) => {
                 let mut app_state = app_state.borrow_mut();
-                if k.physical_key == KeyCode::AltLeft {
-                    app_state.alt_key_pressed = if k.state == ElementState::Pressed {
+                if k.physical_key.to_string() == config.hotkey.0 {
+                    app_state.modifier_pressed = if k.state == ElementState::Pressed {
                         true
                     } else {
                         false
                     };
                 }
 
-                if k.physical_key == KeyCode::Space
+                if k.physical_key.to_string() == config.hotkey.1
                     && k.state == ElementState::Pressed
-                    && app_state.alt_key_pressed
+                    && app_state.modifier_pressed
                 {
-                    let window = app_state.main_window.window();
-                    if window.is_visible() {
-                        window.set_minimized(true);
-                        window.set_visible(false);
+                    let main_window = app_state.main_window.window();
+                    if main_window.is_visible() {
+                        // minimize before hiding to return focus to previous window
+                        #[cfg(target_os = "windows")]
+                        main_window.set_minimized(true);
+                        main_window.set_visible(false);
                     } else {
-                        window.set_visible(true);
-                        window.set_minimized(false);
-                        window.set_focus();
+                        main_window.set_visible(true);
+                        #[cfg(target_os = "windows")]
+                        main_window.set_minimized(false);
+                        main_window.set_focus();
                         emit_event(&app_state.main_window, IPCEvent::FocusInput.into(), &"");
                     }
                 }
@@ -103,16 +148,15 @@ fn main() {
             event, window_id, ..
         } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            WindowEvent::Focused(f) => {
+            WindowEvent::Focused(focus) => {
                 let app_state = app_state.borrow();
-                if window_id == app_state.main_window.window().id() && f {
+                if window_id == app_state.main_window.window().id() && focus {
                     app_state.main_window.focus();
                 }
 
                 #[cfg(any(target_os = "linux", target_os = "macos"))]
                 {
-                    // when main window loses focus
-                    if window_id == app_state.main_window.window().id() && !f {
+                    if window_id == app_state.main_window.window().id() && !focus {
                         app_state.main_window.window().set_visible(false);
                     }
                 }
@@ -121,11 +165,12 @@ fn main() {
         },
         Event::UserEvent(event) => match event {
             AppEvent::WebviewEvent { event, window_id } => match event {
-                WebviewEvent::Focus(f) => {
+                #[cfg(target_os = "windows")]
+                WebviewEvent::Focus(focus) => {
                     let app_state = app_state.borrow();
-                    // when main window loses focus
-                    if window_id == app_state.main_window.window().id() && !f {
-                        app_state.main_window.window().set_visible(false);
+                    let main_window = app_state.main_window.window();
+                    if window_id == main_window.id() && !focus {
+                        main_window.set_visible(false);
                     }
                 }
             },
@@ -153,6 +198,19 @@ fn main() {
                             &sorted_results,
                         );
 
+                        let requested_height =
+                            sorted_results.len() as u32 * config.results_item_height;
+                        let new_height = if requested_height >= config.results_height {
+                            config.results_height
+                        } else {
+                            requested_height
+                        };
+                        app_state
+                            .main_window
+                            .window()
+                            .set_inner_size(LogicalSize::new(config.window_width, new_height));
+                        let _ = app_state.main_window.resize();
+
                         app_state.current_results = sorted_results;
                     }
                     IPCEvent::Execute => {
@@ -173,7 +231,23 @@ fn main() {
                             .execute(item);
                     }
                     IPCEvent::ClearResults => {
-                        app_state.borrow_mut().current_results = Vec::new();
+                        let mut app_state = app_state.borrow_mut();
+                        app_state
+                            .main_window
+                            .window()
+                            .set_inner_size(LogicalSize::new(
+                                config.window_width,
+                                config.input_height,
+                            ));
+                        let _ = app_state.main_window.resize();
+                        app_state.current_results = Vec::new();
+                    }
+                    IPCEvent::HideMainWindow => {
+                        let app_state = app_state.borrow();
+                        let main_window = app_state.main_window.window();
+                        #[cfg(target_os = "windows")]
+                        main_window.set_minimized(true);
+                        main_window.set_visible(false);
                     }
                     _ => {}
                 }
@@ -186,7 +260,7 @@ fn main() {
 /// Emits an event to a window
 ///
 /// This invokes the js handlers registred through `window.KAL.ipc.on()`
-pub fn emit_event(webview: &WebView, event: &str, payload: &impl Serialize) {
+fn emit_event(webview: &WebView, event: &str, payload: &impl Serialize) {
     if webview
         .evaluate_script(
             format!(
@@ -215,8 +289,13 @@ fn create_webview_window(
     url: &str,
     width: u32,
     height: u32,
-    x: u32,
-    y: u32,
+    x: i32,
+    y: i32,
+    decorated: bool,
+    visible: bool,
+    resizable: bool,
+    transparent: bool,
+    skip_taskbar: bool,
     event_loop: &EventLoop<AppEvent>,
 ) -> WebView {
     #[cfg(target_os = "linux")]
@@ -230,17 +309,17 @@ fn create_webview_window(
     let url = format!("kal://localhost/{}", url);
 
     let mut window_builder = WindowBuilder::new()
-        .with_inner_size(LogicalSize::<u32>::new(width, height))
-        .with_position(LogicalPosition::<u32>::new(x, y))
-        .with_decorations(false)
-        .with_resizable(false)
-        .with_visible(false);
+        .with_inner_size(LogicalSize::new(width, height))
+        .with_position(LogicalPosition::new(x, y))
+        .with_decorations(decorated)
+        .with_resizable(resizable)
+        .with_visible(visible);
     #[cfg(any(target_os = "linux", target_os = "windows",))]
     {
-        window_builder = window_builder.with_skip_taskbar(true);
+        window_builder = window_builder.with_skip_taskbar(skip_taskbar);
     }
     let window = window_builder
-        .with_transparent(true)
+        .with_transparent(transparent)
         .build(event_loop)
         .expect(format!("Failed to build {} window!", url).as_str());
 
@@ -248,7 +327,7 @@ fn create_webview_window(
     #[allow(unused_mut)]
     let mut webview_builder = WebViewBuilder::new(window)
         .unwrap()
-        .with_transparent(true)
+        .with_transparent(transparent)
         .with_initialization_script(
             r#"
                   Object.defineProperty(window, "KAL", {

@@ -16,6 +16,7 @@ const MainWindow: Component = () => {
 
   function onkeydown(e: KeyboardEvent) {
     if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+      e.preventDefault();
       if (e.key === "ArrowDown") {
         setCurrentSelection(
           currentSelection() === results().length - 1
@@ -37,6 +38,10 @@ const MainWindow: Component = () => {
 
     if (e.key === "Enter") {
       window.KAL.ipc.send(IPCEvent.Execute, currentSelection());
+    }
+
+    if (e.key === "Escape") {
+      window.KAL.ipc.send(IPCEvent.HideMainWindow);
     }
   }
 
@@ -139,7 +144,8 @@ const MainWindow: Component = () => {
               background-color: var(--bg);
               width: 100%;
               height: 60px;
-              border-radius: 10px 10px 0 0;
+              border-radius: 10px 10px
+                ${results().length === 0 ? "10px 10px" : "0 0"};
               display: flex;
             }
 
