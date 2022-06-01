@@ -4,7 +4,7 @@ import { lazy } from "solid-js";
 import "solid-styled-jsx";
 import "./style.css";
 
-const MainWindow = lazy(() => import("./routes/main_window"));
+const MainWindow = lazy(() => import("./windows/main"));
 // const SettingsWindow = lazy(() => import("./routes/settings_window"));
 
 render(

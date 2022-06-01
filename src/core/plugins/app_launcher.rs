@@ -1,4 +1,7 @@
-use crate::{common_types::SearchResultItem, plugin::Plugin};
+use crate::{
+    common_types::{Icon, IconType, SearchResultItem},
+    plugin::Plugin,
+};
 use std::{
     fs::{self, DirEntry},
     path::PathBuf,
@@ -57,6 +60,10 @@ impl AppLauncherPlugin {
                     secondary_text: path_str.clone(),
                     execution_args: vec![path_str],
                     plugin_name: self.name.clone(),
+                    icon: Icon {
+                        value: "dmmy.png".into(),
+                        r#type: IconType::Path,
+                    },
                 }
             })
             .collect::<Vec<SearchResultItem>>();

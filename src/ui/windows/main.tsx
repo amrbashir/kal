@@ -1,5 +1,5 @@
 import { Component, createSignal, For, onMount } from "solid-js";
-import { IPCEvent, SearchResultItem } from "../../common_types";
+import { IconType, IPCEvent, SearchResultItem } from "../../common_types";
 
 const MainWindow: Component = () => {
   const [currentSelection, setCurrentSelection] = createSignal(0);
@@ -95,24 +95,20 @@ const MainWindow: Component = () => {
                 class="search-results_item"
                 classList={{ selected: index() == currentSelection() }}
               >
-                <div class="search-results_item_left">
-                  {/* TODO: replace with search result icon */}
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                    class="iconify iconify--bi"
-                    width="32"
-                    height="32"
-                    preserveAspectRatio="xMidYMid meet"
-                    viewBox="0 0 16 16"
-                  >
-                    <path
-                      fill="currentColor"
-                      fill-rule="evenodd"
-                      d="M14 4.5V14a2 2 0 0 1-2 2h-1v-1h1a1 1 0 0 0 1-1V4.5h-2A1.5 1.5 0 0 1 9.5 3V1H4a1 1 0 0 0-1 1v9H2V2a2 2 0 0 1 2-2h5.5L14 4.5ZM2.575 15.202H.785v-1.073H2.47v-.606H.785v-1.025h1.79v-.648H0v3.999h2.575v-.647ZM6.31 11.85h-.893l-.823 1.439h-.036l-.832-1.439h-.931l1.227 1.983l-1.239 2.016h.861l.853-1.415h.035l.85 1.415h.908l-1.254-1.992L6.31 11.85Zm1.025 3.352h1.79v.647H6.548V11.85h2.576v.648h-1.79v1.025h1.684v.606H7.334v1.073Z"
-                    ></path>
-                  </svg>
-                </div>
+                <div
+                  class="search-results_item_left"
+                  innerHTML={
+                    result.icon.type === IconType.Svg
+                      ? result.icon.value
+                      : result.icon.type === IconType.Path
+                      ? `<img src="${convertFileSrc(
+                          "kalasset",
+                          result.icon.value
+                        )}" >`
+                      : //  TODO: use a default icon
+                        ""
+                  }
+                ></div>
                 <div class="search-results_item_right">
                   <span class="text-primary">{result.primary_text}</span>
                   <span class="text-secondary">{result.secondary_text}</span>
@@ -234,3 +230,10 @@ const MainWindow: Component = () => {
 };
 
 export default MainWindow;
+
+function convertFileSrc(protocol: string, filePath: string): string {
+  const path = encodeURIComponent(filePath);
+  return navigator.userAgent.includes("Windows")
+    ? `https://${protocol}.localhost/${path}`
+    : `${protocol}://${path}`;
+}

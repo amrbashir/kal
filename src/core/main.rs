@@ -13,8 +13,6 @@ use plugins::app_launcher::AppLauncherPlugin;
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
 use serde::Serialize;
-use std::cell::RefCell;
-#[cfg(not(debug_assertions))]
 use wry::http::ResponseBuilder;
 use wry::{
     application::{
@@ -57,8 +55,8 @@ enum WebviewEvent {
 }
 
 fn main() {
-    let mut config_path = dirs_next::data_local_dir().unwrap();
-    config_path.push("kal");
+    let mut config_path = dirs_next::home_dir().expect("Failed to get $HOME dir path");
+    config_path.push(".kal");
     config_path.push(CONFIG_FILE_NAME);
     let config = Config::load_from_path(config_path);
 
@@ -66,7 +64,7 @@ fn main() {
 
     let monitor = event_loop
         .primary_monitor()
-        .expect("Failed to get primary monitor.");
+        .expect("Failed to get primary monitor");
     let (m_size, m_pos) = (monitor.size(), monitor.position());
 
     let main_window = create_webview_window(
@@ -99,7 +97,7 @@ fn main() {
         }
     }
 
-    let app_state = RefCell::new(AppState {
+    let app_state = std::cell::RefCell::new(AppState {
         main_window,
         plugins: vec![AppLauncherPlugin::new()],
         current_results: Vec::new(),
@@ -225,9 +223,7 @@ fn main() {
                             .filter(|p| p.name() == item.plugin_name)
                             .collect::<Vec<&Box<dyn Plugin>>>()
                             .first()
-                            .expect(
-                                format!("Failed to find the {} plugin!", item.plugin_name).as_str(),
-                            )
+                            .expect(format!("Failed to find  {}!", item.plugin_name).as_str())
                             .execute(item);
                     }
                     IPCEvent::ClearResults => {
@@ -351,6 +347,35 @@ fn create_webview_window(
         .unwrap()
         .with_ipc_handler(move |w, r| {
             let _ = proxy.send_event(AppEvent::Ipc(w.id(), r));
+        })
+        .with_custom_protocol("kalasset".into(), move |request| {
+            let path = request.uri().replace("kalasset://localhost/", "");
+            let path = percent_encoding::percent_decode_str(&path).decode_utf8_lossy();
+            let path =
+                dunce::canonicalize(std::path::PathBuf::from(path.to_string())).unwrap_or_default();
+
+            let mut assets_dir = dirs_next::home_dir().expect("Failed to get $HOME dir path");
+            assets_dir.push(".kal");
+
+            if path.starts_with(assets_dir) {
+                let mimetype = match path
+                    .extension()
+                    .unwrap_or_default()
+                    .to_str()
+                    .unwrap_or_default()
+                {
+                    "png" => "image/png",
+                    "jpg" | "jpeg" => "image/jpeg",
+                    "svg" => "image/svg+xml",
+                    _ => "text/html",
+                };
+
+                ResponseBuilder::new()
+                    .mimetype(mimetype)
+                    .body(std::fs::read(path).unwrap_or_default())
+            } else {
+                ResponseBuilder::new().body([].into())
+            }
         });
     #[cfg(debug_assertions)]
     {
@@ -359,13 +384,11 @@ fn create_webview_window(
     #[cfg(not(debug_assertions))]
     {
         webview_builder = webview_builder.with_custom_protocol("kal".into(), move |request| {
-            use std::path::PathBuf;
-
             let path = request.uri().replace("kal://localhost/", "");
             let data = Asset::get(&path)
                 .unwrap_or_else(|| Asset::get("index.html").unwrap())
                 .data;
-            let mimetype = match PathBuf::from(path)
+            let mimetype = match std::path::PathBuf::from(path)
                 .extension()
                 .unwrap_or_default()
                 .to_str()
@@ -387,7 +410,7 @@ fn create_webview_window(
     }
     let webview = webview_builder
         .build()
-        .expect(format!("Failed to build {} webview!", url).as_str());
+        .expect(format!("Failed to build {} webview", url).as_str());
 
     #[cfg(target_os = "windows")]
     {

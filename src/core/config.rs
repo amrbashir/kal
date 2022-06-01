@@ -16,7 +16,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            hotkey: ("ControlLeft".into(), "Space".into()),
+            hotkey: ("AltLeft".into(), "Space".into()),
             window_width: 600,
             input_height: 60,
             results_height: 480,
@@ -30,21 +30,17 @@ impl Config {
         let path = path.as_ref();
         let config;
         if path.exists() {
-            let config_json =
-                fs::read_to_string(path).expect("Failed to read config file content.");
-            config = serde_json::from_str::<Config>(&config_json)
-                .expect("Failed to deserialize config.");
+            let config_json = fs::read_to_string(path).expect("Failed to read config file content");
+            config =
+                serde_json::from_str::<Config>(&config_json).expect("Failed to deserialize config");
         } else {
             config = Config::default();
-            fs::create_dir_all(
-                path.parent()
-                    .expect("Failed to get config file parent dir."),
-            )
-            .expect("Failed to create config parent dir.");
+            fs::create_dir_all(path.parent().expect("Failed to get config file parent di."))
+                .expect("Failed to create config parent di.");
             fs::write(
                 path,
                 serde_json::to_string(&config)
-                    .expect("Failed to serialize Config.")
+                    .expect("Failed to serialize Confi.")
                     .as_bytes(),
             )
             .expect("Failed to save default config File");
