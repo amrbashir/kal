@@ -1,11 +1,15 @@
 use crate::common_types::SearchResultItem;
 use std::{iter, os::windows::prelude::OsStrExt, path, ptr};
 
-pub fn execute(item: &SearchResultItem) {
+pub fn execute(item: &SearchResultItem, elevated: bool) {
     unsafe {
         windows_sys::Win32::UI::Shell::ShellExecuteW(
             ptr::null::<isize>() as _,
-            ptr::null(),
+            if elevated {
+                encode_wide("runas").as_ptr()
+            } else {
+                ptr::null()
+            },
             encode_wide(&item.execution_args[0]).as_ptr(),
             ptr::null(),
             ptr::null(),

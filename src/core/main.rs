@@ -174,11 +174,11 @@ fn main() {
             AppEvent::Ipc(_window_id, request) => {
                 let mut s = request.split("::");
                 let event: IPCEvent = s.next().unwrap_or_default().into();
-                let payload_str = s.next().unwrap_or_default();
+                let payload = s.next().unwrap_or_default();
 
                 match event {
                     IPCEvent::Search => {
-                        let query = serde_json::from_str::<Vec<&str>>(payload_str).unwrap()[0];
+                        let query = serde_json::from_str::<Vec<&str>>(payload).unwrap()[0];
 
                         let mut app_state = app_state.borrow_mut();
 
@@ -211,7 +211,9 @@ fn main() {
                         app_state.current_results = sorted_results;
                     }
                     IPCEvent::Execute => {
-                        let index = serde_json::from_str::<Vec<usize>>(payload_str).unwrap()[0];
+                        let args = serde_json::from_str::<(usize, bool)>(payload).unwrap();
+                        let index = args.0;
+                        let elevated = args.1;
 
                         let app_state = app_state.borrow();
                         let item = &app_state.current_results[index];
@@ -223,7 +225,7 @@ fn main() {
                             .collect::<Vec<&Box<dyn Plugin>>>()
                             .first()
                             .unwrap_or_else(|| panic!("Failed to find  {}!", item.plugin_name))
-                            .execute(item);
+                            .execute(item, elevated);
                     }
                     IPCEvent::ClearResults => {
                         let mut app_state = app_state.borrow_mut();

@@ -34,8 +34,8 @@ impl Plugin for AppLauncherPlugin {
         self.results(query)
     }
 
-    fn execute(&self, item: &SearchResultItem) {
-        self.execute(item)
+    fn execute(&self, item: &SearchResultItem, elevated: bool) {
+        self.execute(item, elevated)
     }
 }
 
@@ -109,8 +109,8 @@ impl AppLauncherPlugin {
         &self.cached_apps
     }
 
-    pub fn execute(&self, item: &SearchResultItem) {
-        platform::execute(item);
+    pub fn execute(&self, item: &SearchResultItem, elevated: bool) {
+        platform::execute(item, elevated);
     }
 }
 

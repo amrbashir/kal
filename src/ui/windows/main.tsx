@@ -37,7 +37,7 @@ const MainWindow: Component = () => {
     }
 
     if (e.key === "Enter") {
-      window.KAL.ipc.send(IPCEvent.Execute, currentSelection());
+      window.KAL.ipc.send(IPCEvent.Execute, currentSelection(), e.shiftKey);
     }
 
     if (e.key === "Escape") {
