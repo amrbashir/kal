@@ -2,10 +2,17 @@ use crate::{
     common_types::{Icon, IconType, SearchResultItem},
     plugin::Plugin,
 };
-use std::{
-    fs::{self, DirEntry},
-    path::PathBuf,
-};
+use std::{fs, path};
+
+#[cfg(target_os = "windows")]
+#[path = "windows.rs"]
+mod platform;
+#[cfg(target_os = "linux")]
+#[path = "linux.rs"]
+mod platform;
+#[path = "macos.rs"]
+#[cfg(target_os = "macos")]
+mod platform;
 
 pub struct AppLauncherPlugin {
     name: String,
@@ -14,13 +21,31 @@ pub struct AppLauncherPlugin {
     cached_apps: Vec<SearchResultItem>,
 }
 
+impl Plugin for AppLauncherPlugin {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn refresh(&mut self) {
+        self.refresh()
+    }
+
+    fn results(&self, query: &str) -> &[SearchResultItem] {
+        self.results(query)
+    }
+
+    fn execute(&self, item: &SearchResultItem) {
+        self.execute(item)
+    }
+}
+
 impl AppLauncherPlugin {
     pub fn new() -> Box<Self> {
         Box::new(Self {
             name: "AppLauncherPlugin".to_string(),
+            // TODO load these from config
             paths: vec![
                 "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
-                "E:\\Scripts".to_string(),
                 "C:\\Users\\amr\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu".to_string(),
                 "C:\\Users\\amr\\Desktop".to_string(),
                 "D:\\Games".to_string(),
@@ -40,7 +65,7 @@ impl AppLauncherPlugin {
         let mut filtered_entries = Vec::new();
         for path in &self.paths {
             filtered_entries.extend(filter_path_entries_by_extensions(
-                PathBuf::from(path),
+                path::PathBuf::from(path),
                 &self.extensions,
             ));
         }
@@ -48,20 +73,32 @@ impl AppLauncherPlugin {
         self.cached_apps = filtered_entries
             .iter()
             .map(|e| {
-                let path = e.path();
-                let path_str = path.to_str().unwrap_or_default().to_string();
+                let file = e.path();
+
+                let mut cache = dirs_next::home_dir().expect("Failed to get $HOME dir path");
+                cache.push(".kal");
+                cache.push("cache");
+                let _ = fs::create_dir_all(&cache);
+
+                let mut icon = cache.clone();
+                icon.push(file.file_stem().unwrap_or_default());
+                icon.set_extension("png");
+
+                let _ = platform::extract_png(&file, &icon);
+
+                let app_name = file
+                    .file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned();
+                let path = file.to_string_lossy().into_owned();
                 SearchResultItem {
-                    primary_text: path
-                        .file_stem()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or_default()
-                        .to_string(),
-                    secondary_text: path_str.clone(),
-                    execution_args: vec![path_str],
+                    primary_text: app_name,
+                    secondary_text: path.clone(),
+                    execution_args: vec![path],
                     plugin_name: self.name.clone(),
                     icon: Icon {
-                        value: "dmmy.png".into(),
+                        data: icon.to_string_lossy().into_owned(),
                         r#type: IconType::Path,
                     },
                 }
@@ -73,31 +110,19 @@ impl AppLauncherPlugin {
     }
 
     pub fn execute(&self, item: &SearchResultItem) {
-        #[cfg(target_os = "windows")]
-        {
-            use std::ptr::null;
-            use windows_sys::Win32::UI::Shell::ShellExecuteW;
-            const SW_SHOWNORMAL: u32 = 1u32;
-            unsafe {
-                ShellExecuteW(
-                    null::<isize>() as _,
-                    null(),
-                    encode_wide(&item.execution_args[0]).as_ptr(),
-                    null(),
-                    null(),
-                    SW_SHOWNORMAL as _,
-                )
-            };
-        }
+        platform::execute(item);
     }
 }
 
-fn filter_path_entries_by_extensions(path: PathBuf, extensions: &Vec<String>) -> Vec<DirEntry> {
+fn filter_path_entries_by_extensions<P: AsRef<path::Path>>(
+    path: P,
+    extensions: &Vec<String>,
+) -> Vec<fs::DirEntry> {
     let mut filtered = Vec::new();
     if let Ok(entries) = fs::read_dir(path) {
         let entries = entries
-            .filter_map(|e| if e.is_ok() { Some(e.unwrap()) } else { None })
-            .collect::<Vec<DirEntry>>();
+            .filter_map(|e| if let Ok(e) = e { Some(e) } else { None })
+            .collect::<Vec<fs::DirEntry>>();
         for entry in entries {
             if let Ok(metadata) = entry.metadata() {
                 if metadata.is_file() {
@@ -106,9 +131,8 @@ fn filter_path_entries_by_extensions(path: PathBuf, extensions: &Vec<String>) ->
                             .path()
                             .extension()
                             .unwrap_or_default()
-                            .to_str()
-                            .unwrap_or_default()
-                            .to_string(),
+                            .to_string_lossy()
+                            .into_owned(),
                     ) {
                         filtered.push(entry);
                     }
@@ -122,29 +146,4 @@ fn filter_path_entries_by_extensions(path: PathBuf, extensions: &Vec<String>) ->
     }
 
     filtered
-}
-
-#[cfg(target_os = "windows")]
-fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
-    std::os::windows::prelude::OsStrExt::encode_wide(string.as_ref())
-        .chain(std::iter::once(0))
-        .collect()
-}
-
-impl Plugin for AppLauncherPlugin {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn refresh(&mut self) {
-        self.refresh()
-    }
-
-    fn results(&self, query: &str) -> &[SearchResultItem] {
-        self.results(query)
-    }
-
-    fn execute(&self, item: &SearchResultItem) {
-        self.execute(item)
-    }
 }

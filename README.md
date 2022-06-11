@@ -16,3 +16,7 @@ Keyboard-driven app launcher and productivity tool..
 - Run `.scripts/setup.ps1` or `.scripts/setup.sh` to setup the project.
 - Run `.scripts/dev.ps1` or `.scripts/dev.sh` to start development.
 - Run `.scripts/build.ps1` or `.scripts/build.sh` to build the app.
+
+## LICENSE
+
+[MIT](./LICENSE) License

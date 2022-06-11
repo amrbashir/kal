@@ -6,7 +6,7 @@ mod plugin;
 mod plugins;
 
 use common_types::{IPCEvent, SearchResultItem};
-use config::{Config, CONFIG_FILE_NAME};
+use config::Config;
 use fuzzy_sort::fuzzy_sort;
 use plugin::Plugin;
 use plugins::app_launcher::AppLauncherPlugin;
@@ -27,7 +27,7 @@ use wry::{
 #[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "dist"]
-struct Asset;
+struct EmbededAsset;
 
 struct AppState {
     main_window: WebView,
@@ -55,18 +55,16 @@ enum WebviewEvent {
 }
 
 fn main() {
-    let mut config_path = dirs_next::home_dir().expect("Failed to get $HOME dir path");
-    config_path.push(".kal");
-    config_path.push(CONFIG_FILE_NAME);
-    let config = Config::load_from_path(config_path);
+    let config = Config::load();
 
     let event_loop = EventLoop::<AppEvent>::with_user_event();
 
-    let monitor = event_loop
-        .primary_monitor()
-        .expect("Failed to get primary monitor");
-    let (m_size, m_pos) = (monitor.size(), monitor.position());
-
+    let (m_size, m_pos) = {
+        let monitor = event_loop
+            .primary_monitor()
+            .expect("Failed to get primary monitor");
+        (monitor.size(), monitor.position())
+    };
     let main_window = create_webview_window(
         "/main-window",
         config.window_width,
@@ -80,7 +78,13 @@ fn main() {
         true,
         &event_loop,
     );
-    // disable minimize animation on Windows, so it can feel snappy when hiding or showing it.
+    // disable minimize animation on Windows so that hiding or showing the main window can feel snappy.
+    //
+    // why minimize the window in the first place?
+    // on Windows, minimizing the main window before hiding it,
+    // serves as a wrokaround to retsore focus correctly to the previous window.
+    //
+    // TODO: save last focused window before showing the window, and return focus on exiting
     #[cfg(target_os = "windows")]
     {
         use windows_sys::Win32::Graphics::Dwm::{
@@ -109,38 +113,33 @@ fn main() {
     }
 
     event_loop.run(move |event, _, control_flow| match event {
-        Event::DeviceEvent { event, .. } => match event {
-            DeviceEvent::Key(k) => {
-                let mut app_state = app_state.borrow_mut();
-                if k.physical_key.to_string() == config.hotkey.0 {
-                    app_state.modifier_pressed = if k.state == ElementState::Pressed {
-                        true
-                    } else {
-                        false
-                    };
-                }
+        Event::DeviceEvent {
+            event: DeviceEvent::Key(k),
+            ..
+        } => {
+            let mut app_state = app_state.borrow_mut();
+            if k.physical_key.to_string() == config.hotkey.0 {
+                app_state.modifier_pressed = k.state == ElementState::Pressed;
+            }
 
-                if k.physical_key.to_string() == config.hotkey.1
-                    && k.state == ElementState::Pressed
-                    && app_state.modifier_pressed
-                {
-                    let main_window = app_state.main_window.window();
-                    if main_window.is_visible() {
-                        // minimize before hiding to return focus to previous window
-                        #[cfg(target_os = "windows")]
-                        main_window.set_minimized(true);
-                        main_window.set_visible(false);
-                    } else {
-                        main_window.set_visible(true);
-                        #[cfg(target_os = "windows")]
-                        main_window.set_minimized(false);
-                        main_window.set_focus();
-                        emit_event(&app_state.main_window, IPCEvent::FocusInput.into(), &"");
-                    }
+            if k.physical_key.to_string() == config.hotkey.1
+                && k.state == ElementState::Pressed
+                && app_state.modifier_pressed
+            {
+                let main_window = app_state.main_window.window();
+                if main_window.is_visible() {
+                    #[cfg(target_os = "windows")]
+                    main_window.set_minimized(true);
+                    main_window.set_visible(false);
+                } else {
+                    main_window.set_visible(true);
+                    #[cfg(target_os = "windows")]
+                    main_window.set_minimized(false);
+                    main_window.set_focus();
+                    emit_event(&app_state.main_window, IPCEvent::FocusInput.into(), &"");
                 }
             }
-            _ => {}
-        },
+        }
         #[allow(unused)]
         Event::WindowEvent {
             event, window_id, ..
@@ -223,7 +222,7 @@ fn main() {
                             .filter(|p| p.name() == item.plugin_name)
                             .collect::<Vec<&Box<dyn Plugin>>>()
                             .first()
-                            .expect(format!("Failed to find  {}!", item.plugin_name).as_str())
+                            .unwrap_or_else(|| panic!("Failed to find  {}!", item.plugin_name))
                             .execute(item);
                     }
                     IPCEvent::ClearResults => {
@@ -317,7 +316,7 @@ fn create_webview_window(
     let window = window_builder
         .with_transparent(transparent)
         .build(event_loop)
-        .expect(format!("Failed to build {} window!", url).as_str());
+        .unwrap_or_else(|_| panic!("Failed to build {} window!", url));
 
     let proxy = event_loop.create_proxy();
     #[allow(unused_mut)]
@@ -385,8 +384,8 @@ fn create_webview_window(
     {
         webview_builder = webview_builder.with_custom_protocol("kal".into(), move |request| {
             let path = request.uri().replace("kal://localhost/", "");
-            let data = Asset::get(&path)
-                .unwrap_or_else(|| Asset::get("index.html").unwrap())
+            let data = EmbededAsset::get(&path)
+                .unwrap_or_else(|| EmbededAsset::get("index.html").unwrap())
                 .data;
             let mimetype = match std::path::PathBuf::from(path)
                 .extension()
@@ -410,7 +409,7 @@ fn create_webview_window(
     }
     let webview = webview_builder
         .build()
-        .expect(format!("Failed to build {} webview", url).as_str());
+        .unwrap_or_else(|_| panic!("Failed to build {} webview", url));
 
     #[cfg(target_os = "windows")]
     {

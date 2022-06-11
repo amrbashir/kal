@@ -47,7 +47,9 @@ const MainWindow: Component = () => {
 
   onMount(() => {
     window.KAL.ipc.on(IPCEvent.FocusInput, () => {
-      document.getElementById("search-input").focus();
+      let input = document.getElementById("search-input");
+      input.focus();
+      (input as HTMLInputElement).select();
     });
 
     window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) =>
@@ -99,11 +101,11 @@ const MainWindow: Component = () => {
                   class="search-results_item_left"
                   innerHTML={
                     result.icon.type === IconType.Svg
-                      ? result.icon.value
+                      ? result.icon.data
                       : result.icon.type === IconType.Path
                       ? `<img src="${convertFileSrc(
                           "kalasset",
-                          result.icon.value
+                          result.icon.data
                         )}" >`
                       : //  TODO: use a default icon
                         ""
@@ -123,10 +125,10 @@ const MainWindow: Component = () => {
         {
           /* css */ `
             :root {
-              --bg: #1f1f1f;
-              --accent: red;
-              --text-primary: #ffffff;
-              --text-secondary: #6b6b6b;
+              --primary: rgba(31, 31, 31, 0.8);
+              --accent: rgba(72, 141, 210, 0.5);
+              --text-primary: rgba(255, 255, 255);
+              --text-secondary: rgb(107, 107, 107);
             }
 
             main {
@@ -137,7 +139,7 @@ const MainWindow: Component = () => {
 
             #search-input_container {
               appearance: none;
-              background-color: var(--bg);
+              background-color: var(--primary);
               width: 100%;
               height: 60px;
               border-radius: 10px 10px
@@ -170,7 +172,7 @@ const MainWindow: Component = () => {
 
             #search-results_container {
               overflow-x: hidden;
-              background-color: var(--bg);
+              background-color: var(--primary);
               width: 100%;
               height: 400px;
               border-radius: 0 0 10px 10px;

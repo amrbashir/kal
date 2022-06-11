@@ -26,6 +26,13 @@ impl Default for Config {
 }
 
 impl Config {
+    pub fn load() -> Config {
+        let mut path = dirs_next::home_dir().expect("Failed to get $HOME dir path");
+        path.push(".kal");
+        path.push(CONFIG_FILE_NAME);
+        Self::load_from_path(path)
+    }
+
     pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> Config {
         let path = path.as_ref();
         let config;
@@ -35,12 +42,12 @@ impl Config {
                 serde_json::from_str::<Config>(&config_json).expect("Failed to deserialize config");
         } else {
             config = Config::default();
-            fs::create_dir_all(path.parent().expect("Failed to get config file parent di."))
-                .expect("Failed to create config parent di.");
+            fs::create_dir_all(path.parent().expect("Failed to get config file parent dir"))
+                .expect("Failed to create config parent dir");
             fs::write(
                 path,
                 serde_json::to_string(&config)
-                    .expect("Failed to serialize Confi.")
+                    .expect("Failed to serialize Config")
                     .as_bytes(),
             )
             .expect("Failed to save default config File");

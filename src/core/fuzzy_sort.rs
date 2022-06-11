@@ -1,7 +1,7 @@
 use crate::common_types::SearchResultItem;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
-pub fn fuzzy_sort<'a>(query: &str, items: Vec<SearchResultItem>) -> Vec<SearchResultItem> {
+pub fn fuzzy_sort(query: &str, items: Vec<SearchResultItem>) -> Vec<SearchResultItem> {
     let matcher = SkimMatcherV2::default();
     let mut sorted_items = Vec::new();
     for item in items {
