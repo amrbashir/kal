@@ -1,5 +1,6 @@
 use crate::{
     common_types::{Icon, IconType, SearchResultItem},
+    plugin::impl_plugin,
     plugin::Plugin,
 };
 use std::{fs, path};
@@ -21,27 +22,7 @@ pub struct AppLauncherPlugin {
     cached_apps: Vec<SearchResultItem>,
 }
 
-impl Plugin for AppLauncherPlugin {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn refresh(&mut self) {
-        self.refresh()
-    }
-
-    fn results(&self, query: &str) -> &[SearchResultItem] {
-        self.results(query)
-    }
-
-    fn execute(&self, item: &SearchResultItem, elevated: bool) {
-        self.execute(item, elevated)
-    }
-
-    fn open_location(&self, item: &SearchResultItem) {
-        self.open_location(item);
-    }
-}
+impl_plugin!(AppLauncherPlugin);
 
 impl AppLauncherPlugin {
     pub fn new() -> Box<Self> {
@@ -64,6 +45,9 @@ impl AppLauncherPlugin {
             ],
             cached_apps: Vec::new(),
         })
+    }
+    pub fn name(&self) -> &str {
+        &self.name
     }
     pub fn refresh(&mut self) {
         let mut filtered_entries = Vec::new();
