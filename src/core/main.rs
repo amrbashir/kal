@@ -226,6 +226,29 @@ fn main() {
                             .first()
                             .unwrap_or_else(|| panic!("Failed to find  {}!", item.plugin_name))
                             .execute(item, elevated);
+                        let main_window = app_state.main_window.window();
+                        #[cfg(target_os = "windows")]
+                        main_window.set_minimized(true);
+                        main_window.set_visible(false);
+                    }
+                    IPCEvent::OpenLocation => {
+                        let index = serde_json::from_str::<Vec<usize>>(payload).unwrap()[0];
+
+                        let app_state = app_state.borrow();
+                        let item = &app_state.current_results[index];
+
+                        app_state
+                            .plugins
+                            .iter()
+                            .filter(|p| p.name() == item.plugin_name)
+                            .collect::<Vec<&Box<dyn Plugin>>>()
+                            .first()
+                            .unwrap_or_else(|| panic!("Failed to find  {}!", item.plugin_name))
+                            .open_location(item);
+                        let main_window = app_state.main_window.window();
+                        #[cfg(target_os = "windows")]
+                        main_window.set_minimized(true);
+                        main_window.set_visible(false);
                     }
                     IPCEvent::ClearResults => {
                         let mut app_state = app_state.borrow_mut();

@@ -15,6 +15,11 @@ const MainWindow: Component = () => {
   }
 
   function onkeydown(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      window.KAL.ipc.send(IPCEvent.HideMainWindow);
+    }
+
     if (["ArrowDown", "ArrowUp"].includes(e.key)) {
       e.preventDefault();
       if (e.key === "ArrowDown") {
@@ -37,11 +42,13 @@ const MainWindow: Component = () => {
     }
 
     if (e.key === "Enter") {
+      e.preventDefault();
       window.KAL.ipc.send(IPCEvent.Execute, currentSelection(), e.shiftKey);
     }
 
-    if (e.key === "Escape") {
-      window.KAL.ipc.send(IPCEvent.HideMainWindow);
+    if (e.key === "o" && e.ctrlKey) {
+      e.preventDefault();
+      window.KAL.ipc.send(IPCEvent.OpenLocation, currentSelection());
     }
   }
 
@@ -52,9 +59,10 @@ const MainWindow: Component = () => {
       (input as HTMLInputElement).select();
     });
 
-    window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) =>
-      setResults(payload)
-    );
+    window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
+      setCurrentSelection(0);
+      setResults(payload);
+    });
   });
 
   return (

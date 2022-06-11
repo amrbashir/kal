@@ -37,6 +37,10 @@ impl Plugin for AppLauncherPlugin {
     fn execute(&self, item: &SearchResultItem, elevated: bool) {
         self.execute(item, elevated)
     }
+
+    fn open_location(&self, item: &SearchResultItem) {
+        self.open_location(item);
+    }
 }
 
 impl AppLauncherPlugin {
@@ -111,6 +115,10 @@ impl AppLauncherPlugin {
 
     pub fn execute(&self, item: &SearchResultItem, elevated: bool) {
         platform::execute(item, elevated);
+    }
+
+    pub fn open_location(&self, item: &SearchResultItem) {
+        platform::open_location(item);
     }
 }
 
