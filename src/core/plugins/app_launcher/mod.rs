@@ -1,51 +1,62 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     common_types::{Icon, IconType, SearchResultItem},
+    config::Config,
     plugin::impl_plugin,
-    plugin::Plugin,
 };
 use std::{fs, path};
 
 #[cfg(target_os = "windows")]
 #[path = "windows.rs"]
 mod platform;
-#[cfg(target_os = "linux")]
-#[path = "linux.rs"]
-mod platform;
-#[path = "macos.rs"]
-#[cfg(target_os = "macos")]
-mod platform;
 
 pub struct AppLauncherPlugin {
     name: String,
+    enabled: bool,
     paths: Vec<String>,
     extensions: Vec<String>,
     cached_apps: Vec<SearchResultItem>,
 }
 
+#[derive(Serialize, Deserialize)]
+struct AppLauncherPluginConfig {
+    enabled: bool,
+    paths: Vec<String>,
+    extensions: Vec<String>,
+}
+
+impl Default for AppLauncherPluginConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            paths: Default::default(),
+            extensions: Default::default(),
+        }
+    }
+}
+
 impl_plugin!(AppLauncherPlugin);
 
 impl AppLauncherPlugin {
-    pub fn new() -> Box<Self> {
+    pub fn new(config: &Config) -> Box<Self> {
+        let name = "AppLauncher".to_string();
+        let config = config
+            .plugin_config::<AppLauncherPluginConfig>(&name)
+            .unwrap_or_default();
         Box::new(Self {
-            name: "AppLauncherPlugin".to_string(),
-            // TODO load these from config
-            paths: vec![
-                "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
-                "C:\\Users\\amr\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu".to_string(),
-                "C:\\Users\\amr\\Desktop".to_string(),
-                "D:\\Games".to_string(),
-            ],
-            extensions: vec![
-                "lnk".to_string(),
-                "appref-ms".to_string(),
-                "exe".to_string(),
-                "cmd".to_string(),
-                "bat".to_string(),
-                "py".to_string(),
-            ],
+            name,
+            enabled: config.enabled,
+            paths: config.paths,
+            extensions: config.extensions,
             cached_apps: Vec::new(),
         })
     }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
     pub fn name(&self) -> &str {
         &self.name
     }

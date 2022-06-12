@@ -67,14 +67,14 @@ fn main() {
     };
     let main_window = create_webview_window(
         "/main-window",
-        config.window_width,
-        config.input_height,
-        m_pos.x + (m_size.width as i32 / 2 - config.window_width as i32 / 2),
+        config.appearance.window_width,
+        config.appearance.input_height,
+        m_pos.x + (m_size.width as i32 / 2 - config.appearance.window_width as i32 / 2),
         m_pos.y + (m_size.height as i32 / 4),
         false,
         false,
         false,
-        true,
+        config.appearance.transparent,
         true,
         &event_loop,
     );
@@ -103,7 +103,7 @@ fn main() {
 
     let app_state = std::cell::RefCell::new(AppState {
         main_window,
-        plugins: vec![AppLauncherPlugin::new()],
+        plugins: vec![AppLauncherPlugin::new(&config)],
         current_results: Vec::new(),
         modifier_pressed: false,
     });
@@ -118,11 +118,12 @@ fn main() {
             ..
         } => {
             let mut app_state = app_state.borrow_mut();
-            if k.physical_key.to_string() == config.hotkey.0 {
+            let (modifier, key) = &config.general.hotkey;
+            if &k.physical_key.to_string() == modifier {
                 app_state.modifier_pressed = k.state == ElementState::Pressed;
             }
 
-            if k.physical_key.to_string() == config.hotkey.1
+            if &k.physical_key.to_string() == key
                 && k.state == ElementState::Pressed
                 && app_state.modifier_pressed
             {
@@ -183,32 +184,41 @@ fn main() {
                         let mut app_state = app_state.borrow_mut();
 
                         let mut results = Vec::new();
-                        for plugin in &app_state.plugins {
+                        for plugin in app_state.plugins.iter().filter(|p| p.enabled()) {
                             results.extend_from_slice(plugin.results(query));
                         }
 
-                        let sorted_results = fuzzy_sort(query, results);
+                        fuzzy_sort!(results, primary_text, query);
+                        let max_results =
+                            if results.len() <= config.general.max_search_results as usize {
+                                &results
+                            } else {
+                                &results[0..config.general.max_search_results as usize]
+                            };
 
                         emit_event(
                             &app_state.main_window,
                             IPCEvent::Results.into(),
-                            &sorted_results,
+                            &max_results,
                         );
 
-                        let requested_height =
-                            sorted_results.len() as u32 * config.results_item_height;
-                        let new_height = if requested_height >= config.results_height {
-                            config.results_height
+                        let results_height =
+                            max_results.len() as u32 * config.appearance.results_item_height;
+                        let new_height = if results_height >= config.appearance.results_height {
+                            config.appearance.results_height
                         } else {
-                            requested_height
+                            results_height
                         };
                         app_state
                             .main_window
                             .window()
-                            .set_inner_size(LogicalSize::new(config.window_width, new_height));
+                            .set_inner_size(LogicalSize::new(
+                                config.appearance.window_width,
+                                new_height + config.appearance.input_height,
+                            ));
                         let _ = app_state.main_window.resize();
 
-                        app_state.current_results = sorted_results;
+                        app_state.current_results = results;
                     }
                     IPCEvent::Execute => {
                         let args = serde_json::from_str::<(usize, bool)>(payload).unwrap();
@@ -256,8 +266,8 @@ fn main() {
                             .main_window
                             .window()
                             .set_inner_size(LogicalSize::new(
-                                config.window_width,
-                                config.input_height,
+                                config.appearance.window_width,
+                                config.appearance.input_height,
                             ));
                         let _ = app_state.main_window.resize();
                         app_state.current_results = Vec::new();
