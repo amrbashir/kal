@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fs, path};
 
-pub const CONFIG_FILE_NAME: &str = "kal.conf.json";
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub general: GeneralConfig,
@@ -48,6 +46,8 @@ impl Default for Config {
     }
 }
 
+const CONFIG_FILE_NAME: &str = "kal.conf.json";
+
 impl Config {
     /// Loads the config from the conventional location `$HOME/.kal/kal.conf.json`
     pub fn load() -> Config {
@@ -57,7 +57,7 @@ impl Config {
         Self::load_from_path(path)
     }
 
-    /// Loads the config from path
+    /// Loads the config from a path
     pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> Config {
         let path = path.as_ref();
         let config;

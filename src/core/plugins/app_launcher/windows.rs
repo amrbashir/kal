@@ -41,6 +41,39 @@ fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(iter::once(0)).collect()
 }
 
-pub fn extract_png<P: AsRef<path::Path>>(_src: &P, _out: &P) -> std::io::Result<()> {
+pub fn extract_png<P: AsRef<path::Path>>(src: &P, out: &P) -> std::io::Result<()> {
+    // TODO: use win32 apis
+    std::process::Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+        .args([
+            "-Command",
+            &format!(
+                r#"
+              Add-Type -AssemblyName System.Drawing;
+              $Shell = New-Object -ComObject WScript.Shell;
+              $src = "{}";
+              $out = "{}";
+              try {{
+                $path = $Shell.CreateShortcut($src).TargetPath;
+                if ((Test-Path -Path $path -PathType Container) -or ($path -match '.url$')) {{
+                  $path = $src;
+                }}
+              }} catch {{
+                $path = $src;
+              }}
+              $icon = $null;
+              try {{
+                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path);
+              }} catch {{
+                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($src);
+              }}
+              if ($icon -ne $null) {{
+                $i = $icon.ToBitmap().Save($out, [System.Drawing.Imaging.ImageFormat]::Png);
+              }}
+            "#,
+                &src.as_ref().to_string_lossy(),
+                &out.as_ref().to_string_lossy()
+            ),
+        ])
+        .spawn()?;
     Ok(())
 }
