@@ -1,12 +1,12 @@
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{collections::HashMap, fs, path};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
-    pub plugins: HashMap<String, Value>,
+    pub plugins: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -15,7 +15,7 @@ pub struct GeneralConfig {
     pub hotkey: (String, String),
     /// A vector of glob patterns
     pub blacklist: Vec<String>,
-    pub max_search_results: u8,
+    pub max_search_results: u32,
 }
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AppearanceConfig {
@@ -50,35 +50,30 @@ const CONFIG_FILE_NAME: &str = "kal.conf.json";
 
 impl Config {
     /// Loads the config from the conventional location `$HOME/.kal/kal.conf.json`
-    pub fn load() -> Config {
-        let mut path = dirs_next::home_dir().expect("Failed to get $HOME dir path");
+    pub fn load() -> Result<Config> {
+        let mut path = dirs_next::home_dir().context("Failed to get $HOME dir path")?;
         path.push(".kal");
         path.push(CONFIG_FILE_NAME);
         Self::load_from_path(path)
     }
 
     /// Loads the config from a path
-    pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> Config {
+    pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> Result<Config> {
         let path = path.as_ref();
         let config;
         if path.exists() {
-            let config_json = fs::read_to_string(path).expect("Failed to read config file content");
-            config =
-                serde_json::from_str::<Config>(&config_json).expect("Failed to deserialize config");
+            let config_json = fs::read_to_string(path)?;
+            config = serde_json::from_str::<Config>(&config_json)?;
         } else {
             config = Config::default();
-            fs::create_dir_all(path.parent().expect("Failed to get config file parent dir"))
-                .expect("Failed to create config parent dir");
-            fs::write(
-                path,
-                serde_json::to_string_pretty(&config)
-                    .expect("Failed to serialize Config")
-                    .as_bytes(),
-            )
-            .expect("Failed to save default config File");
+            fs::create_dir_all(
+                path.parent()
+                    .context("Failed to get config file parent dir")?,
+            )?;
+            fs::write(path, serde_json::to_string_pretty(&config)?.as_bytes())?;
         }
 
-        config
+        Ok(config)
     }
 
     /// Gets the specified plugin config

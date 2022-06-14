@@ -1,10 +1,9 @@
-use serde::{Deserialize, Serialize};
-
 use crate::{
     common_types::{Icon, IconType, SearchResultItem},
     config::Config,
     plugin::impl_plugin,
 };
+use serde::{Deserialize, Serialize};
 use std::{fs, path};
 
 #[cfg(target_os = "windows")]

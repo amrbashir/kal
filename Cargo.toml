@@ -22,6 +22,7 @@ fuzzy-matcher = "0.3"
 dirs-next = "2.0"
 percent-encoding = "2.1"
 dunce = "1.0"
+anyhow = "1.0.57"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 webview2-com = "0.13"
