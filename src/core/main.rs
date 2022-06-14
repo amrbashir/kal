@@ -160,6 +160,12 @@ fn main() -> anyhow::Result<()> {
 
                         app_state.current_results = Vec::new();
                     }
+                    IPCEvent::Refresh => {
+                        let mut app_state = app_state.borrow_mut();
+                        for plugin in &mut app_state.plugins {
+                            plugin.refresh();
+                        }
+                    }
                     IPCEvent::HideMainWindow => {
                         hide_main_window(&app_state.borrow(), true);
                     }

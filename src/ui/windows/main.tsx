@@ -50,6 +50,11 @@ const MainWindow: Component = () => {
       e.preventDefault();
       window.KAL.ipc.send(IPCEvent.OpenLocation, currentSelection());
     }
+
+    if (e.key === "r" && e.ctrlKey) {
+      e.preventDefault();
+      window.KAL.ipc.send(IPCEvent.Refresh);
+    }
   }
 
   onMount(() => {
