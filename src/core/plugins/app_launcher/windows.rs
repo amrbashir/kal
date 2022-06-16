@@ -1,4 +1,4 @@
-use crate::common_types::SearchResultItem;
+use crate::common::SearchResultItem;
 use std::{iter, os::windows::prelude::OsStrExt, path, ptr};
 
 pub fn execute(item: &SearchResultItem, elevated: bool) {

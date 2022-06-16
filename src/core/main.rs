@@ -1,4 +1,4 @@
-use common_types::{IPCEvent, SearchResultItem};
+use common::{IPCEvent, SearchResultItem};
 use config::Config;
 use event::{emit_event, AppEvent, ThreadEvent, WebviewEvent, INIT_SCRIPT};
 use fuzzy_sort::fuzzy_sort;
@@ -18,8 +18,8 @@ use wry::application::{
 };
 use wry::webview::WebViewAttributes;
 
-#[path = "../common_types/mod.rs"]
-mod common_types;
+#[path = "../common/mod.rs"]
+mod common;
 mod config;
 mod event;
 mod fuzzy_sort;

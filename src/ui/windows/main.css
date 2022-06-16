@@ -44,10 +44,10 @@ main {
 }
 
 #refreshing_icon-container {
-  transition: opacity 1s;
+  transition: opacity 500ms;
 }
 
-#rerfeshing_icon {
+#refreshing_icon {
   animation: rotation 1s infinite linear;
 }
 

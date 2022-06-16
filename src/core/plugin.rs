@@ -1,4 +1,4 @@
-use crate::common_types::SearchResultItem;
+use crate::common::SearchResultItem;
 
 pub trait Plugin {
     /// Gets the name of the plugin.

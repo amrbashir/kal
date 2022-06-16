@@ -1,5 +1,5 @@
 use crate::{
-    common_types::{Icon, IconType, SearchResultItem},
+    common::{Icon, IconType, SearchResultItem},
     config::Config,
     plugin::impl_plugin,
 };

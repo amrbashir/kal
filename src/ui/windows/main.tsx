@@ -1,12 +1,14 @@
 import { Component, createSignal, For, JSX, onMount } from "solid-js";
-import { Icon, IconType, IPCEvent, SearchResultItem } from "../../common_types";
+import { Icon, IconType, IPCEvent, SearchResultItem } from "../../common";
 import "./main.css";
 
 const MainWindow: Component = () => {
+  // state
   const [currentSelection, setCurrentSelection] = createSignal(0);
   const [results, setResults] = createSignal<SearchResultItem[]>([]);
-  const [refreshingIndex, setRefreshingIndex] = createSignal<boolean>(false);
+  const [refreshingIndex, setRefreshingIndex] = createSignal(false);
 
+  // handlers
   function search(query: string) {
     if (query) {
       window.KAL.ipc.send(IPCEvent.Search, query);
@@ -132,6 +134,14 @@ const MainWindow: Component = () => {
 
 export default MainWindow;
 
+// utils
+function convertFileSrc(protocol: string, filePath: string): string {
+  const path = encodeURIComponent(filePath);
+  return navigator.userAgent.includes("Windows")
+    ? `https://${protocol}.localhost/${path}`
+    : `${protocol}://${path}`;
+}
+
 function getIconHtml(icon: Icon): string {
   switch (icon.type) {
     case IconType.Path:
@@ -143,16 +153,7 @@ function getIconHtml(icon: Icon): string {
   }
 }
 
-function convertFileSrc(protocol: string, filePath: string): string {
-  const path = encodeURIComponent(filePath);
-  return navigator.userAgent.includes("Windows")
-    ? `https://${protocol}.localhost/${path}`
-    : `${protocol}://${path}`;
-}
-
-const SearchIcon: Component<
-  JSX.HTMLAttributes<JSX.IntrinsicElements["svg"]>
-> = (props) => (
+const SearchIcon: Component<JSX.HTMLAttributes<HTMLElement>> = (props) => (
   <svg
     id={props.id}
     style={props.style}
@@ -173,9 +174,7 @@ const SearchIcon: Component<
   </svg>
 );
 
-const RefreshingIcon: Component<
-  JSX.HTMLAttributes<JSX.IntrinsicElements["svg"]>
-> = (props) => (
+const RefreshingIcon: Component<JSX.HTMLAttributes<HTMLElement>> = (props) => (
   <svg
     id={props.id}
     style={props.style}
