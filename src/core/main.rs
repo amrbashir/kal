@@ -1,3 +1,23 @@
+use common_types::{IPCEvent, SearchResultItem};
+use config::Config;
+use event::{emit_event, AppEvent, ThreadEvent, WebviewEvent, INIT_SCRIPT};
+use fuzzy_sort::fuzzy_sort;
+use plugin::Plugin;
+use plugins::app_launcher::AppLauncherPlugin;
+#[cfg(not(debug_assertions))]
+use rust_embed::RustEmbed;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use webview_window::WebviewWindow;
+use wry::application::event_loop::EventLoopProxy;
+use wry::application::window::WindowAttributes;
+use wry::application::{
+    dpi::{LogicalPosition, LogicalSize},
+    event::{DeviceEvent, ElementState, Event, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+};
+use wry::webview::WebViewAttributes;
+
 #[path = "../common_types/mod.rs"]
 mod common_types;
 mod config;
@@ -7,56 +27,44 @@ mod plugin;
 mod plugins;
 mod webview_window;
 
-use common_types::{IPCEvent, SearchResultItem};
-use config::Config;
-use event::{emit_event, AppEvent, WebviewEvent, INIT_SCRIPT};
-use fuzzy_sort::fuzzy_sort;
-use plugin::Plugin;
-use plugins::app_launcher::AppLauncherPlugin;
-#[cfg(not(debug_assertions))]
-use rust_embed::RustEmbed;
-use webview_window::WebviewWindow;
-use wry::application::window::WindowAttributes;
-use wry::application::{
-    dpi::{LogicalPosition, LogicalSize},
-    event::{DeviceEvent, ElementState, Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-};
-use wry::webview::WebViewAttributes;
-
 #[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "dist"]
 pub(crate) struct EmbededAsset;
 
-struct AppState {
+struct AppState<T: 'static> {
     main_window: WebviewWindow,
     #[cfg(target_os = "windows")]
     previously_foreground_hwnd: windows_sys::Win32::Foundation::HWND,
-    plugins: Vec<Box<dyn Plugin>>,
+    plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
     current_results: Vec<SearchResultItem>,
     modifier_pressed: bool,
+    proxy: EventLoopProxy<T>,
 }
 
 fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
-    let plugins: Vec<Box<dyn Plugin>> = vec![AppLauncherPlugin::new(&config)];
+    let plugins: Vec<Box<dyn Plugin + Send + 'static>> = vec![AppLauncherPlugin::new(&config)];
     let event_loop = EventLoop::<AppEvent>::with_user_event();
     let main_window = create_main_window(&config, &event_loop)?;
     let app_state = std::cell::RefCell::new(AppState {
         main_window,
         #[cfg(target_os = "windows")]
         previously_foreground_hwnd: 0,
-        plugins,
+        plugins: Arc::new(Mutex::new(plugins)),
         current_results: Default::default(),
         modifier_pressed: false,
+        proxy: event_loop.create_proxy(),
     });
 
-    for plugin in &mut app_state.borrow_mut().plugins {
-        plugin.refresh();
-    }
+    let plugins = app_state.borrow_mut().plugins.clone();
+    thread::spawn(move || {
+        for plugin in plugins.lock().unwrap().iter_mut() {
+            plugin.refresh();
+        }
+    });
 
-    event_loop.run(move |event, _, control_flow| match event {
+    event_loop.run(move |event, _event_loop, control_flow| match event {
         // handle hotkey
         Event::DeviceEvent {
             event: DeviceEvent::Key(k),
@@ -73,18 +81,15 @@ fn main() -> anyhow::Result<()> {
                 && k.state == ElementState::Pressed
                 && app_state.modifier_pressed
             {
-                #[cfg(target_os = "windows")]
-                {
-                    app_state.previously_foreground_hwnd = unsafe {
-                        windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow()
-                    };
-                }
                 toggle_main_window(&mut app_state);
             }
         }
 
         Event::UserEvent(event) => match event {
-            AppEvent::Ipc(_window_id, request) => {
+            // handle ipc events from the main window
+            AppEvent::Ipc(window_id, request)
+                if window_id == app_state.borrow().main_window.window().id() =>
+            {
                 let r = request.split("::").take(2).collect::<Vec<_>>();
                 let (event, payload): (IPCEvent, &str) = (r[0].into(), r[1]);
 
@@ -95,7 +100,13 @@ fn main() -> anyhow::Result<()> {
                         let query =
                             serde_json::from_str::<Vec<&str>>(payload).unwrap_or_default()[0];
                         let mut results = Vec::new();
-                        for plugin in app_state.plugins.iter().filter(|p| p.enabled()) {
+                        for plugin in app_state
+                            .plugins
+                            .lock()
+                            .unwrap()
+                            .iter()
+                            .filter(|p| p.enabled())
+                        {
                             results.extend_from_slice(plugin.results(query));
                         }
 
@@ -128,9 +139,11 @@ fn main() -> anyhow::Result<()> {
                         let item = &app_state.current_results[index];
                         app_state
                             .plugins
+                            .lock()
+                            .unwrap()
                             .iter()
-                            .filter(|p| p.name() == item.plugin_name)
-                            .collect::<Vec<&Box<dyn Plugin>>>()
+                            .filter(|p| p.name() == item.plugin_name && p.enabled())
+                            .collect::<Vec<&Box<dyn Plugin + Send + 'static>>>()
                             .first()
                             .unwrap_or_else(|| panic!("Failed to find  {}!", item.plugin_name))
                             .execute(item, elevated);
@@ -144,9 +157,11 @@ fn main() -> anyhow::Result<()> {
                         let item = &app_state.current_results[index];
                         app_state
                             .plugins
+                            .lock()
+                            .unwrap()
                             .iter()
                             .filter(|p| p.name() == item.plugin_name)
-                            .collect::<Vec<&Box<dyn Plugin>>>()
+                            .collect::<Vec<&Box<dyn Plugin + Send + 'static>>>()
                             .first()
                             .unwrap_or_else(|| panic!("Failed to find  {}!", item.plugin_name))
                             .open_location(item);
@@ -161,10 +176,18 @@ fn main() -> anyhow::Result<()> {
                         app_state.current_results = Vec::new();
                     }
                     IPCEvent::Refresh => {
-                        let mut app_state = app_state.borrow_mut();
-                        for plugin in &mut app_state.plugins {
-                            plugin.refresh();
-                        }
+                        let app_state = app_state.borrow();
+                        let proxy = app_state.proxy.clone();
+                        let plugins = app_state.plugins.clone();
+                        thread::spawn(move || {
+                            for plugin in plugins.lock().unwrap().iter_mut().filter(|p| p.enabled())
+                            {
+                                plugin.refresh();
+                            }
+                            proxy.send_event(AppEvent::ThreadEvent(
+                                ThreadEvent::RefreshingIndexFinished,
+                            ))
+                        });
                     }
                     IPCEvent::HideMainWindow => {
                         hide_main_window(&app_state.borrow(), true);
@@ -172,6 +195,19 @@ fn main() -> anyhow::Result<()> {
                     _ => {}
                 }
             }
+
+            // handle ipc events from other windows
+            AppEvent::Ipc(_window_id, _event) => {}
+
+            AppEvent::ThreadEvent(event) => match event {
+                ThreadEvent::RefreshingIndexFinished => {
+                    emit_event(
+                        &app_state.borrow().main_window,
+                        IPCEvent::RefreshingIndexFinished.into(),
+                        &"",
+                    );
+                }
+            },
 
             AppEvent::WebviewEvent { event, window_id } => match event {
                 #[cfg(target_os = "windows")]
@@ -213,6 +249,53 @@ fn main() -> anyhow::Result<()> {
 
         _ => {}
     });
+}
+
+fn toggle_main_window<T>(app_state: &mut AppState<T>) {
+    let window = app_state.main_window.window();
+    if window.is_visible() {
+        hide_main_window::<T>(app_state, true);
+    } else {
+        show_main_window(app_state);
+    }
+}
+
+fn show_main_window<T>(app_state: &mut AppState<T>) {
+    #[cfg(target_os = "windows")]
+    {
+        app_state.previously_foreground_hwnd =
+            unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
+    }
+    let main_window = &app_state.main_window;
+    let window = main_window.window();
+    window.set_visible(true);
+    window.set_focus();
+    emit_event(&main_window, IPCEvent::FocusInput.into(), &"");
+}
+
+fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
+    app_state.main_window.window().set_visible(false);
+    #[cfg(target_os = "windows")]
+    {
+        if restore_focus {
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(
+                    app_state.previously_foreground_hwnd,
+                )
+            };
+        }
+    }
+}
+
+fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
+    main_window.window().set_inner_size(LogicalSize::new(
+        config.appearance.window_width,
+        std::cmp::min(
+            count as u32 * config.appearance.results_item_height,
+            config.appearance.results_height,
+        ) + config.appearance.input_height,
+    ));
+    let _ = main_window.resize();
 }
 
 fn create_main_window(
@@ -279,51 +362,4 @@ fn create_main_window(
     main_window.window().set_skip_taskbar(true);
 
     Ok(main_window)
-}
-
-fn toggle_main_window(app_state: &mut AppState) {
-    let window = app_state.main_window.window();
-    if window.is_visible() {
-        hide_main_window(app_state, true);
-    } else {
-        show_main_window(app_state);
-    }
-}
-
-fn show_main_window(app_state: &mut AppState) {
-    #[cfg(target_os = "windows")]
-    {
-        app_state.previously_foreground_hwnd =
-            unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
-    }
-    let main_window = &app_state.main_window;
-    let window = main_window.window();
-    window.set_visible(true);
-    window.set_focus();
-    emit_event(&main_window, IPCEvent::FocusInput.into(), &"");
-}
-
-fn hide_main_window(app_state: &AppState, #[allow(unused)] restore_focus: bool) {
-    app_state.main_window.window().set_visible(false);
-    #[cfg(target_os = "windows")]
-    {
-        if restore_focus {
-            unsafe {
-                windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(
-                    app_state.previously_foreground_hwnd,
-                )
-            };
-        }
-    }
-}
-
-fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
-    main_window.window().set_inner_size(LogicalSize::new(
-        config.appearance.window_width,
-        std::cmp::min(
-            count as u32 * config.appearance.results_item_height,
-            config.appearance.results_height,
-        ) + config.appearance.input_height,
-    ));
-    let _ = main_window.resize();
 }

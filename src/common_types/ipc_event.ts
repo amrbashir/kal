@@ -7,4 +7,5 @@ export enum IPCEvent {
   FocusInput = "focus-input",
   HideMainWindow = "hide-main-window",
   Refresh = "refresh",
+  RefreshingIndexFinished = "refreshing-index-finished",
 }

@@ -4,6 +4,7 @@ import { IconType, IPCEvent, SearchResultItem } from "../../common_types";
 const MainWindow: Component = () => {
   const [currentSelection, setCurrentSelection] = createSignal(0);
   const [results, setResults] = createSignal<SearchResultItem[]>([]);
+  const [refreshingIndex, setRefreshingIndex] = createSignal<boolean>(false);
 
   function search(query: string) {
     if (query) {
@@ -54,6 +55,7 @@ const MainWindow: Component = () => {
     if (e.key === "r" && e.ctrlKey) {
       e.preventDefault();
       window.KAL.ipc.send(IPCEvent.Refresh);
+      setRefreshingIndex(true);
     }
   }
 
@@ -68,30 +70,17 @@ const MainWindow: Component = () => {
       setCurrentSelection(0);
       setResults(payload);
     });
+
+    window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
+      setRefreshingIndex(false);
+    });
   });
 
   return (
     <main>
       <div id="search-input_container">
         <div id="search-input_icon-container">
-          <svg
-            id="search-input_icon"
-            xmlns="http://www.w3.org/2000/svg"
-            width="32px"
-            height="32px"
-            viewBox="0 0 24 24"
-          >
-            <g
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-            >
-              <circle cx="10" cy="10" r="7"></circle>
-              <path d="m21 21l-6-6"></path>
-            </g>
-          </svg>
+          <SearchIcon id="search-input_icon" />
         </div>
         <input
           id="search-input"
@@ -99,6 +88,9 @@ const MainWindow: Component = () => {
           onkeydown={(e) => onkeydown(e)}
           onInput={(e) => search(e.currentTarget.value)}
         />
+        <div id="refreshing_icon-container">
+          <RefreshingIcon id="refreshing_icon" />
+        </div>
       </div>
 
       <div id="search-results_container">
@@ -135,110 +127,131 @@ const MainWindow: Component = () => {
       </div>
 
       <style jsx dynamic>
-        {
-          /* css */ `
-            :root {
-              --primary: rgba(31, 31, 31, 0.8);
-              --accent: rgba(72, 141, 210, 0.5);
-              --text-primary: rgba(255, 255, 255);
-              --text-secondary: rgb(107, 107, 107);
-            }
+        {`
+          :root {
+            --primary: rgba(31, 31, 31, 0.8);
+            --accent: rgba(72, 141, 210, 0.5);
+            --text-primary: rgba(255, 255, 255);
+            --text-secondary: rgb(107, 107, 107);
+          }
 
-            main {
-              overflow: hidden;
-              width: 100vw;
-              height: 100vh;
-            }
+          main {
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+          }
 
-            #search-input_container {
-              appearance: none;
-              background-color: var(--primary);
-              width: 100%;
-              height: 60px;
-              border-radius: 10px 10px
-                ${results().length === 0 ? "10px 10px" : "0 0"};
-              display: flex;
-            }
+          #search-input_container {
+            appearance: none;
+            background-color: var(--primary);
+            width: 100%;
+            height: 60px;
+            border-radius: 10px 10px
+              ${results().length === 0 ? "10px 10px" : "0 0"};
+            display: flex;
+          }
 
-            #search-input {
-              flex-grow: 1;
-              background: transparent;
-              height: 100%;
-              outline: none;
-              border: none;
-              font-size: larger;
-              color: var(--text-primary);
-              padding: 1rem;
-            }
+          #search-input {
+            flex-grow: 1;
+            background: transparent;
+            height: 100%;
+            outline: none;
+            border: none;
+            font-size: larger;
+            color: var(--text-primary);
+            padding: 1rem;
+          }
 
-            #search-input::placeholder {
-              color: var(--text-secondary);
-            }
+          #search-input::placeholder {
+            color: var(--text-secondary);
+          }
 
-            #search-input_icon-container {
-              display: grid;
-              place-items: center;
-              height: 100%;
-              width: 50px;
-              color: var(--text-primary);
-            }
+          #search-input_icon-container,
+          #refreshing_icon-container {
+            display: grid;
+            place-items: center;
+            height: 100%;
+            width: 50px;
+            color: var(--text-primary);
+          }
 
-            #search-results_container {
-              overflow-x: hidden;
-              background-color: var(--primary);
-              width: 100%;
-              height: 400px;
-              border-radius: 0 0 10px 10px;
-            }
+          #refreshing_icon-container {
+            opacity: ${refreshingIndex() ? "1" : "0"};
+            transition: opacity 1s;
+          }
 
-            .search-results_item {
-              overflow: hidden;
-              padding: 0 10px;
-              list-style: none;
-              display: flex;
-              width: 100%;
-              height: 60px;
-            }
-            .search-results_item:hover,
-            .search-results_item.selected {
-              background-color: var(--accent);
-            }
+          #refreshing_icon {
+            animation: ${refreshingIndex()
+              ? "rotation 1s infinite linear"
+              : "unset"};
+          }
 
-            .search-results_item_left {
-              flex-shrink: 0;
-              width: 60px;
-              height: 100%;
-              display: grid;
-              place-items: center;
+          @keyframes rotation {
+            from {
+              transform: rotate(0deg);
             }
+            to {
+              transform: rotate(359deg);
+            }
+          }
 
-            .search-results_item_left > * {
-              width: 50%;
-              height: 50%;
-            }
+          #search-results_container {
+            overflow-x: hidden;
+            background-color: var(--primary);
+            width: 100%;
+            height: 400px;
+            border-radius: 0 0 10px 10px;
+          }
 
-            .search-results_item_right {
-              overflow: hidden;
-              height: 100%;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-            }
+          .search-results_item {
+            overflow: hidden;
+            padding: 0 10px;
+            list-style: none;
+            display: flex;
+            width: 100%;
+            height: 60px;
+          }
 
-            .search-results_item_right span {
-              overflow: hidden;
-              white-space: nowrap;
-              text-overflow: ellipsis;
-            }
-            .text-primary {
-              color: var(--text-primary);
-            }
+          .search-results_item:hover,
+          .search-results_item.selected {
+            background-color: var(--accent);
+          }
 
-            .text-secondary {
-              color: var(--text-secondary);
-            }
-          `
-        }
+          .search-results_item_left {
+            flex-shrink: 0;
+            width: 60px;
+            height: 100%;
+            display: grid;
+            place-items: center;
+          }
+
+          .search-results_item_left > * {
+            width: 50%;
+            height: 50%;
+          }
+
+          .search-results_item_right {
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+
+          .search-results_item_right span {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+          }
+
+          .text-primary {
+            color: var(--text-primary);
+          }
+
+          .text-secondary {
+            color: var(--text-secondary);
+          }
+        `}
       </style>
     </main>
   );
@@ -252,3 +265,37 @@ function convertFileSrc(protocol: string, filePath: string): string {
     ? `https://${protocol}.localhost/${path}`
     : `${protocol}://${path}`;
 }
+
+const SearchIcon: Component<{ id: string }> = (props) => (
+  <svg id={props.id} width="32px" height="32px" viewBox="0 0 24 24">
+    <g
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+    >
+      <circle cx="10" cy="10" r="7"></circle>
+      <path d="m21 21l-6-6"></path>
+    </g>
+  </svg>
+);
+
+const RefreshingIcon: Component<{ id: string }> = (props) => (
+  <svg
+    id={props.id}
+    width="32"
+    height="32"
+    preserveAspectRatio="xMidYMid meet"
+    viewBox="0 0 24 24"
+  >
+    <path
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"
+    ></path>
+  </svg>
+);

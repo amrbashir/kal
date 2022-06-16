@@ -1,8 +1,7 @@
-use std::fmt::Display;
-
 use serde::Serialize;
 use wry::{application::window::WindowId, webview::WebView};
 
+#[non_exhaustive]
 pub enum AppEvent {
     /// An Ipc event from the webview
     Ipc(WindowId, String),
@@ -11,14 +10,22 @@ pub enum AppEvent {
         event: WebviewEvent,
         window_id: WindowId,
     },
+    /// Describes an event from a thread
+    ThreadEvent(ThreadEvent),
 }
 
+#[non_exhaustive]
 pub enum WebviewEvent {
     /// The webview gained or lost focus
     ///
     /// Currently, it is only used on Windows
     #[cfg(target_os = "windows")]
     Focus(bool),
+}
+
+#[non_exhaustive]
+pub enum ThreadEvent {
+    RefreshingIndexFinished,
 }
 
 /// Emits an event to a window

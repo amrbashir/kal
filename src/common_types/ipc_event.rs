@@ -8,6 +8,7 @@ pub enum IPCEvent {
     FocusInput,
     HideMainWindow,
     Refresh,
+    RefreshingIndexFinished,
 }
 
 impl From<IPCEvent> for &str {
@@ -21,6 +22,7 @@ impl From<IPCEvent> for &str {
             IPCEvent::FocusInput => "focus-input",
             IPCEvent::HideMainWindow => "hide-main-window",
             IPCEvent::Refresh => "refresh",
+            IPCEvent::RefreshingIndexFinished => "refreshing-index-finished",
         }
     }
 }
@@ -36,6 +38,7 @@ impl From<&str> for IPCEvent {
             "focus-input" => IPCEvent::FocusInput,
             "hide-main-window" => IPCEvent::HideMainWindow,
             "refresh" => IPCEvent::Refresh,
+            "refreshing-index-finished" => IPCEvent::RefreshingIndexFinished,
             _ => unreachable!(),
         }
     }
