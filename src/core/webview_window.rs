@@ -58,8 +58,9 @@ impl WebviewWindow {
                 let path = dunce::canonicalize(std::path::PathBuf::from(path.to_string()))
                     .unwrap_or_default();
 
-                let mut assets_dir = dirs_next::home_dir().expect("Failed to get $HOME dir path");
-                assets_dir.push(".kal");
+                let mut assets_dir =
+                    dirs_next::data_local_dir().expect("Failed to get $data_local_dir path");
+                assets_dir.push("kal");
 
                 if path.starts_with(assets_dir) {
                     let mimetype = match path

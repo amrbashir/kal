@@ -6,17 +6,20 @@ use plugin::Plugin;
 use plugins::app_launcher::AppLauncherPlugin;
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
-use std::sync::{Arc, Mutex};
-use std::thread;
-use webview_window::WebviewWindow;
-use wry::application::event_loop::EventLoopProxy;
-use wry::application::window::WindowAttributes;
-use wry::application::{
-    dpi::{LogicalPosition, LogicalSize},
-    event::{DeviceEvent, ElementState, Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+use std::{
+    sync::{Arc, Mutex},
+    thread,
 };
-use wry::webview::WebViewAttributes;
+use webview_window::WebviewWindow;
+use wry::{
+    application::{
+        dpi::{LogicalPosition, LogicalSize},
+        event::{DeviceEvent, ElementState, Event, WindowEvent},
+        event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+        window::WindowAttributes,
+    },
+    webview::WebViewAttributes,
+};
 
 #[path = "../common/mod.rs"]
 mod common;

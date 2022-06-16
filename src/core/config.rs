@@ -51,8 +51,8 @@ const CONFIG_FILE_NAME: &str = "kal.conf.json";
 impl Config {
     /// Loads the config from the conventional location `$HOME/.kal/kal.conf.json`
     pub fn load() -> Result<Config> {
-        let mut path = dirs_next::home_dir().context("Failed to get $HOME dir path")?;
-        path.push(".kal");
+        let mut path = dirs_next::home_dir().context("Failed to get $home_dir path")?;
+        path.push(".config");
         path.push(CONFIG_FILE_NAME);
         Self::load_from_path(path)
     }

@@ -73,8 +73,9 @@ impl AppLauncherPlugin {
             .map(|e| {
                 let file = e.path();
 
-                let mut cache = dirs_next::home_dir().expect("Failed to get $HOME dir path");
-                cache.push(".kal");
+                let mut cache =
+                    dirs_next::data_local_dir().expect("Failed to get $data_local_dir path");
+                cache.push("kal");
                 cache.push("cache");
                 let _ = fs::create_dir_all(&cache);
 
