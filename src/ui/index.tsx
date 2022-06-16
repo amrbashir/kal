@@ -1,7 +1,6 @@
 import { render } from "solid-js/web";
 import { Router, Route, Routes } from "solid-app-router";
 import { lazy } from "solid-js";
-import "solid-styled-jsx";
 import "./style.css";
 
 const MainWindow = lazy(() => import("./windows/main"));

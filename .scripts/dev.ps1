@@ -17,6 +17,7 @@ $fileWatcher = New-Object System.IO.FileSystemWatcher
 $fileWatcher.Path = "$PSScriptRoot/../src/core"
 $fileWatcher.Filter = "*"
 $fileWatcher.IncludeSubdirectories = $true
+
 function RestartCargoRun {
   $cargoRun.kill()
   [void]$cargoRun.start()
