@@ -41,7 +41,26 @@ fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(iter::once(0)).collect()
 }
 
-pub fn extract_png<P: AsRef<path::Path>>(src: &P, out: &P) -> std::io::Result<()> {
+pub fn extract_png<P: AsRef<path::Path>>(files: Vec<(P, P)>) -> std::io::Result<()> {
+    if files.is_empty() {
+        return Ok(());
+    }
+
+    let (srcs, outs): (Vec<P>, Vec<P>) = files
+        .into_iter()
+        .filter_map(|e| if e.1.as_ref().exists() { None } else { Some(e) })
+        .collect::<Vec<_>>()
+        .into_iter()
+        .unzip();
+    let (srcs, outs) = (
+        srcs.into_iter()
+            .map(|p| format!(r#""{}""#, p.as_ref().to_string_lossy()))
+            .collect::<Vec<_>>(),
+        outs.into_iter()
+            .map(|p| format!(r#""{}""#, p.as_ref().to_string_lossy()))
+            .collect::<Vec<_>>(),
+    );
+
     // TODO: use win32 apis
     std::process::Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
         .args([
@@ -50,28 +69,32 @@ pub fn extract_png<P: AsRef<path::Path>>(src: &P, out: &P) -> std::io::Result<()
                 r#"
               Add-Type -AssemblyName System.Drawing;
               $Shell = New-Object -ComObject WScript.Shell;
-              $src = "{}";
-              $out = "{}";
-              try {{
-                $path = $Shell.CreateShortcut($src).TargetPath;
-                if ((Test-Path -Path $path -PathType Container) -or ($path -match '.url$')) {{
-                  $path = $src;
+              $srcs = @({});
+              $outs = @({});
+              $len = $srcs.Length;
+              for ($i=0; $i -lt $len; $i++) {{
+                $srcPath = $srcs[$i]
+                try {{
+                  $path = $Shell.CreateShortcut($srcPath).TargetPath;
+                  if ((Test-Path -Path $path -PathType Container) -or ($path -match '.url$')) {{
+                    $path = $srcPath;
+                  }}
+                }} catch {{
+                  $path = $srcPath;
                 }}
-              }} catch {{
-                $path = $src;
-              }}
-              $icon = $null;
-              try {{
-                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path);
-              }} catch {{
-                $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($src);
-              }}
-              if ($icon -ne $null) {{
-                $i = $icon.ToBitmap().Save($out, [System.Drawing.Imaging.ImageFormat]::Png);
+                $icon = $null;
+                try {{
+                  $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($path);
+                }} catch {{
+                  $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($srcPath);
+                }}
+                if ($icon -ne $null) {{
+                  [void]$icon.ToBitmap().Save($outs[$i], [System.Drawing.Imaging.ImageFormat]::Png);
+                }}
               }}
             "#,
-                &src.as_ref().to_string_lossy(),
-                &out.as_ref().to_string_lossy()
+                &srcs.join(","),
+                &outs.join(",")
             ),
         ])
         .spawn()?;
