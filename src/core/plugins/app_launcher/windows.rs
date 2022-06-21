@@ -46,12 +46,7 @@ pub fn extract_png<P: AsRef<path::Path>>(files: Vec<(P, P)>) -> std::io::Result<
         return Ok(());
     }
 
-    let (srcs, outs): (Vec<P>, Vec<P>) = files
-        .into_iter()
-        .filter_map(|e| if e.1.as_ref().exists() { None } else { Some(e) })
-        .collect::<Vec<_>>()
-        .into_iter()
-        .unzip();
+    let (srcs, outs): (Vec<P>, Vec<P>) = files.into_iter().unzip();
     let (srcs, outs) = (
         srcs.into_iter()
             .map(|p| format!(r#""{}""#, p.as_ref().to_string_lossy()))
