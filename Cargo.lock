@@ -1342,9 +1342,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.81"
+version = "1.0.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b7ce2b32a1aed03c558dc61a5cd328f15aff2dbc17daad8fb8af04d2100e15c"
+checksum = "82c2c1fdcd807d1098552c5b9a36e425e42e9fbd7c6a37a8425f390f781f7fa7"
 dependencies = [
  "itoa",
  "ryu",
@@ -1474,9 +1474,9 @@ dependencies = [
 
 [[package]]
 name = "tao"
-version = "0.11.2"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bfe4c782f0543f667ee3b732d026b2f1c64af39cd52e726dec1ea1f2d8f6b80"
+checksum = "1e394212ba69118794d1b66e1c3a9752f483d228e8ac0c2820f6324d72b5332e"
 dependencies = [
  "bitflags",
  "cairo-rs",
@@ -1511,24 +1511,11 @@ dependencies = [
  "raw-window-handle",
  "scopeguard",
  "serde",
- "tao-core-video-sys",
  "unicode-segmentation",
  "uuid",
  "windows",
  "windows-implement",
  "x11-dl",
-]
-
-[[package]]
-name = "tao-core-video-sys"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "271450eb289cb4d8d0720c6ce70c72c8c858c93dd61fc625881616752e6b98f6"
-dependencies = [
- "cfg-if",
- "core-foundation-sys",
- "libc",
- "objc",
 ]
 
 [[package]]
@@ -1652,9 +1639,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.11"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bc28f93baff38037f64e6f43d34cfa1605f27a49c34e8a04c5e78b0babf2596"
+checksum = "cfbbce75cad20b56f4f4200e413b894c990c7bbd7e47245ff5cbc2b82511e4da"
 dependencies = [
  "ansi_term",
  "sharded-slab",
@@ -2001,8 +1988,8 @@ checksum = "f4dd6dc7df2d84cf7b33822ed5b86318fb1781948e9663bacd047fc9dd52259d"
 
 [[package]]
 name = "wry"
-version = "0.18.3"
-source = "git+https://github.com/tauri-apps/wry?branch=dev#6f20268af7666dad729a86cce140299af8a917c0"
+version = "0.19.0"
+source = "git+https://github.com/tauri-apps/wry?branch=dev#9d424195fdef887904c835c41be6bb0921553ddf"
 dependencies = [
  "block",
  "cocoa",
