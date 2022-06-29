@@ -1,4 +1,8 @@
-#[derive(PartialEq)]
+use std::fmt::Display;
+
+use serde::{Deserialize, Serialize};
+
+#[derive(PartialEq, Serialize, Deserialize)]
 pub enum IPCEvent {
     Search,
     Results,
@@ -7,22 +11,22 @@ pub enum IPCEvent {
     ClearResults,
     FocusInput,
     HideMainWindow,
-    Refresh,
+    RefreshIndex,
     RefreshingIndexFinished,
 }
 
-impl From<IPCEvent> for &str {
-    fn from(e: IPCEvent) -> Self {
-        match e {
-            IPCEvent::Search => "search",
-            IPCEvent::Results => "results",
-            IPCEvent::Execute => "execute",
-            IPCEvent::OpenLocation => "open-location",
-            IPCEvent::ClearResults => "clear-results",
-            IPCEvent::FocusInput => "focus-input",
-            IPCEvent::HideMainWindow => "hide-main-window",
-            IPCEvent::Refresh => "refresh",
-            IPCEvent::RefreshingIndexFinished => "refreshing-index-finished",
+impl Display for IPCEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IPCEvent::Search => write!(f, "search"),
+            IPCEvent::Results => write!(f, "results"),
+            IPCEvent::Execute => write!(f, "execute"),
+            IPCEvent::OpenLocation => write!(f, "open-location"),
+            IPCEvent::ClearResults => write!(f, "clear-results"),
+            IPCEvent::FocusInput => write!(f, "focus-input"),
+            IPCEvent::HideMainWindow => write!(f, "hide-main-window"),
+            IPCEvent::RefreshIndex => write!(f, "refresh-index"),
+            IPCEvent::RefreshingIndexFinished => write!(f, "refreshing-index-finished"),
         }
     }
 }
@@ -37,7 +41,7 @@ impl From<&str> for IPCEvent {
             "clear-results" => IPCEvent::ClearResults,
             "focus-input" => IPCEvent::FocusInput,
             "hide-main-window" => IPCEvent::HideMainWindow,
-            "refresh" => IPCEvent::Refresh,
+            "refresh-index" => IPCEvent::RefreshIndex,
             "refreshing-index-finished" => IPCEvent::RefreshingIndexFinished,
             _ => unreachable!(),
         }

@@ -1,6 +1,9 @@
+use std::fmt::Display;
+
 use serde::Serialize;
 use wry::{application::window::WindowId, webview::WebView};
 
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum AppEvent {
     /// An Ipc event from the webview
@@ -10,10 +13,11 @@ pub enum AppEvent {
         event: WebviewEvent,
         window_id: WindowId,
     },
-    /// Describes an event from a thread
+    /// Describes an event from a spawned thread
     ThreadEvent(ThreadEvent),
 }
 
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum WebviewEvent {
     /// The webview gained or lost focus
@@ -23,37 +27,36 @@ pub enum WebviewEvent {
     Focus(bool),
 }
 
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum ThreadEvent {
+    /// Refreshing plugins index has finished
     RefreshingIndexFinished,
 }
 
 /// Emits an event to a window
 ///
 /// This invokes the js handlers registred through `window.KAL.ipc.on()`
-pub fn emit_event(webview: &WebView, event: &str, payload: &impl Serialize) {
-    if webview
-        .evaluate_script(
-            format!(
-                r#"
+pub fn emit_event(webview: &WebView, event: impl Display, payload: &impl Serialize) {
+    if let Err(e) = webview.evaluate_script(
+        format!(
+            r#"
               (function(){{
                 window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
                   handler({});
                 }});
               }})()
             "#,
-                event,
-                serialize_to_javascript::Serialized::new(
-                    &serde_json::value::to_raw_value(payload).unwrap_or_default(),
-                    &serialize_to_javascript::Options::default()
-                ),
-            )
-            .as_str(),
+            event,
+            serialize_to_javascript::Serialized::new(
+                &serde_json::value::to_raw_value(payload).unwrap_or_default(),
+                &serialize_to_javascript::Options::default()
+            ),
         )
-        .is_err()
-    {
-        println!("[ERROR][IPC]: failed to emit `{}` event", event);
-    };
+        .as_str(),
+    ) {
+        tracing::error!("{e}");
+    }
 }
 
 pub const INIT_SCRIPT: &str = r#"

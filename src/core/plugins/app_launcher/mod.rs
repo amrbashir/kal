@@ -1,7 +1,8 @@
 use crate::{
     common::{Icon, IconType, SearchResultItem},
     config::Config,
-    plugin::impl_plugin,
+    plugin::Plugin,
+    KAL_DATA_DIR,
 };
 use serde::{Deserialize, Serialize};
 use std::{fs, path, thread};
@@ -17,7 +18,7 @@ pub struct AppLauncherPlugin {
     paths: Vec<String>,
     extensions: Vec<String>,
     cached_apps: Vec<SearchResultItem>,
-    cache_path: path::PathBuf,
+    icons_dir: path::PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -37,35 +38,29 @@ impl Default for AppLauncherPluginConfig {
     }
 }
 
-impl_plugin!(AppLauncherPlugin);
-
-impl AppLauncherPlugin {
-    pub fn new(config: &Config) -> Box<Self> {
+impl Plugin for AppLauncherPlugin {
+    fn new(config: &Config) -> anyhow::Result<Box<Self>> {
         let name = "AppLauncher".to_string();
-        let config = config
-            .plugin_config::<AppLauncherPluginConfig>(&name)
-            .unwrap_or_default();
-        Box::new(Self {
+        let config = config.plugin_config::<AppLauncherPluginConfig>(&name);
+
+        Ok(Box::new(Self {
             name,
             enabled: config.enabled,
             paths: config.paths,
             extensions: config.extensions,
             cached_apps: Vec::new(),
-            cache_path: dirs_next::data_local_dir()
-                .expect("Failed to get $data_local_dir path")
-                .join("kal")
-                .join("cache"),
-        })
+            icons_dir: KAL_DATA_DIR.join("icons"),
+        }))
     }
 
-    pub fn enabled(&self) -> bool {
+    fn enabled(&self) -> bool {
         self.enabled
     }
 
-    pub fn name(&self) -> &str {
+    fn name(&self) -> &str {
         &self.name
     }
-    pub fn refresh(&mut self) {
+    fn refresh(&mut self) {
         let mut apps = Vec::new();
         for path in &self.paths {
             apps.extend(filter_path_entries_by_extensions(
@@ -80,11 +75,13 @@ impl AppLauncherPlugin {
             .map(|(i, e)| {
                 let file = e.path();
 
-                let mut icon_path = self.cache_path.join(format!(
-                    "{}-{}",
-                    file.file_stem().unwrap_or_default().to_string_lossy(),
-                    i.to_string()
-                )); // to avoid collision if a file with the same file stem exists in two different places
+                let mut icon_path = self.icons_dir.join(
+                    format!(
+                        "{}-{}",
+                        file.file_stem().unwrap_or_default().to_string_lossy(),
+                        i.to_string()
+                    ), // to avoid collision if a file with the same file stem exists in two different places
+                );
                 icon_path.set_extension("png");
 
                 let app_name = file
@@ -107,25 +104,25 @@ impl AppLauncherPlugin {
             })
             .collect::<Vec<SearchResultItem>>();
 
-        let _ = std::fs::create_dir_all(&self.cache_path);
+        let _ = std::fs::create_dir_all(&self.icons_dir);
         let apps = self.cached_apps.clone();
         thread::spawn(move || {
-            let _ = platform::extract_png(
+            platform::extract_png(
                 apps.into_iter()
                     .map(|a| (a.execution_args[0].clone(), a.icon.data.clone()))
                     .collect(),
             );
         });
     }
-    pub fn results(&self, _query: &str) -> &[SearchResultItem] {
+    fn results(&self, _query: &str) -> &[SearchResultItem] {
         &self.cached_apps
     }
 
-    pub fn execute(&self, item: &SearchResultItem, elevated: bool) {
+    fn execute(&self, item: &SearchResultItem, elevated: bool) {
         platform::execute(item, elevated);
     }
 
-    pub fn open_location(&self, item: &SearchResultItem) {
+    fn open_location(&self, item: &SearchResultItem) {
         platform::open_location(item);
     }
 }

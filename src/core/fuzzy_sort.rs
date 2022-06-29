@@ -1,4 +1,4 @@
-/// Sorts a vectore of
+/// Sorts a vector of structs by field
 macro_rules! fuzzy_sort {
     ($items:ident, $key:ident, $query:ident) => {
         let matcher = ::fuzzy_matcher::skim::SkimMatcherV2::default();

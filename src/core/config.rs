@@ -1,6 +1,7 @@
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path};
+
+use crate::CONFIG_FILE;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -46,43 +47,53 @@ impl Default for Config {
     }
 }
 
-const CONFIG_FILE_NAME: &str = "kal.conf.json";
-
 impl Config {
-    /// Loads the config from the conventional location `$HOME/.kal/kal.conf.json`
-    pub fn load() -> Result<Config> {
-        let mut path = dirs_next::home_dir().context("Failed to get $home_dir path")?;
-        path.push(".config");
-        path.push(CONFIG_FILE_NAME);
-        Self::load_from_path(path)
+    /// Loads the config from the conventional location `$HOME/.config/kal.conf.json`
+    pub fn load() -> anyhow::Result<Config> {
+        Self::load_from_path(&*CONFIG_FILE)
     }
 
     /// Loads the config from a path
-    pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> Result<Config> {
+    pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> anyhow::Result<Config> {
         let path = path.as_ref();
-        let config;
-        if path.exists() {
+        let config = if path.exists() {
             let config_json = fs::read_to_string(path)?;
-            config = serde_json::from_str::<Config>(&config_json)?;
+            match serde_json::from_str::<Config>(&config_json) {
+                Ok(c) => c,
+                Err(e) => {
+                    tracing::error!("Failed to deserialize config, falling back to default: {e}",);
+                    Config::default()
+                }
+            }
         } else {
-            config = Config::default();
-            fs::create_dir_all(
-                path.parent()
-                    .context("Failed to get config file parent dir")?,
-            )?;
-            fs::write(path, serde_json::to_string_pretty(&config)?.as_bytes())?;
-        }
-
+            tracing::debug!("Config file wasn't found, falling back to default");
+            Config::default()
+        };
+        tracing::info!("Config loaded");
         Ok(config)
     }
 
     /// Gets the specified plugin config
-    pub fn plugin_config<T>(&self, name: &str) -> Option<T>
+    pub fn plugin_config<T>(&self, name: &str) -> T
     where
+        T: Default,
         for<'de> T: Deserialize<'de>,
     {
-        self.plugins
-            .get(name)
-            .map(|c| serde_json::from_value(c.clone()).unwrap())
+        let default = serde_json::Value::default();
+        serde_json::from_value::<T>(
+            self.plugins
+                .get(name)
+                .unwrap_or_else(|| {
+                    tracing::debug!(
+                        "{name} config wasn't found under plugins object, falling back to default",
+                    );
+                    &default
+                })
+                .clone(),
+        )
+        .unwrap_or_else(|e| {
+            tracing::error!("Failed to deserialize {name} config, falling back to default {e}",);
+            T::default()
+        })
     }
 }

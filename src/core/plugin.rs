@@ -1,6 +1,11 @@
-use crate::common::SearchResultItem;
+use std::fmt::Debug;
 
-pub trait Plugin {
+use crate::{common::SearchResultItem, config::Config};
+
+pub trait Plugin: Debug {
+    fn new(config: &Config) -> anyhow::Result<Box<Self>>
+    where
+        Self: Sized;
     /// Gets the name of the plugin.
     ///
     /// usually used to identify the origin of a [`SearchResultItem`]
@@ -17,36 +22,3 @@ pub trait Plugin {
     /// Called when `CtrlLeft + O` are pressed
     fn open_location(&self, item: &SearchResultItem);
 }
-
-/// The plugin struct must have methods with the same signature as the methods from the [`Plugin`] trait.
-macro_rules! impl_plugin {
-    ($plugin:ident) => {
-        impl $crate::plugin::Plugin for $plugin {
-            fn name(&self) -> &str {
-                self.name()
-            }
-
-            fn enabled(&self) -> bool {
-                self.enabled()
-            }
-
-            fn refresh(&mut self) {
-                self.refresh()
-            }
-
-            fn results(&self, query: &str) -> &[SearchResultItem] {
-                self.results(query)
-            }
-
-            fn execute(&self, item: &SearchResultItem, elevated: bool) {
-                self.execute(item, elevated)
-            }
-
-            fn open_location(&self, item: &SearchResultItem) {
-                self.open_location(item);
-            }
-        }
-    };
-}
-
-pub(crate) use impl_plugin;

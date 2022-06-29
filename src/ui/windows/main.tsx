@@ -57,7 +57,7 @@ const MainWindow: Component = () => {
 
     if (e.key === "r" && e.ctrlKey) {
       e.preventDefault();
-      window.KAL.ipc.send(IPCEvent.Refresh);
+      window.KAL.ipc.send(IPCEvent.RefreshIndex);
       setRefreshingIndex(true);
     }
   }

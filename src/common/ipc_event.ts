@@ -6,6 +6,6 @@ export enum IPCEvent {
   ClearResults = "clear-results",
   FocusInput = "focus-input",
   HideMainWindow = "hide-main-window",
-  Refresh = "refresh",
+  RefreshIndex = "refresh-index",
   RefreshingIndexFinished = "refreshing-index-finished",
 }

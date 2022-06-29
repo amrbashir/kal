@@ -41,9 +41,9 @@ fn encode_wide(string: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
     string.as_ref().encode_wide().chain(iter::once(0)).collect()
 }
 
-pub fn extract_png<P: AsRef<path::Path>>(files: Vec<(P, P)>) -> std::io::Result<()> {
+pub fn extract_png<P: AsRef<path::Path>>(files: Vec<(P, P)>) {
     if files.is_empty() {
-        return Ok(());
+        return;
     }
 
     let (srcs, outs): (Vec<P>, Vec<P>) = files.into_iter().unzip();
@@ -57,11 +57,12 @@ pub fn extract_png<P: AsRef<path::Path>>(files: Vec<(P, P)>) -> std::io::Result<
     );
 
     // TODO: use win32 apis
-    std::process::Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
-        .args([
-            "-Command",
-            &format!(
-                r#"
+    if let Err(e) =
+        std::process::Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
+            .args([
+                "-Command",
+                &format!(
+                    r#"
               Add-Type -AssemblyName System.Drawing;
               $Shell = New-Object -ComObject WScript.Shell;
               $srcs = @({});
@@ -88,10 +89,12 @@ pub fn extract_png<P: AsRef<path::Path>>(files: Vec<(P, P)>) -> std::io::Result<
                 }}
               }}
             "#,
-                &srcs.join(","),
-                &outs.join(",")
-            ),
-        ])
-        .spawn()?;
-    Ok(())
+                    &srcs.join(","),
+                    &outs.join(",")
+                ),
+            ])
+            .spawn()
+    {
+        tracing::error!("Failed to extract icons: {e}");
+    }
 }
