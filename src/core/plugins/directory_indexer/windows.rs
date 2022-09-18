@@ -1,8 +1,8 @@
 use crate::common::{utils, SearchResultItem};
 use std::path::Path;
 
-pub fn execute(item: &SearchResultItem, elevated: bool) {
-    utils::windows::execute(&item.execution_args[0], elevated)
+pub fn execute(item: &SearchResultItem, _elevated: bool) {
+    utils::windows::open_path(&item.execution_args[0])
 }
 pub fn open_location(item: &SearchResultItem) {
     utils::windows::open_path(&item.execution_args[0])

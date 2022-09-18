@@ -1,4 +1,4 @@
-use super::Icon;
+use super::icon::Icon;
 use serde::Serialize;
 
 #[derive(Serialize, Debug, Clone)]

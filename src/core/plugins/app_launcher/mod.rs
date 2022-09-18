@@ -1,13 +1,20 @@
 use crate::{
-    common::{Icon, IconType, SearchResultItem},
+    common::{
+        icon::{Icon, IconType},
+        SearchResultItem,
+    },
     config::Config,
     plugin::Plugin,
     KAL_DATA_DIR,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs, path, thread};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    thread,
+};
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 #[path = "windows.rs"]
 mod platform;
 
@@ -18,7 +25,7 @@ pub struct AppLauncherPlugin {
     paths: Vec<String>,
     extensions: Vec<String>,
     cached_apps: Vec<SearchResultItem>,
-    icons_dir: path::PathBuf,
+    icons_dir: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,8 +39,17 @@ impl Default for AppLauncherPluginConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            paths: Default::default(),
-            extensions: Default::default(),
+            paths: vec![
+                "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+                "C:\\Users\\amr\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs"
+                    .to_string(),
+                "C:\\Users\\amr\\Desktop".to_string(),
+            ],
+            extensions: vec![
+                "exe".to_string(),
+                "lnk".to_string(),
+                "appref-ms".to_string(),
+            ],
         }
     }
 }
@@ -64,24 +80,19 @@ impl Plugin for AppLauncherPlugin {
         let mut apps = Vec::new();
         for path in &self.paths {
             apps.extend(filter_path_entries_by_extensions(
-                path::PathBuf::from(path),
+                PathBuf::from(path),
                 &self.extensions,
             ));
         }
 
         self.cached_apps = apps
             .iter()
-            .enumerate()
-            .map(|(i, e)| {
+            .map(|e| {
                 let file = e.path();
 
-                let mut icon_path = self.icons_dir.join(
-                    format!(
-                        "{}-{}",
-                        file.file_stem().unwrap_or_default().to_string_lossy(),
-                        i.to_string()
-                    ), // to avoid collision if a file with the same file stem exists in two different places
-                );
+                let mut icon_path = self
+                    .icons_dir
+                    .join(&*file.file_stem().unwrap_or_default().to_string_lossy());
                 icon_path.set_extension("png");
 
                 let app_name = file
@@ -114,6 +125,7 @@ impl Plugin for AppLauncherPlugin {
             );
         });
     }
+
     fn results(&self, _query: &str) -> &[SearchResultItem] {
         &self.cached_apps
     }
@@ -127,7 +139,7 @@ impl Plugin for AppLauncherPlugin {
     }
 }
 
-fn filter_path_entries_by_extensions<P: AsRef<path::Path>>(
+fn filter_path_entries_by_extensions<P: AsRef<Path>>(
     path: P,
     extensions: &Vec<String>,
 ) -> Vec<fs::DirEntry> {

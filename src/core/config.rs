@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path};
+use std::{collections::HashMap, fs, path::Path};
 
 use crate::CONFIG_FILE;
 
@@ -54,7 +54,7 @@ impl Config {
     }
 
     /// Loads the config from a path
-    pub fn load_from_path<P: AsRef<path::Path>>(path: P) -> anyhow::Result<Config> {
+    pub fn load_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {
         let path = path.as_ref();
         let config = if path.exists() {
             let config_json = fs::read_to_string(path)?;

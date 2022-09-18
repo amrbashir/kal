@@ -7,4 +7,5 @@ export interface Icon {
 export enum IconType {
   Path = "Path",
   Svg = "Svg",
+  Default = "Default",
 }

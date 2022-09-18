@@ -7,12 +7,17 @@ mod plugin;
 mod plugins;
 mod webview_window;
 
-use std::{cell, path, sync, thread};
+use std::{
+    cell::RefCell,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crate::{
     common::{IPCEvent, SearchResultItem},
     config::Config,
-    event::{emit_event, AppEvent, ThreadEvent, WebviewEvent, INIT_SCRIPT},
+    event::{emit_event, AppEvent, ThreadEvent, WebviewEvent, KAL_IPC_INIT_SCRIPT},
     fuzzy_sort::fuzzy_sort,
     plugin::Plugin,
     plugins::app_launcher::AppLauncherPlugin,
@@ -21,6 +26,7 @@ use crate::{
 
 use anyhow::Context;
 use once_cell::sync::Lazy;
+use plugins::directory_indexer::DirectoryIndexerPlugin;
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
 use wry::{
@@ -33,12 +39,12 @@ use wry::{
     webview::WebViewAttributes,
 };
 
-static KAL_DATA_DIR: Lazy<path::PathBuf> = Lazy::new(|| {
+static KAL_DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
     dirs_next::data_local_dir()
         .expect("Failed to get $data_local_dir path")
         .join("kal")
 });
-static CONFIG_FILE: Lazy<path::PathBuf> = Lazy::new(|| {
+static CONFIG_FILE: Lazy<PathBuf> = Lazy::new(|| {
     dirs_next::home_dir()
         .expect("Failed to get $home_dir path")
         .join(".config")
@@ -53,9 +59,9 @@ pub(crate) struct EmbededAssets;
 #[derive(Debug)]
 struct AppState<T: 'static> {
     main_window: WebviewWindow,
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     previously_foreground_hwnd: windows_sys::Win32::Foundation::HWND,
-    plugins: sync::Arc<sync::Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
+    plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
     current_results: Vec<SearchResultItem>,
     modifier_pressed: bool,
     proxy: EventLoopProxy<T>,
@@ -68,7 +74,7 @@ fn create_main_window(
 ) -> anyhow::Result<WebviewWindow> {
     #[cfg(target_os = "linux")]
     use wry::application::platform::linux::WindowExtWindows;
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     use wry::application::platform::windows::WindowExtWindows;
 
     let (m_size, m_pos) = {
@@ -108,7 +114,7 @@ fn create_main_window(
         WebViewAttributes {
             url: Some(url.parse().unwrap()),
             transparent: config.appearance.transparent,
-            initialization_scripts: vec![INIT_SCRIPT.to_string()],
+            initialization_scripts: vec![KAL_IPC_INIT_SCRIPT.to_string()],
             devtools: cfg!(debug_assertions),
             ipc_handler: Some({
                 let proxy = event_loop.create_proxy();
@@ -130,7 +136,7 @@ fn create_main_window(
 
 // Saves the current foreground window then shows the main window
 fn show_main_window(app_state: &mut AppState<AppEvent>) {
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     {
         app_state.previously_foreground_hwnd =
             unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
@@ -145,7 +151,7 @@ fn show_main_window(app_state: &mut AppState<AppEvent>) {
 /// Hides the main window and restores focus to the previous foreground window if needed
 fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
     app_state.main_window.window().set_visible(false);
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     {
         if restore_focus {
             unsafe {
@@ -170,7 +176,7 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
 
 fn process_events(
     event: &Event<AppEvent>,
-    app_state: &cell::RefCell<AppState<AppEvent>>,
+    app_state: &RefCell<AppState<AppEvent>>,
     config: &Config,
 ) -> anyhow::Result<()> {
     match event {
@@ -318,7 +324,7 @@ fn process_events(
             },
 
             AppEvent::WebviewEvent { event, window_id } => match event {
-                #[cfg(target_os = "windows")]
+                #[cfg(windows)]
                 WebviewEvent::Focus(focus) => {
                     let app_state = app_state.borrow();
                     let main_window = app_state.main_window.window();
@@ -352,16 +358,19 @@ fn process_events(
 #[tracing::instrument]
 fn run() -> anyhow::Result<()> {
     let config = Config::load()?;
-    let plugins: Vec<Box<dyn Plugin + Send + 'static>> = vec![AppLauncherPlugin::new(&config)?];
+    let plugins: Vec<Box<dyn Plugin + Send + 'static>> = vec![
+        AppLauncherPlugin::new(&config)?,
+        DirectoryIndexerPlugin::new(&config)?,
+    ];
     let event_loop = EventLoop::<AppEvent>::with_user_event();
     event_loop.set_device_event_filter(DeviceEventFilter::Never);
     let main_window = create_main_window(&config, &event_loop)?;
     let main_window_id = main_window.window().id();
-    let app_state = cell::RefCell::new(AppState {
+    let app_state = RefCell::new(AppState {
         main_window,
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         previously_foreground_hwnd: 0,
-        plugins: sync::Arc::new(sync::Mutex::new(plugins)),
+        plugins: Arc::new(Mutex::new(plugins)),
         current_results: Default::default(),
         modifier_pressed: false,
         proxy: event_loop.create_proxy(),
@@ -369,7 +378,7 @@ fn run() -> anyhow::Result<()> {
 
     let plugins = app_state.borrow_mut().plugins.clone();
     thread::spawn(move || {
-        for plugin in plugins.lock().unwrap().iter_mut() {
+        for plugin in plugins.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
             plugin.refresh();
         }
     });

@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-echo ">> Running \"cargo fmt --all\" in $(pwd)"
-cargo fmt --all
-echo ">> Running \"pnpm format\" in $(pwd)"
-pnpm format
+echo ">> Running \"cargo fmt --all --check\" in $(pwd)"
+cargo fmt --all --check
+echo ">> Running \"pnpm format:check\" in $(pwd)"
+pnpm format:check

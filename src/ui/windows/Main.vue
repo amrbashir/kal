@@ -86,6 +86,7 @@ function convertFileSrc(protocol: string, filePath: string): string {
 
 function getIconHtml(icon: Icon): string {
   switch (icon.type) {
+    case IconType.Default:
     case IconType.Path:
       return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
     case IconType.Svg:
@@ -120,8 +121,9 @@ function getIconHtml(icon: Icon): string {
     </div>
 
     <div id="search-results_container">
-      <ul v-for="(item, index) in results">
+      <ul>
         <li
+          v-for="(item, index) in results"
           :id="`search-results_item_#${index}`"
           class="search-results_item"
           :class="{ selected: index === currentSelection }"
@@ -143,10 +145,12 @@ function getIconHtml(icon: Icon): string {
 <style>
 /* TODO: use scss */
 :root {
-  --primary: rgba(31, 31, 31, 0.8);
-  --accent: rgba(72, 141, 210, 0.5);
-  --text-primary: rgba(255, 255, 255);
-  --text-secondary: rgb(107, 107, 107);
+  --primary: rgba(31, 31, 31, 0.75);
+  --accent: rgba(70, 140, 210, 0.5);
+  --text-primary: rgba(180, 180, 180);
+  --text-secondary: rgb(100, 100, 100);
+  --text-primary-on-accent: rgba(255, 255, 255);
+  --text-secondary-on-accent: rgb(160, 160, 160);
 }
 
 main {
@@ -261,5 +265,13 @@ main {
 
 .text-secondary {
   color: var(--text-secondary);
+}
+
+.search-results_item.selected .text-primary {
+  color: var(--text-primary-on-accent);
+}
+
+.search-results_item.selected .text-secondary {
+  color: var(--text-secondary-on-accent);
 }
 </style>

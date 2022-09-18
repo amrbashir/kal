@@ -23,7 +23,7 @@ pub enum WebviewEvent {
     /// The webview gained or lost focus
     ///
     /// Currently, it is only used on Windows
-    #[cfg(target_os = "windows")]
+    #[cfg(windows)]
     Focus(bool),
 }
 
@@ -59,7 +59,7 @@ pub fn emit_event(webview: &WebView, event: impl Display, payload: &impl Seriali
     }
 }
 
-pub const INIT_SCRIPT: &str = r#"
+pub const KAL_IPC_INIT_SCRIPT: &str = r#"
   Object.defineProperty(window, "KAL", {
     value: {
       ipc: {

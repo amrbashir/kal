@@ -4,7 +4,10 @@ use std::{
     path::PathBuf,
 };
 
-use crate::event::{AppEvent, WebviewEvent};
+use crate::{
+    common::icon,
+    event::{AppEvent, WebviewEvent},
+};
 
 use wry::{
     application::{event_loop::EventLoop, window::WindowAttributes},
@@ -66,8 +69,14 @@ impl WebviewWindow {
             Box::new(move |request| {
                 let path = request.uri().replace("kalasset://localhost/", "");
                 let path = percent_encoding::percent_decode_str(&path).decode_utf8_lossy();
-                let path = dunce::canonicalize(PathBuf::from(path.to_string())).unwrap_or_default();
 
+                if path.starts_with("icons/defaults") {
+                    return ResponseBuilder::new()
+                        .mimetype("image/png")
+                        .body(icon::Defaults::bytes(&path).to_vec());
+                }
+
+                let path = dunce::canonicalize(PathBuf::from(path.to_string())).unwrap_or_default();
                 let assets_dir = dirs_next::data_local_dir()
                     .expect("Failed to get $data_local_dir path")
                     .join("kal");
@@ -91,7 +100,7 @@ impl WebviewWindow {
 
         let webview = builder.build()?;
 
-        #[cfg(target_os = "windows")]
+        #[cfg(windows)]
         {
             use wry::webview::WebviewExtWindows;
             let mut token = unsafe { std::mem::zeroed() };

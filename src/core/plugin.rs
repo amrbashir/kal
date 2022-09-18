@@ -15,7 +15,7 @@ pub trait Plugin: Debug {
     fn enabled(&self) -> bool;
     /// Refreshs the cache and configuration of the plugin
     fn refresh(&mut self);
-    /// Gets [SearchResultItem]s from the plugin for this query
+    /// Gets [SearchResultItem]s for this query
     fn results(&self, query: &str) -> &[SearchResultItem];
     /// Called when `Enter` or `Shift + Enter` are pressed
     fn execute(&self, item: &SearchResultItem, elevated: bool);
