@@ -27,7 +27,7 @@ use wry::{
     application::{
         dpi::{LogicalPosition, LogicalSize},
         event::{DeviceEvent, ElementState, Event, WindowEvent},
-        event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+        event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopProxy},
         window::WindowAttributes,
     },
     webview::WebViewAttributes,
@@ -79,9 +79,9 @@ fn create_main_window(
     };
 
     #[cfg(debug_assertions)]
-    let url = "http://localhost:9010/main-window";
+    let url = "http://localhost:9010/main";
     #[cfg(not(debug_assertions))]
-    let url = "kal://localhost/main-window";
+    let url = "kal://localhost/main";
 
     let main_window = WebviewWindow::new(
         WindowAttributes {
@@ -103,7 +103,6 @@ fn create_main_window(
             resizable: false,
             visible: false,
             transparent: config.appearance.transparent,
-
             ..Default::default()
         },
         WebViewAttributes {
@@ -126,7 +125,6 @@ fn create_main_window(
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     main_window.window().set_skip_taskbar(true);
-
     Ok(main_window)
 }
 
@@ -170,7 +168,6 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
     ));
 }
 
-#[tracing::instrument]
 fn process_events(
     event: &Event<AppEvent>,
     app_state: &cell::RefCell<AppState<AppEvent>>,
@@ -357,7 +354,9 @@ fn run() -> anyhow::Result<()> {
     let config = Config::load()?;
     let plugins: Vec<Box<dyn Plugin + Send + 'static>> = vec![AppLauncherPlugin::new(&config)?];
     let event_loop = EventLoop::<AppEvent>::with_user_event();
+    event_loop.set_device_event_filter(DeviceEventFilter::Never);
     let main_window = create_main_window(&config, &event_loop)?;
+    let main_window_id = main_window.window().id();
     let app_state = cell::RefCell::new(AppState {
         main_window,
         #[cfg(target_os = "windows")]
@@ -377,28 +376,15 @@ fn run() -> anyhow::Result<()> {
 
     event_loop.run(move |event, _event_loop, control_flow| {
         let mut _run = || -> anyhow::Result<()> {
-            match &event {
-                #[allow(unused)]
-                Event::WindowEvent {
-                    event, window_id, ..
-                } => match event {
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    #[cfg(target_os = "windows")]
-                    WindowEvent::Focused(focus) => {
-                        let app_state = app_state.borrow();
-                        let main_window = app_state.main_window.window();
-
-                        // because On Windows, the window and the webview have differnet focus states,
-                        // we have to focus the webview, when the window gains focus so input
-                        // elements and similar can take focus correcty.
-                        if *window_id == main_window.id() && *focus {
-                            app_state.main_window.focus();
-                        }
-                    }
-                    _ => {}
-                },
-
-                _ => {}
+            if let Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id,
+                ..
+            } = &event
+            {
+                if window_id == &main_window_id {
+                    *control_flow = ControlFlow::Exit
+                }
             }
 
             process_events(&event, &app_state, &config)?;
@@ -417,9 +403,10 @@ fn main() -> anyhow::Result<()> {
     let appender = tracing_appender::rolling::never(&*KAL_DATA_DIR, "kal.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
-    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
     tracing::subscriber::set_global_default(
         tracing_subscriber::fmt::Subscriber::builder()
+            .with_max_level(LevelFilter::TRACE)
             .finish()
             .with(
                 tracing_subscriber::fmt::Layer::default()

@@ -7,20 +7,23 @@
   "license": "MIT",
   "private": "true",
   "scripts": {
-    "dev": "vite --clearScreen false --port 9010",
+    "dev": "vite",
     "build": "vite build",
-    "format": "prettier --write \"./**/*.{ts,tsx,css,scss,html,json}\" --ignore-path ../.gitignore",
-    "format:check": "prettier --check \"./**/*.{ts,tsx,css,scss,html,json}\" --ignore-path ../.gitignore"
+    "ts:check": "vue-tsc --noEmit",
+    "format": "prettier --write \"./**/*.{ts,tsx,css,scss,html,json,vue}\" --ignore-path ../.gitignore",
+    "format:check": "prettier --check \"./**/*.{ts,tsx,css,scss,html,json,vue}\" --ignore-path ../.gitignore",
+    "deps:up": "pnpm dlx taze latest -w -i && cargo update"
   },
   "dependencies": {
-    "solid-app-router": "^0.4.1",
-    "solid-js": "^1.4.5"
+    "vue": "3.2.39",
+    "vue-router": "4.1.5"
   },
   "devDependencies": {
-    "@types/node": "^18.0.0",
-    "prettier": "^2.7.1",
-    "typescript": "^4.7.4",
-    "vite": "^2.9.13",
-    "vite-plugin-solid": "^2.2.6"
+    "@types/node": "18.7.18",
+    "@vitejs/plugin-vue": "3.1",
+    "prettier": "2.7.1",
+    "typescript": "4.8.3",
+    "vite": "3.1.2",
+    "vue-tsc": "0.40.13"
   }
 }

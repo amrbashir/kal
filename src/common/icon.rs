@@ -9,5 +9,7 @@ pub struct Icon {
 #[derive(Serialize, Debug, Clone)]
 pub enum IconType {
     Path,
+    // TODO: remove this allow
+    #[allow(unused)]
     Svg,
 }

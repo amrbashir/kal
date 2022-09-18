@@ -100,7 +100,7 @@ impl WebviewWindow {
             unsafe {
                 let proxy = event_loop.create_proxy();
                 controller.add_GotFocus(
-                    webview2_com::FocusChangedEventHandler::create(Box::new(move |_, _| {
+                    &webview2_com::FocusChangedEventHandler::create(Box::new(move |_, _| {
                         if let Err(e) = proxy.send_event(AppEvent::WebviewEvent {
                             event: WebviewEvent::Focus(true),
                             window_id,
@@ -113,7 +113,7 @@ impl WebviewWindow {
                 )?;
                 let proxy = event_loop.create_proxy();
                 controller.add_LostFocus(
-                    webview2_com::FocusChangedEventHandler::create(Box::new(move |_, _| {
+                    &webview2_com::FocusChangedEventHandler::create(Box::new(move |_, _| {
                         if let Err(e) = proxy.send_event(AppEvent::WebviewEvent {
                             event: WebviewEvent::Focus(false),
                             window_id,

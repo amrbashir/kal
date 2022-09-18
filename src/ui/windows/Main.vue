@@ -1,0 +1,265 @@
+<script lang="ts" setup>
+import { watch, onMounted } from "vue";
+import { SearchResultItem, IPCEvent, Icon, IconType } from "../../common";
+import SearchIcon from "../icons/SearchIcon.vue";
+import RefreshingIcon from "../icons/RefreshingIcon.vue";
+
+let results = $ref<SearchResultItem[]>([]);
+let currentQuery = $ref("");
+let currentSelection = $ref(0);
+let refreshingIndex = $ref(false);
+
+// handlers
+function search(query: string) {
+  if (query) {
+    window.KAL.ipc.send(IPCEvent.Search, query);
+  } else {
+    results = [];
+    window.KAL.ipc.send(IPCEvent.ClearResults);
+  }
+}
+
+watch($$(currentQuery), (query) => search(query));
+
+function onkeydown(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    window.KAL.ipc.send(IPCEvent.HideMainWindow);
+  }
+
+  if (["ArrowDown", "ArrowUp"].includes(e.key)) {
+    e.preventDefault();
+    if (e.key === "ArrowDown") {
+      currentSelection =
+        currentSelection === results.length - 1 ? 0 : currentSelection + 1;
+    } else {
+      currentSelection =
+        currentSelection === 0 ? results.length - 1 : currentSelection - 1;
+    }
+
+    document
+      .getElementById(`search-results_item_#${currentSelection}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  if (e.key === "Enter") {
+    e.preventDefault();
+    window.KAL.ipc.send(IPCEvent.Execute, currentSelection, e.shiftKey);
+  }
+
+  if (e.key === "o" && e.ctrlKey) {
+    e.preventDefault();
+    window.KAL.ipc.send(IPCEvent.OpenLocation, currentSelection);
+  }
+
+  if (e.key === "r" && e.ctrlKey) {
+    e.preventDefault();
+    window.KAL.ipc.send(IPCEvent.RefreshIndex);
+    refreshingIndex = true;
+  }
+}
+
+onMounted(() => {
+  window.KAL.ipc.on(IPCEvent.FocusInput, () => {
+    let input = document.getElementById("search-input");
+    input?.focus();
+    (input as HTMLInputElement).select();
+  });
+
+  window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
+    currentSelection = 0;
+    results = payload;
+  });
+
+  window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
+    refreshingIndex = false;
+  });
+});
+
+// utils
+function convertFileSrc(protocol: string, filePath: string): string {
+  const path = encodeURIComponent(filePath);
+  return navigator.userAgent.includes("Windows")
+    ? `https://${protocol}.localhost/${path}`
+    : `${protocol}://${path}`;
+}
+
+function getIconHtml(icon: Icon): string {
+  switch (icon.type) {
+    case IconType.Path:
+      return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
+    case IconType.Svg:
+      return icon.data;
+    default:
+      return ""; // TODO use a default icon
+  }
+}
+</script>
+
+<template>
+  <main>
+    <div
+      id="search-input_container"
+      :style="{ 'border-radius': results.length === 0 ? '10px 10px' : '0 0' }"
+    >
+      <div id="search-input_icon-container">
+        <SearchIcon id="search-input_icon" />
+      </div>
+      <input
+        id="search-input"
+        placeholder="Search..."
+        v-model="currentQuery"
+        @keydown="onkeydown"
+      />
+      <div
+        id="refreshing_icon-container"
+        :style="{ opacity: refreshingIndex ? 1 : 0 }"
+      >
+        <RefreshingIcon id="refreshing_icon" />
+      </div>
+    </div>
+
+    <div id="search-results_container">
+      <ul v-for="(item, index) in results">
+        <li
+          :id="`search-results_item_#${index}`"
+          class="search-results_item"
+          :class="{ selected: index === currentSelection }"
+        >
+          <div
+            class="search-results_item_left"
+            v-html="getIconHtml(item.icon)"
+          ></div>
+          <div class="search-results_item_right">
+            <span class="text-primary">{{ item.primary_text }}</span>
+            <span class="text-secondary">{{ item.secondary_text }}</span>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </main>
+</template>
+
+<style>
+/* TODO: use scss */
+:root {
+  --primary: rgba(31, 31, 31, 0.8);
+  --accent: rgba(72, 141, 210, 0.5);
+  --text-primary: rgba(255, 255, 255);
+  --text-secondary: rgb(107, 107, 107);
+}
+
+main {
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+#search-input_container {
+  appearance: none;
+  background-color: var(--primary);
+  width: 100%;
+  height: 60px;
+  display: flex;
+}
+
+#search-input {
+  flex-grow: 1;
+  background: transparent;
+  height: 100%;
+  outline: none;
+  border: none;
+  font-size: larger;
+  color: var(--text-primary);
+  padding: 1rem;
+}
+
+#search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+#search-input_icon-container,
+#refreshing_icon-container {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  width: 50px;
+  color: var(--text-primary);
+}
+
+/* TODO: use vue transition apis to slide/fade in/out */
+#refreshing_icon-container {
+  transition: opacity 500ms;
+}
+
+#refreshing_icon {
+  animation: rotation 1s infinite linear;
+}
+
+@keyframes rotation {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(359deg);
+  }
+}
+
+#search-results_container {
+  overflow-x: hidden;
+  background-color: var(--primary);
+  width: 100%;
+  height: 400px;
+  border-radius: 0 0 10px 10px;
+}
+
+.search-results_item {
+  overflow: hidden;
+  padding: 0 10px;
+  list-style: none;
+  display: flex;
+  width: 100%;
+  height: 60px;
+}
+
+.search-results_item:hover,
+.search-results_item.selected {
+  background-color: var(--accent);
+}
+
+.search-results_item_left {
+  flex-shrink: 0;
+  width: 60px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.search-results_item_left > * {
+  width: 50%;
+  height: 50%;
+}
+
+.search-results_item_right {
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.search-results_item_right span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+</style>
