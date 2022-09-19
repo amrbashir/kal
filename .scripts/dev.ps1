@@ -12,25 +12,32 @@ $cargoRunInfo.WorkingDirectory = "$PSScriptRoot/.."
 $cargoRun = New-Object System.Diagnostics.Process
 $cargoRun.StartInfo = $cargoRunInfo
 
-# file watcher for the rust code
-$fileWatcher = New-Object System.IO.FileSystemWatcher
-$fileWatcher.Path = "$PSScriptRoot/../src/core"
-$fileWatcher.Filter = "*"
-$fileWatcher.IncludeSubdirectories = $true
-
-function RestartCargoRun {
-  $cargoRun.kill()
-  [void]$cargoRun.start()
-}
-
-$watching = $true
-
+# Start
 [void]$pnpmDev.start()
 [void]$cargoRun.start()
 
-do {
-  $result = $fileWatcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed, 1000)
-  if ($result.TimedOut) { continue }
-  RestartCargoRun
+# Setup file watcher for the rust code
+$fileWatcher = New-Object System.IO.FileSystemWatcher
+$fileWatcher.Path = Split-Path -Parent $PSScriptRoot
+$fileWatcher.Filter = "*"
+$fileWatcher.IncludeSubdirectories = $true
+
+try {
+  do {
+    $result = $fileWatcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed, 1000)
+    if (
+      ($result.Name -like 'src\core\*') -or
+      ($result.Name -like 'src\common\*.rs') -or
+      ($result.Name -like 'Cargo.toml') -or
+      ($result.Name -like 'Cargo.lock')
+    ) {
+      $cargoRun.kill()
+      [void]$cargoRun.start()
+    }
+  }
+  while($true)
+} finally {
+  $fileWatcher.Dispose();
+  $cargoRun.kill();
+  $pnpmDev.kill();
 }
-while($watching)
