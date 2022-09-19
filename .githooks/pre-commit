@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 echo ">> Running \"cargo fmt --all --check\" in $(pwd)"
 cargo fmt --all --check
