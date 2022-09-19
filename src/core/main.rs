@@ -126,7 +126,7 @@ fn create_main_window(
             }),
             ..Default::default()
         },
-        &event_loop,
+        event_loop,
     )?;
 
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -145,7 +145,7 @@ fn show_main_window(app_state: &mut AppState<AppEvent>) {
     let window = main_window.window();
     window.set_visible(true);
     window.set_focus();
-    emit_event(&main_window, IPCEvent::FocusInput, &"");
+    emit_event(main_window, IPCEvent::FocusInput, &"");
 }
 
 /// Hides the main window and restores focus to the previous foreground window if needed
@@ -239,7 +239,7 @@ fn process_events(
 
                         resize_main_window_for_results(
                             &app_state.main_window,
-                            &config,
+                            config,
                             max_results.len(),
                         );
 
@@ -285,7 +285,7 @@ fn process_events(
                     IPCEvent::ClearResults => {
                         let mut app_state = app_state.borrow_mut();
                         app_state.current_results = Vec::new();
-                        resize_main_window_for_results(&app_state.main_window, &config, 0);
+                        resize_main_window_for_results(&app_state.main_window, config, 0);
                     }
                     IPCEvent::RefreshIndex => {
                         let app_state = app_state.borrow();

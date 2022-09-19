@@ -33,7 +33,7 @@ impl WebviewWindow {
     ) -> anyhow::Result<Self> {
         let mut builder = wry::application::window::WindowBuilder::new();
         builder.window = window_options;
-        let window = builder.build(&event_loop)?;
+        let window = builder.build(event_loop)?;
 
         let mut builder = WebViewBuilder::new(window)?;
         builder.webview = webview_options;
