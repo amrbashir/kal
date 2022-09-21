@@ -58,6 +58,7 @@ pub(crate) struct EmbededAssets;
 
 #[derive(Debug)]
 struct AppState<T: 'static> {
+    config: Config,
     main_window: WebviewWindow,
     #[cfg(windows)]
     previously_foreground_hwnd: windows_sys::Win32::Foundation::HWND,
@@ -177,7 +178,6 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
 fn process_events(
     event: &Event<AppEvent>,
     app_state: &RefCell<AppState<AppEvent>>,
-    config: &Config,
 ) -> anyhow::Result<()> {
     match event {
         // handle hotkey
@@ -186,13 +186,13 @@ fn process_events(
             ..
         } => {
             let mut app_state = app_state.borrow_mut();
-            let (modifier, key) = &config.general.hotkey;
+            let (modifier, key) = app_state.config.general.hotkey.clone();
 
-            if &k.physical_key.to_string() == modifier {
+            if k.physical_key.to_string() == modifier {
                 app_state.modifier_pressed = k.state == ElementState::Pressed;
             }
 
-            if &k.physical_key.to_string() == key
+            if k.physical_key.to_string() == key
                 && k.state == ElementState::Pressed
                 && app_state.modifier_pressed
             {
@@ -232,14 +232,14 @@ fn process_events(
 
                         let max_results = results
                             .iter()
-                            .take(config.general.max_search_results as usize)
+                            .take(app_state.config.general.max_search_results as usize)
                             .collect::<Vec<_>>();
 
                         emit_event(&app_state.main_window, IPCEvent::Results, &max_results);
 
                         resize_main_window_for_results(
                             &app_state.main_window,
-                            config,
+                            &app_state.config,
                             max_results.len(),
                         );
 
@@ -285,20 +285,34 @@ fn process_events(
                     IPCEvent::ClearResults => {
                         let mut app_state = app_state.borrow_mut();
                         app_state.current_results = Vec::new();
-                        resize_main_window_for_results(&app_state.main_window, config, 0);
+                        resize_main_window_for_results(
+                            &app_state.main_window,
+                            &app_state.config,
+                            0,
+                        );
                     }
                     IPCEvent::RefreshIndex => {
                         let app_state = app_state.borrow();
                         let proxy = app_state.proxy.clone();
                         let plugins = app_state.plugins.clone();
                         thread::spawn(move || {
-                            for plugin in plugins.lock().unwrap().iter_mut().filter(|p| p.enabled())
-                            {
-                                plugin.refresh();
-                            }
-                            if let Err(e) = proxy.send_event(AppEvent::ThreadEvent(
-                                ThreadEvent::RefreshingIndexFinished,
-                            )) {
+                            let res = || -> anyhow::Result<()> {
+                                let config = Config::load()?;
+                                proxy.send_event(AppEvent::ThreadEvent(
+                                    ThreadEvent::UpdateConfig(config.clone()),
+                                ))?;
+                                for plugin in
+                                    plugins.lock().unwrap().iter_mut().filter(|p| p.enabled())
+                                {
+                                    plugin.refresh(&config);
+                                }
+                                proxy.send_event(AppEvent::ThreadEvent(
+                                    ThreadEvent::RefreshingIndexFinished,
+                                ))?;
+                                Ok(())
+                            };
+
+                            if let Err(e) = res() {
                                 tracing::error!("{e}");
                             }
                         });
@@ -320,6 +334,9 @@ fn process_events(
                         IPCEvent::RefreshingIndexFinished,
                         &"",
                     );
+                }
+                ThreadEvent::UpdateConfig(c) => {
+                    app_state.borrow_mut().config = c.clone();
                 }
             },
 
@@ -358,29 +375,32 @@ fn process_events(
 #[tracing::instrument]
 fn run() -> anyhow::Result<()> {
     let config = Config::load()?;
-    let plugins: Vec<Box<dyn Plugin + Send + 'static>> = vec![
+    let plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>> = Arc::new(Mutex::new(vec![
         AppLauncherPlugin::new(&config)?,
         DirectoryIndexerPlugin::new(&config)?,
-    ];
+    ]));
+
+    let plugins_c = plugins.clone();
+    let config_c = config.clone();
+    thread::spawn(move || {
+        for plugin in plugins_c.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
+            plugin.refresh(&config_c);
+        }
+    });
+
     let event_loop = EventLoop::<AppEvent>::with_user_event();
     event_loop.set_device_event_filter(DeviceEventFilter::Never);
     let main_window = create_main_window(&config, &event_loop)?;
     let main_window_id = main_window.window().id();
     let app_state = RefCell::new(AppState {
+        config,
         main_window,
         #[cfg(windows)]
         previously_foreground_hwnd: 0,
-        plugins: Arc::new(Mutex::new(plugins)),
+        plugins,
         current_results: Default::default(),
         modifier_pressed: false,
         proxy: event_loop.create_proxy(),
-    });
-
-    let plugins = app_state.borrow_mut().plugins.clone();
-    thread::spawn(move || {
-        for plugin in plugins.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
-            plugin.refresh();
-        }
     });
 
     event_loop.run(move |event, _event_loop, control_flow| {
@@ -396,7 +416,7 @@ fn run() -> anyhow::Result<()> {
                 }
             }
 
-            process_events(&event, &app_state, &config)?;
+            process_events(&event, &app_state)?;
 
             Ok(())
         };

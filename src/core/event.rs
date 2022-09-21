@@ -3,6 +3,8 @@ use std::fmt::Display;
 use serde::Serialize;
 use wry::{application::window::WindowId, webview::WebView};
 
+use crate::config::Config;
+
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum AppEvent {
@@ -32,6 +34,8 @@ pub enum WebviewEvent {
 pub enum ThreadEvent {
     /// Refreshing plugins index has finished
     RefreshingIndexFinished,
+    /// Update config in the app state
+    UpdateConfig(Config),
 }
 
 /// Emits an event to a window

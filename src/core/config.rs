@@ -3,14 +3,14 @@ use std::{collections::HashMap, fs, path::Path};
 
 use crate::CONFIG_FILE;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
     pub plugins: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeneralConfig {
     /// A tuple of (Modifier, Key)
     pub hotkey: (String, String),
@@ -18,7 +18,7 @@ pub struct GeneralConfig {
     pub blacklist: Vec<String>,
     pub max_search_results: u32,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppearanceConfig {
     pub window_width: u32,
     pub input_height: u32,

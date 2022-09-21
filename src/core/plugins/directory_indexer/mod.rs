@@ -64,7 +64,11 @@ impl Plugin for DirectoryIndexerPlugin {
         &self.name
     }
 
-    fn refresh(&mut self) {
+    fn refresh(&mut self, config: &Config) {
+        let config = config.plugin_config::<DirectoryIndexerPluginConfig>(&self.name);
+        self.enabled = config.enabled;
+        self.paths = config.paths;
+
         let mut dir_entries = Vec::new();
         for path in &self.paths {
             dir_entries.extend(read_dir(PathBuf::from(path)));

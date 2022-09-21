@@ -76,7 +76,12 @@ impl Plugin for AppLauncherPlugin {
     fn name(&self) -> &str {
         &self.name
     }
-    fn refresh(&mut self) {
+    fn refresh(&mut self, config: &Config) {
+        let config = config.plugin_config::<AppLauncherPluginConfig>(&self.name);
+        self.enabled = config.enabled;
+        self.paths = config.paths;
+        self.extensions = config.extensions;
+
         let mut apps = Vec::new();
         for path in &self.paths {
             apps.extend(filter_path_entries_by_extensions(
