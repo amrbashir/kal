@@ -1,11 +1,13 @@
 use crate::common::{utils, SearchResultItem};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn execute(item: &SearchResultItem, elevated: bool) {
-    utils::windows::execute(&item.execution_args[0], elevated)
+    utils::windows::execute(&item.execution_args.as_str().unwrap(), elevated)
 }
 pub fn open_location(item: &SearchResultItem) {
-    utils::windows::open_path(&item.execution_args[0])
+    if let Some(parent) = PathBuf::from(&item.execution_args.as_str().unwrap()).parent() {
+        utils::windows::open_path(&*parent.to_string_lossy())
+    }
 }
 
 pub fn extract_png<P: AsRef<Path>>(files: Vec<(P, P)>) {

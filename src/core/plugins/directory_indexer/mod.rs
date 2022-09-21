@@ -102,7 +102,7 @@ impl Plugin for DirectoryIndexerPlugin {
                 SearchResultItem {
                     primary_text: app_name,
                     secondary_text: path.clone(),
-                    execution_args: vec![path],
+                    execution_args: serde_json::Value::String(path),
                     plugin_name: self.name.clone(),
                     icon,
                 }
@@ -117,7 +117,7 @@ impl Plugin for DirectoryIndexerPlugin {
                     .into_iter()
                     .filter_map(|a| {
                         if a.icon.r#type == IconType::Path {
-                            Some((a.execution_args[0].clone(), a.icon.data.clone()))
+                            Some((a.execution_args.as_str().unwrap().to_string(), a.icon.data))
                         } else {
                             None
                         }

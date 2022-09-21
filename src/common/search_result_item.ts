@@ -5,7 +5,7 @@ export interface SearchResultItem {
   primary_text: string;
   /** The secondary text to be displayed for this item */
   secondary_text: string;
-  execution_args: string[];
+  execution_args: any;
   plugin_name: string;
   /** The icon to display next to this item */
   icon: Icon;
