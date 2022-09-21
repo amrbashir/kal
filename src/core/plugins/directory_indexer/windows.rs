@@ -1,4 +1,4 @@
-use crate::common::{utils, SearchResultItem};
+use crate::{common::SearchResultItem, utils};
 use std::path::{Path, PathBuf};
 
 pub fn execute(item: &SearchResultItem, _elevated: bool) {

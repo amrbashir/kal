@@ -5,6 +5,7 @@ mod event;
 mod fuzzy_sort;
 mod plugin;
 mod plugins;
+mod utils;
 mod webview_window;
 
 use std::{
@@ -69,110 +70,81 @@ struct AppState<T: 'static> {
 }
 
 #[tracing::instrument]
-fn create_main_window(
-    config: &Config,
-    event_loop: &EventLoop<AppEvent>,
-) -> anyhow::Result<WebviewWindow> {
-    #[cfg(target_os = "linux")]
-    use wry::application::platform::linux::WindowExtWindows;
-    #[cfg(windows)]
-    use wry::application::platform::windows::WindowExtWindows;
+fn main() -> anyhow::Result<()> {
+    let appender = tracing_appender::rolling::never(&*KAL_DATA_DIR, "kal.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
-    let (m_size, m_pos) = {
-        let monitor = event_loop
-            .primary_monitor()
-            .with_context(|| "Failed to get primary monitor")?;
-        (monitor.size(), monitor.position())
-    };
-
-    #[cfg(debug_assertions)]
-    let url = "http://localhost:9010/main";
-    #[cfg(not(debug_assertions))]
-    let url = "kal://localhost/main";
-
-    let main_window = WebviewWindow::new(
-        WindowAttributes {
-            inner_size: Some(
-                LogicalSize::new(
-                    config.appearance.window_width,
-                    config.appearance.input_height,
-                )
-                .into(),
+    use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+    tracing::subscriber::set_global_default(
+        tracing_subscriber::fmt::Subscriber::builder()
+            .with_max_level(LevelFilter::TRACE)
+            .finish()
+            .with(
+                tracing_subscriber::fmt::Layer::default()
+                    .with_writer(non_blocking)
+                    .with_ansi(false),
             ),
-            position: Some(
-                LogicalPosition::new(
-                    m_pos.x + (m_size.width as i32 / 2 - config.appearance.window_width as i32 / 2),
-                    m_pos.y + (m_size.height as i32 / 4),
-                )
-                .into(),
-            ),
-            decorations: false,
-            resizable: false,
-            visible: false,
-            transparent: config.appearance.transparent,
-            ..Default::default()
-        },
-        WebViewAttributes {
-            url: Some(url.parse().unwrap()),
-            transparent: config.appearance.transparent,
-            initialization_scripts: vec![KAL_IPC_INIT_SCRIPT.to_string()],
-            devtools: cfg!(debug_assertions),
-            ipc_handler: Some({
-                let proxy = event_loop.create_proxy();
-                Box::new(move |w, r| {
-                    if let Err(e) = proxy.send_event(AppEvent::Ipc(w.id(), r)) {
-                        tracing::error!("{e}");
-                    }
-                })
-            }),
-            ..Default::default()
-        },
-        event_loop,
-    )?;
+    )
+    .expect("failed to setup logger");
 
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
-    main_window.window().set_skip_taskbar(true);
-    Ok(main_window)
+    run()?;
+
+    Ok(())
 }
 
-// Saves the current foreground window then shows the main window
-fn show_main_window(app_state: &mut AppState<AppEvent>) {
-    #[cfg(windows)]
-    {
-        app_state.previously_foreground_hwnd =
-            unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
-    }
-    let main_window = &app_state.main_window;
-    let window = main_window.window();
-    window.set_visible(true);
-    window.set_focus();
-    emit_event(main_window, IPCEvent::FocusInput, &"");
-}
+#[tracing::instrument]
+fn run() -> anyhow::Result<()> {
+    let config = Config::load()?;
+    let plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>> = Arc::new(Mutex::new(vec![
+        AppLauncherPlugin::new(&config)?,
+        DirectoryIndexerPlugin::new(&config)?,
+    ]));
 
-/// Hides the main window and restores focus to the previous foreground window if needed
-fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
-    app_state.main_window.window().set_visible(false);
-    #[cfg(windows)]
-    {
-        if restore_focus {
-            unsafe {
-                windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(
-                    app_state.previously_foreground_hwnd,
-                )
-            };
+    let plugins_c = plugins.clone();
+    let config_c = config.clone();
+    thread::spawn(move || {
+        for plugin in plugins_c.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
+            plugin.refresh(&config_c);
         }
-    }
-}
+    });
 
-// Resizes the main window based on the number of current results and user config
-fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
-    main_window.window().set_inner_size(LogicalSize::new(
-        config.appearance.window_width,
-        std::cmp::min(
-            count as u32 * config.appearance.results_item_height,
-            config.appearance.results_height,
-        ) + config.appearance.input_height,
-    ));
+    let event_loop = EventLoop::<AppEvent>::with_user_event();
+    event_loop.set_device_event_filter(DeviceEventFilter::Never);
+    let main_window = create_main_window(&config, &event_loop)?;
+    let main_window_id = main_window.window().id();
+    let app_state = RefCell::new(AppState {
+        config,
+        main_window,
+        #[cfg(windows)]
+        previously_foreground_hwnd: 0,
+        plugins,
+        current_results: Default::default(),
+        modifier_pressed: false,
+        proxy: event_loop.create_proxy(),
+    });
+
+    event_loop.run(move |event, _event_loop, control_flow| {
+        let mut _run = || -> anyhow::Result<()> {
+            if let Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                window_id,
+                ..
+            } = &event
+            {
+                if window_id == &main_window_id {
+                    *control_flow = ControlFlow::Exit
+                }
+            }
+
+            process_events(&event, &app_state)?;
+
+            Ok(())
+        };
+
+        if let Err(e) = _run() {
+            tracing::error!("{e}");
+        }
+    });
 }
 
 fn process_events(
@@ -373,79 +345,108 @@ fn process_events(
 }
 
 #[tracing::instrument]
-fn run() -> anyhow::Result<()> {
-    let config = Config::load()?;
-    let plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>> = Arc::new(Mutex::new(vec![
-        AppLauncherPlugin::new(&config)?,
-        DirectoryIndexerPlugin::new(&config)?,
-    ]));
+fn create_main_window(
+    config: &Config,
+    event_loop: &EventLoop<AppEvent>,
+) -> anyhow::Result<WebviewWindow> {
+    #[cfg(target_os = "linux")]
+    use wry::application::platform::linux::WindowExtWindows;
+    #[cfg(windows)]
+    use wry::application::platform::windows::WindowExtWindows;
 
-    let plugins_c = plugins.clone();
-    let config_c = config.clone();
-    thread::spawn(move || {
-        for plugin in plugins_c.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
-            plugin.refresh(&config_c);
-        }
-    });
+    let (m_size, m_pos) = {
+        let monitor = event_loop
+            .primary_monitor()
+            .with_context(|| "Failed to get primary monitor")?;
+        (monitor.size(), monitor.position())
+    };
 
-    let event_loop = EventLoop::<AppEvent>::with_user_event();
-    event_loop.set_device_event_filter(DeviceEventFilter::Never);
-    let main_window = create_main_window(&config, &event_loop)?;
-    let main_window_id = main_window.window().id();
-    let app_state = RefCell::new(AppState {
-        config,
-        main_window,
-        #[cfg(windows)]
-        previously_foreground_hwnd: 0,
-        plugins,
-        current_results: Default::default(),
-        modifier_pressed: false,
-        proxy: event_loop.create_proxy(),
-    });
+    #[cfg(debug_assertions)]
+    let url = "http://localhost:9010/main";
+    #[cfg(not(debug_assertions))]
+    let url = "kal://localhost/main";
 
-    event_loop.run(move |event, _event_loop, control_flow| {
-        let mut _run = || -> anyhow::Result<()> {
-            if let Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id,
-                ..
-            } = &event
-            {
-                if window_id == &main_window_id {
-                    *control_flow = ControlFlow::Exit
-                }
-            }
+    let main_window = WebviewWindow::new(
+        WindowAttributes {
+            inner_size: Some(
+                LogicalSize::new(
+                    config.appearance.window_width,
+                    config.appearance.input_height,
+                )
+                .into(),
+            ),
+            position: Some(
+                LogicalPosition::new(
+                    m_pos.x + (m_size.width as i32 / 2 - config.appearance.window_width as i32 / 2),
+                    m_pos.y + (m_size.height as i32 / 4),
+                )
+                .into(),
+            ),
+            decorations: false,
+            resizable: false,
+            visible: false,
+            transparent: config.appearance.transparent,
+            ..Default::default()
+        },
+        WebViewAttributes {
+            url: Some(url.parse().unwrap()),
+            transparent: config.appearance.transparent,
+            initialization_scripts: vec![KAL_IPC_INIT_SCRIPT.to_string()],
+            devtools: cfg!(debug_assertions),
+            ipc_handler: Some({
+                let proxy = event_loop.create_proxy();
+                Box::new(move |w, r| {
+                    if let Err(e) = proxy.send_event(AppEvent::Ipc(w.id(), r)) {
+                        tracing::error!("{e}");
+                    }
+                })
+            }),
+            ..Default::default()
+        },
+        event_loop,
+    )?;
 
-            process_events(&event, &app_state)?;
-
-            Ok(())
-        };
-
-        if let Err(e) = _run() {
-            tracing::error!("{e}");
-        }
-    });
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    main_window.window().set_skip_taskbar(true);
+    Ok(main_window)
 }
 
-#[tracing::instrument]
-fn main() -> anyhow::Result<()> {
-    let appender = tracing_appender::rolling::never(&*KAL_DATA_DIR, "kal.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
+// Saves the current foreground window then shows the main window
+fn show_main_window(app_state: &mut AppState<AppEvent>) {
+    #[cfg(windows)]
+    {
+        app_state.previously_foreground_hwnd =
+            unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
+    }
+    let main_window = &app_state.main_window;
+    let window = main_window.window();
+    window.set_visible(true);
+    window.set_focus();
+    emit_event(main_window, IPCEvent::FocusInput, &"");
+}
 
-    use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::fmt::Subscriber::builder()
-            .with_max_level(LevelFilter::TRACE)
-            .finish()
-            .with(
-                tracing_subscriber::fmt::Layer::default()
-                    .with_writer(non_blocking)
-                    .with_ansi(false),
-            ),
-    )
-    .expect("failed to setup logger");
+/// Hides the main window and restores focus to the previous foreground window if needed
+fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
+    app_state.main_window.window().set_visible(false);
+    #[cfg(windows)]
+    {
+        if restore_focus {
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(
+                    app_state.previously_foreground_hwnd,
+                )
+            };
+        }
+    }
+}
 
-    run()?;
-
-    Ok(())
+// Resizes the main window based on the number of current results and user config
+fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
+    main_window.window().set_inner_size(LogicalSize::new(
+        config.appearance.window_width,
+        std::cmp::min(
+            count as u32 * config.appearance.results_item_height,
+            config.appearance.results_height,
+        ) + config.appearance.input_height,
+    ));
 }

@@ -18,6 +18,7 @@ pub struct GeneralConfig {
     pub blacklist: Vec<String>,
     pub max_search_results: u32,
 }
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppearanceConfig {
     pub window_width: u32,
