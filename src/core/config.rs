@@ -57,18 +57,18 @@ impl Config {
     /// Loads the config from a path
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {
         let path = path.as_ref();
-        let config = if path.exists() {
-            let config_json = fs::read_to_string(path)?;
-            match toml::from_str::<Config>(&config_json) {
-                Ok(c) => c,
-                Err(e) => {
+        let config = match path.exists() {
+            true => {
+                let config_toml = fs::read_to_string(path)?;
+                toml::from_str::<Config>(&config_toml).unwrap_or_else(|e| {
                     tracing::error!("Failed to deserialize config, falling back to default: {e}",);
                     Config::default()
-                }
+                })
             }
-        } else {
-            tracing::debug!("Config file wasn't found, falling back to default");
-            Config::default()
+            false => {
+                tracing::debug!("Config file wasn't found, falling back to default");
+                Config::default()
+            }
         };
         tracing::info!("Config loaded");
         Ok(config)
@@ -80,15 +80,16 @@ impl Config {
         T: Default,
         for<'de> T: Deserialize<'de>,
     {
-        if let Some(toml_value) = self.plugins.get(name) {
-            toml::from_str(&toml_value.to_string()).unwrap_or_else(|e| {
-                tracing::error!(
-                    "Failed to deserialize {name} config, failling back to default: {e}"
-                );
-                T::default()
+        self.plugins
+            .get(name)
+            .map(|toml_value| {
+                toml::from_str(&toml_value.to_string()).unwrap_or_else(|e| {
+                    tracing::error!(
+                        "Failed to deserialize {name} config, failling back to default: {e}"
+                    );
+                    T::default()
+                })
             })
-        } else {
-            T::default()
-        }
+            .unwrap_or_default()
     }
 }

@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::Debug,
     ops::{Deref, DerefMut},
     path::PathBuf,
@@ -50,38 +51,26 @@ impl WebviewWindow {
 
         let mut builder = WebViewBuilder::new(&window);
         builder.attrs = webview_options;
-        #[cfg(not(debug_assertions))]
-        builder.attrs.custom_protocols.push((
-            "kal".into(),
-            Box::new(move |request| {
-                let path = &request.uri().path()[1..];
-                let data = crate::EmbededAssets::get(&path)
-                    .unwrap_or_else(|| crate::EmbededAssets::get("index.html").unwrap())
-                    .data;
-                let mimetype = match &*PathBuf::from(path)
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                {
-                    "html" | "htm" => "text/html",
-                    "js" | "mjs" => "text/javascript",
-                    "css" => "text/css",
-                    "png" => "image/png",
-                    "jpg" | "jpeg" => "image/jpeg",
-                    "svg" => "image/svg+xml",
-                    _ => "text/html",
-                };
 
-                Response::builder()
-                    .header(CONTENT_TYPE, mimetype)
-                    .body(data.to_vec())
-            }),
-        ));
+        #[cfg(not(debug_assertions))]
+        {
+            builder =
+                builder.with_custom_protocol("kal".into(), move |request| {
+                    match kal_protocol(request) {
+                        Ok(r) => r,
+                        Err(e) => Response::builder()
+                            .status(500)
+                            .body(e.to_string().as_bytes().to_vec())
+                            .unwrap()
+                            .map(Into::into),
+                    }
+                });
+        }
         builder =
             builder.with_custom_protocol(
                 "kalasset".into(),
                 move |request| match kal_asset_protocol(request) {
-                    Ok(r) => r.map(Into::into),
+                    Ok(r) => r,
                     Err(e) => Response::builder()
                         .status(500)
                         .body(e.to_string().as_bytes().to_vec())
@@ -152,35 +141,64 @@ impl DerefMut for WebviewWindow {
     }
 }
 
-fn kal_asset_protocol(request: Request<Vec<u8>>) -> Result<Response<Vec<u8>>, wry::Error> {
+const EMPTY_BODY: [u8; 0] = [0_u8; 0];
+
+#[cfg(not(debug_assertions))]
+fn kal_protocol<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
     let path = &request.uri().path()[1..];
-    let path = percent_encoding::percent_decode_str(path).decode_utf8_lossy();
+    let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
+
+    let file = crate::EmbededAssets::get(&path)
+        .unwrap_or_else(|| crate::EmbededAssets::get("index.html").unwrap());
+
+    let path = PathBuf::from(&*path);
+    let mimetype = match path.extension().unwrap_or_default().to_str() {
+        Some("html") | Some("htm") => "text/html",
+        Some("js") | Some("mjs") => "text/javascript",
+        Some("css") => "text/css",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        _ => "text/html",
+    };
+
+    Response::builder()
+        .header(CONTENT_TYPE, mimetype)
+        .body(Cow::from(file.data))
+        .map_err(Into::into)
+}
+
+fn kal_asset_protocol<'a>(
+    request: Request<Vec<u8>>,
+) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
+    let path = &request.uri().path()[1..];
+    let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 
     if path.starts_with("icons/defaults") {
         return Response::builder()
             .header(CONTENT_TYPE, "image/png")
-            .body(icon::Defaults::bytes(&path).to_vec())
-            .map_err(wry::Error::HttpError);
+            .body(Cow::from(icon::Defaults::bytes(&path)))
+            .map_err(Into::into);
     }
 
-    let path = dunce::canonicalize(PathBuf::from(path.to_string())).unwrap_or_default();
+    let path = dunce::canonicalize(PathBuf::from(&*path))?;
 
     if path.starts_with(&*KAL_DATA_DIR) {
-        let mimetype = match &*path.extension().unwrap_or_default().to_string_lossy() {
-            "png" => "image/png",
-            "jpg" | "jpeg" => "image/jpeg",
-            "svg" => "image/svg+xml",
+        let mimetype = match path.extension().unwrap_or_default().to_str() {
+            Some("png") => "image/png",
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("svg") => "image/svg+xml",
             _ => "text/html",
         };
 
         Response::builder()
             .header(CONTENT_TYPE, mimetype)
-            .body(std::fs::read(path).unwrap_or_default())
-            .map_err(wry::Error::HttpError)
+            .body(Cow::from(std::fs::read(path)?))
+            .map_err(Into::into)
     } else {
         Response::builder()
             .status(403)
-            .body([].into())
-            .map_err(wry::Error::HttpError)
+            .body(Cow::from(&EMPTY_BODY[..]))
+            .map_err(Into::into)
     }
 }

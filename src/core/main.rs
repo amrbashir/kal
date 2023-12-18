@@ -29,8 +29,6 @@ use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use once_cell::sync::Lazy;
 use plugins::{directory_indexer::DirectoryIndexerPlugin, shortcuts::ShortcutsPlugin};
-#[cfg(not(debug_assertions))]
-use rust_embed::RustEmbed;
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
     event::{DeviceEvent, ElementState, Event, WindowEvent},
@@ -58,7 +56,7 @@ static CONFIG_FILE: Lazy<PathBuf> = Lazy::new(|| {
 static TEMP_DIR: Lazy<PathBuf> = Lazy::new(|| std::env::temp_dir());
 
 #[cfg(not(debug_assertions))]
-#[derive(RustEmbed)]
+#[derive(rust_embed::RustEmbed)]
 #[folder = "dist"]
 pub(crate) struct EmbededAssets;
 
