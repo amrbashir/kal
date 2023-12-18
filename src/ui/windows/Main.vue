@@ -1,25 +1,25 @@
 <script lang="ts" setup>
-import { watch, onMounted } from "vue";
+import { watch, onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent, Icon, IconType } from "../../common";
 import SearchIcon from "../icons/SearchIcon.vue";
 import RefreshingIcon from "../icons/RefreshingIcon.vue";
 
-let results = $ref<SearchResultItem[]>([]);
-let currentQuery = $ref("");
-let currentSelection = $ref(0);
-let refreshingIndex = $ref(false);
+let results = ref<SearchResultItem[]>([]);
+let currentQuery = ref("");
+let currentSelection = ref(0);
+let refreshingIndex = ref(false);
 
 // handlers
 function search(query: string) {
   if (query) {
     window.KAL.ipc.send(IPCEvent.Search, query);
   } else {
-    results = [];
+    results.value = [];
     window.KAL.ipc.send(IPCEvent.ClearResults);
   }
 }
 
-watch($$(currentQuery), (query) => search(query));
+watch(currentQuery, (query) => search(query));
 
 function onkeydown(e: KeyboardEvent) {
   if (e.key === "Escape") {
@@ -30,11 +30,15 @@ function onkeydown(e: KeyboardEvent) {
   if (["ArrowDown", "ArrowUp"].includes(e.key)) {
     e.preventDefault();
     if (e.key === "ArrowDown") {
-      currentSelection =
-        currentSelection === results.length - 1 ? 0 : currentSelection + 1;
+      currentSelection.value =
+        currentSelection.value === results.value.length - 1
+          ? 0
+          : currentSelection.value + 1;
     } else {
-      currentSelection =
-        currentSelection === 0 ? results.length - 1 : currentSelection - 1;
+      currentSelection.value =
+        currentSelection.value === 0
+          ? results.value.length - 1
+          : currentSelection.value - 1;
     }
 
     document
@@ -44,18 +48,18 @@ function onkeydown(e: KeyboardEvent) {
 
   if (e.key === "Enter") {
     e.preventDefault();
-    window.KAL.ipc.send(IPCEvent.Execute, currentSelection, e.shiftKey);
+    window.KAL.ipc.send(IPCEvent.Execute, currentSelection.value, e.shiftKey);
   }
 
-  if (e.key === "o" && e.ctrlKey) {
+  if (e.ctrlKey && e.key === "o") {
     e.preventDefault();
-    window.KAL.ipc.send(IPCEvent.OpenLocation, currentSelection);
+    window.KAL.ipc.send(IPCEvent.OpenLocation, currentSelection.value);
   }
 
-  if (e.key === "r" && e.ctrlKey) {
+  if (e.ctrlKey && e.key === "r") {
     e.preventDefault();
     window.KAL.ipc.send(IPCEvent.RefreshIndex);
-    refreshingIndex = true;
+    refreshingIndex.value = true;
   }
 }
 
@@ -67,12 +71,13 @@ onMounted(() => {
   });
 
   window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
-    currentSelection = 0;
-    results = payload;
+    currentSelection.value = 0;
+    results.value = payload;
   });
 
   window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
-    refreshingIndex = false;
+    setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for transition purposes
+    search(currentQuery.value);
   });
 });
 
@@ -80,7 +85,7 @@ onMounted(() => {
 function convertFileSrc(protocol: string, filePath: string): string {
   const path = encodeURIComponent(filePath);
   return navigator.userAgent.includes("Windows")
-    ? `https://${protocol}.localhost/${path}`
+    ? `http://${protocol}.localhost/${path}`
     : `${protocol}://${path}`;
 }
 
@@ -92,7 +97,7 @@ function getIconHtml(icon: Icon): string {
     case IconType.Svg:
       return icon.data;
     default:
-      return ""; // TODO use a default icon
+      return "<span>TODO: empty icon</span>";
   }
 }
 </script>
@@ -101,23 +106,26 @@ function getIconHtml(icon: Icon): string {
   <main>
     <div
       id="search-input_container"
-      :style="{ 'border-radius': results.length === 0 ? '10px 10px' : '0 0' }"
+      :style="{
+        'border-radius': results.length === 0 ? '10px 10px' : '10px 10px 0 0',
+      }"
     >
       <div id="search-input_icon-container">
         <SearchIcon id="search-input_icon" />
       </div>
+
       <input
         id="search-input"
         placeholder="Search..."
         v-model="currentQuery"
         @keydown="onkeydown"
       />
-      <div
-        id="refreshing_icon-container"
-        :style="{ opacity: refreshingIndex ? 1 : 0 }"
-      >
-        <RefreshingIcon id="refreshing_icon" />
-      </div>
+
+      <Transition name="slide-fade">
+        <div v-if="refreshingIndex" id="refreshing_icon-container">
+          <RefreshingIcon id="refreshing_icon" />
+        </div>
+      </Transition>
     </div>
 
     <div id="search-results_container">
@@ -143,10 +151,10 @@ function getIconHtml(icon: Icon): string {
 </template>
 
 <style>
-/* TODO: use scss */
 :root {
-  --primary: rgba(31, 31, 31, 0.75);
+  --primary: rgba(21, 20, 20, 0.75);
   --accent: rgba(70, 140, 210, 0.5);
+  --accent-lighter: rgba(90, 163, 235, 0.5);
   --text-primary: rgba(180, 180, 180);
   --text-secondary: rgb(100, 100, 100);
   --text-primary-on-accent: rgba(255, 255, 255);
@@ -191,9 +199,15 @@ main {
   color: var(--text-primary);
 }
 
-/* TODO: use vue transition apis to slide/fade in/out */
-#refreshing_icon-container {
-  transition: opacity 500ms;
+.slide-fade-leave-active,
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
 }
 
 #refreshing_icon {

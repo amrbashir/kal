@@ -17,12 +17,18 @@ pub enum IconType {
 
 pub enum Defaults {
     Folder,
+    Url,
+    File,
+    Shell,
 }
 
 impl Defaults {
     pub fn path(&self) -> &str {
         match self {
             Defaults::Folder => "icons/defaults/folder",
+            Defaults::Url => "icons/defaults/url",
+            Defaults::File => "icons/defaults/file",
+            Defaults::Shell => "icons/defaults/shell",
         }
     }
 
@@ -30,6 +36,9 @@ impl Defaults {
         Icon {
             data: match self {
                 Defaults::Folder => self.path().to_string(),
+                Defaults::Url => self.path().to_string(),
+                Defaults::File => self.path().to_string(),
+                Defaults::Shell => self.path().to_string(),
             },
             r#type: IconType::Default,
         }
@@ -38,8 +47,15 @@ impl Defaults {
     pub fn bytes(path: &str) -> &[u8] {
         let icon = path.split('/').rev().next().unwrap();
         match icon {
+            // TODO: replace with svgs
             #[cfg(windows)]
             "folder" => include_bytes!("./icons/windows/folder.png"),
+            #[cfg(windows)]
+            "file" => include_bytes!("./icons/windows/file.png"),
+            #[cfg(windows)]
+            "url" => include_bytes!("./icons/windows/url.png"),
+            #[cfg(windows)]
+            "shell" => include_bytes!("./icons/windows/shell.png"),
             _ => &[],
         }
     }

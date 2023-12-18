@@ -1,18 +1,25 @@
-/// Sorts a vector of structs by field
-macro_rules! fuzzy_sort {
-    ($items:ident, $key:ident, $query:ident) => {
-        let matcher = ::fuzzy_matcher::skim::SkimMatcherV2::default();
-        let mut si = Vec::new();
-        for item in $items {
-            si.push((
-                ::fuzzy_matcher::FuzzyMatcher::fuzzy_match(&matcher, &item.$key, $query)
-                    .unwrap_or_default(),
-                item,
-            ));
-        }
-        si.sort_by_cached_key(|i| i.0);
-        $items = si.into_iter().rev().map(|i| i.1).collect();
-    };
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+
+use crate::common::SearchResultItem;
+
+pub trait CanBeFuzzed {
+    fn key(&self) -> &str;
 }
 
-pub(crate) use fuzzy_sort;
+impl<T: AsRef<str>> CanBeFuzzed for T {
+    fn key(&self) -> &str {
+        self.as_ref()
+    }
+}
+
+impl CanBeFuzzed for SearchResultItem {
+    fn key(&self) -> &str {
+        &self.primary_text
+    }
+}
+
+/// Sorts a vector of structs by field
+pub fn fuzzy_sort<T: CanBeFuzzed>(matcher: &SkimMatcherV2, items: &mut Vec<T>, query: &str) {
+    items.sort_by_cached_key(|item| matcher.fuzzy_match(item.key(), query));
+    items.reverse();
+}

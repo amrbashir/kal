@@ -1,4 +1,5 @@
 use std::{iter, os::windows::prelude::OsStrExt, path::Path, ptr};
+use url::Url;
 use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
 
 pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) {
@@ -19,11 +20,28 @@ pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) {
 }
 
 pub fn open_path<P: AsRef<Path>>(path: P) {
+    let verb = encode_wide("open");
+    let path = encode_wide(path.as_ref().to_string_lossy().into_owned());
     unsafe {
         windows_sys::Win32::UI::Shell::ShellExecuteW(
             ptr::null::<isize>() as _,
-            encode_wide("open").as_ptr(),
-            encode_wide(path.as_ref().to_string_lossy().into_owned()).as_ptr(),
+            verb.as_ptr(),
+            path.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL as _,
+        )
+    };
+}
+
+pub fn open_url(url: &Url) {
+    let verb = encode_wide("open");
+    let url = encode_wide(url.as_str());
+    unsafe {
+        windows_sys::Win32::UI::Shell::ShellExecuteW(
+            ptr::null::<isize>() as _,
+            verb.as_ptr(),
+            url.as_ptr(),
             ptr::null(),
             ptr::null(),
             SW_SHOWNORMAL as _,

@@ -5,7 +5,7 @@ use crate::{
     },
     config::Config,
     plugin::Plugin,
-    KAL_DATA_DIR,
+    utils, KAL_DATA_DIR,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -71,7 +71,8 @@ impl Plugin for DirectoryIndexerPlugin {
 
         let mut dir_entries = Vec::new();
         for path in &self.paths {
-            dir_entries.extend(read_dir(PathBuf::from(path)));
+            let path = utils::resolve_env_vars(path);
+            dir_entries.extend(read_dir(path));
         }
 
         self.cached_dir_entries = dir_entries

@@ -5,7 +5,7 @@ use crate::{
     },
     config::Config,
     plugin::Plugin,
-    KAL_DATA_DIR,
+    utils, KAL_DATA_DIR,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -40,10 +40,9 @@ impl Default for AppLauncherPluginConfig {
         Self {
             enabled: true,
             paths: vec![
-                "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
-                "C:\\Users\\amr\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs"
-                    .to_string(),
-                "C:\\Users\\amr\\Desktop".to_string(),
+                "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+                "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+                "%USERPROFILE%\\Desktop".to_string(),
             ],
             extensions: vec![
                 "exe".to_string(),
@@ -84,10 +83,8 @@ impl Plugin for AppLauncherPlugin {
 
         let mut apps = Vec::new();
         for path in &self.paths {
-            apps.extend(filter_path_entries_by_extensions(
-                PathBuf::from(path),
-                &self.extensions,
-            ));
+            let path = utils::resolve_env_vars(path);
+            apps.extend(filter_path_entries_by_extensions(path, &self.extensions));
         }
 
         self.cached_apps = apps
@@ -95,10 +92,10 @@ impl Plugin for AppLauncherPlugin {
             .map(|e| {
                 let file = e.path();
 
-                let mut icon_path = self
+                let icon_path = self
                     .icons_dir
-                    .join(&*file.file_stem().unwrap_or_default().to_string_lossy());
-                icon_path.set_extension("png");
+                    .join(&*file.file_stem().unwrap_or_default().to_string_lossy())
+                    .with_extension("png");
 
                 let app_name = file
                     .file_stem()

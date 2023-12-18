@@ -11,7 +11,7 @@ declare interface Window {
       ): void;
       on<T>(
         event: import("../common/ipc_event").IPCEvent,
-        eventHandler: (...payload: T) => void
+        eventHandler: (...payload: T) => void,
       ): void;
     };
   };

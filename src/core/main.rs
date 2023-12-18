@@ -26,38 +26,42 @@ use crate::{
 };
 
 use anyhow::Context;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use once_cell::sync::Lazy;
-use plugins::directory_indexer::DirectoryIndexerPlugin;
+use plugins::{directory_indexer::DirectoryIndexerPlugin, shortcuts::ShortcutsPlugin};
 #[cfg(not(debug_assertions))]
 use rust_embed::RustEmbed;
-use wry::{
-    application::{
-        dpi::{LogicalPosition, LogicalSize},
-        event::{DeviceEvent, ElementState, Event, WindowEvent},
-        event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopProxy},
-        window::WindowAttributes,
-    },
-    webview::WebViewAttributes,
+use tao::{
+    dpi::{LogicalPosition, LogicalSize},
+    event::{DeviceEvent, ElementState, Event, WindowEvent},
+    event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy},
+    window::WindowAttributes,
 };
+use wry::WebViewAttributes;
 
 static KAL_DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    dirs_next::data_local_dir()
+    dirs::data_local_dir()
         .expect("Failed to get $data_local_dir path")
         .join("kal")
 });
 static CONFIG_FILE: Lazy<PathBuf> = Lazy::new(|| {
-    dirs_next::home_dir()
+    #[cfg(debug_assertions)]
+    return std::env::current_dir()
+        .expect("Failed to get current directory path")
+        .join("kal.toml");
+    #[cfg(not(debug_assertions))]
+    dirs::home_dir()
         .expect("Failed to get $home_dir path")
         .join(".config")
-        .join("kal.conf.json")
+        .join("kal.toml")
 });
+static TEMP_DIR: Lazy<PathBuf> = Lazy::new(|| std::env::temp_dir());
 
 #[cfg(not(debug_assertions))]
 #[derive(RustEmbed)]
 #[folder = "dist"]
 pub(crate) struct EmbededAssets;
 
-#[derive(Debug)]
 struct AppState<T: 'static> {
     config: Config,
     main_window: WebviewWindow,
@@ -67,6 +71,7 @@ struct AppState<T: 'static> {
     current_results: Vec<SearchResultItem>,
     modifier_pressed: bool,
     proxy: EventLoopProxy<T>,
+    fuzzy_matcher: SkimMatcherV2,
 }
 
 #[tracing::instrument]
@@ -98,6 +103,7 @@ fn run() -> anyhow::Result<()> {
     let plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>> = Arc::new(Mutex::new(vec![
         AppLauncherPlugin::new(&config)?,
         DirectoryIndexerPlugin::new(&config)?,
+        ShortcutsPlugin::new(&config)?,
     ]));
 
     let plugins_c = plugins.clone();
@@ -108,11 +114,11 @@ fn run() -> anyhow::Result<()> {
         }
     });
 
-    let event_loop = EventLoop::<AppEvent>::with_user_event();
+    let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     event_loop.set_device_event_filter(DeviceEventFilter::Never);
     let main_window = create_main_window(&config, &event_loop)?;
-    let main_window_id = main_window.window().id();
-    let app_state = RefCell::new(AppState {
+    let main_window_id = main_window.window.id();
+    let app_state = AppState {
         config,
         main_window,
         #[cfg(windows)]
@@ -121,7 +127,9 @@ fn run() -> anyhow::Result<()> {
         current_results: Default::default(),
         modifier_pressed: false,
         proxy: event_loop.create_proxy(),
-    });
+        fuzzy_matcher: SkimMatcherV2::default(),
+    };
+    let app_state = RefCell::new(app_state);
 
     event_loop.run(move |event, _event_loop, control_flow| {
         let mut _run = || -> anyhow::Result<()> {
@@ -168,7 +176,7 @@ fn process_events(
                 && k.state == ElementState::Pressed
                 && app_state.modifier_pressed
             {
-                let window = app_state.main_window.window();
+                let window = &app_state.main_window.window;
                 if window.is_visible() {
                     hide_main_window(&app_state, true);
                 } else {
@@ -177,9 +185,38 @@ fn process_events(
             }
         }
 
+        #[cfg(not(windows))]
+        Event::WindowEvent {
+            event, window_id, ..
+        } => {
+            match event {
+                WindowEvent::Focused(focus) => {
+                    let app_state = app_state.borrow();
+                    let main_window = app_state.main_window.window();
+                    // hide main window when it loses focus
+                    if *window_id == main_window.id() && !focus {
+                        main_window.set_visible(false);
+                    }
+                }
+                _ => {}
+            }
+        }
+
         Event::UserEvent(event) => match event {
+            #[cfg(windows)]
+            AppEvent::WebviewEvent { event, window_id } => match event {
+                WebviewEvent::Focus(focus) => {
+                    let app_state = app_state.borrow();
+                    let main_window = &app_state.main_window.window;
+                    // hide main window when the webview loses focus
+                    if *window_id == main_window.id() && !focus {
+                        main_window.set_visible(false);
+                    }
+                }
+            },
+
             AppEvent::Ipc(window_id, request)
-                if *window_id == app_state.borrow().main_window.window().id() =>
+                if *window_id == app_state.borrow().main_window.window.id() =>
             {
                 let r = request.split("::").take(2).collect::<Vec<_>>();
                 let (event, payload): (IPCEvent, &str) = (r[0].into(), r[1]);
@@ -188,7 +225,9 @@ fn process_events(
                     IPCEvent::Search => {
                         let mut app_state = app_state.borrow_mut();
 
-                        let query = serde_json::from_str::<Vec<&str>>(payload)?[0];
+                        let payload = serde_json::from_str::<Vec<String>>(payload)?;
+                        let query = &payload[0];
+
                         let mut results = Vec::new();
                         for plugin in app_state
                             .plugins
@@ -197,10 +236,10 @@ fn process_events(
                             .iter()
                             .filter(|p| p.enabled())
                         {
-                            results.extend_from_slice(plugin.results(query));
+                            results.extend_from_slice(plugin.results(&query));
                         }
 
-                        fuzzy_sort!(results, primary_text, query);
+                        fuzzy_sort(&app_state.fuzzy_matcher, &mut results, &query);
 
                         let max_results = results
                             .iter()
@@ -273,9 +312,7 @@ fn process_events(
                                 proxy.send_event(AppEvent::ThreadEvent(
                                     ThreadEvent::UpdateConfig(config.clone()),
                                 ))?;
-                                for plugin in
-                                    plugins.lock().unwrap().iter_mut().filter(|p| p.enabled())
-                                {
+                                for plugin in plugins.lock().unwrap().iter_mut() {
                                     plugin.refresh(&config);
                                 }
                                 proxy.send_event(AppEvent::ThreadEvent(
@@ -311,34 +348,8 @@ fn process_events(
                     app_state.borrow_mut().config = c.clone();
                 }
             },
-
-            AppEvent::WebviewEvent { event, window_id } => match event {
-                #[cfg(windows)]
-                WebviewEvent::Focus(focus) => {
-                    let app_state = app_state.borrow();
-                    let main_window = app_state.main_window.window();
-                    // hide main window when the webview loses focus
-                    if *window_id == main_window.id() && !focus {
-                        main_window.set_visible(false);
-                    }
-                }
-            },
         },
-        Event::WindowEvent { event, .. } => {
-            match event {
-                #[cfg(not(target_os = "windows"))]
-                WindowEvent::Focused(focus) => {
-                    let app_state = app_state.borrow();
-                    let main_window = app_state.main_window.window();
-                    // hide main window when it loses focus
-                    #[cfg(any(target_os = "linux", target_os = "macos"))]
-                    if *window_id == main_window.id() && !focus {
-                        main_window.set_visible(false);
-                    }
-                }
-                _ => {}
-            }
-        }
+
         _ => {}
     }
     Ok(())
@@ -350,21 +361,24 @@ fn create_main_window(
     event_loop: &EventLoop<AppEvent>,
 ) -> anyhow::Result<WebviewWindow> {
     #[cfg(target_os = "linux")]
-    use wry::application::platform::linux::WindowExtWindows;
+    use tao::platform::linux::WindowExtWindows;
     #[cfg(windows)]
-    use wry::application::platform::windows::WindowExtWindows;
+    use tao::platform::windows::WindowExtWindows;
 
     let (m_size, m_pos) = {
         let monitor = event_loop
             .primary_monitor()
             .with_context(|| "Failed to get primary monitor")?;
-        (monitor.size(), monitor.position())
+        (
+            monitor.size().to_logical::<u32>(monitor.scale_factor()),
+            monitor.position().to_logical::<u32>(monitor.scale_factor()),
+        )
     };
 
     #[cfg(debug_assertions)]
-    let url = "http://localhost:9010/main";
+    let url = "http://localhost:9010";
     #[cfg(not(debug_assertions))]
-    let url = "kal://localhost/main";
+    let url = "kal://localhost";
 
     let main_window = WebviewWindow::new(
         WindowAttributes {
@@ -377,8 +391,8 @@ fn create_main_window(
             ),
             position: Some(
                 LogicalPosition::new(
-                    m_pos.x + (m_size.width as i32 / 2 - config.appearance.window_width as i32 / 2),
-                    m_pos.y + (m_size.height as i32 / 4),
+                    m_pos.x + (m_size.width / 2 - config.appearance.window_width / 2),
+                    m_pos.y + (m_size.height / 4),
                 )
                 .into(),
             ),
@@ -393,21 +407,14 @@ fn create_main_window(
             transparent: config.appearance.transparent,
             initialization_scripts: vec![KAL_IPC_INIT_SCRIPT.to_string()],
             devtools: cfg!(debug_assertions),
-            ipc_handler: Some({
-                let proxy = event_loop.create_proxy();
-                Box::new(move |w, r| {
-                    if let Err(e) = proxy.send_event(AppEvent::Ipc(w.id(), r)) {
-                        tracing::error!("{e}");
-                    }
-                })
-            }),
             ..Default::default()
         },
         event_loop,
     )?;
 
-    #[cfg(any(target_os = "windows", target_os = "linux"))]
-    main_window.window().set_skip_taskbar(true);
+    #[cfg(any(windows, target_os = "linux"))]
+    main_window.window.set_skip_taskbar(true);
+
     Ok(main_window)
 }
 
@@ -419,15 +426,14 @@ fn show_main_window(app_state: &mut AppState<AppEvent>) {
             unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() };
     }
     let main_window = &app_state.main_window;
-    let window = main_window.window();
-    window.set_visible(true);
-    window.set_focus();
+    main_window.window.set_visible(true);
+    main_window.window.set_focus();
     emit_event(main_window, IPCEvent::FocusInput, &"");
 }
 
 /// Hides the main window and restores focus to the previous foreground window if needed
 fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
-    app_state.main_window.window().set_visible(false);
+    app_state.main_window.window.set_visible(false);
     #[cfg(windows)]
     {
         if restore_focus {
@@ -442,7 +448,7 @@ fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: 
 
 // Resizes the main window based on the number of current results and user config
 fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
-    main_window.window().set_inner_size(LogicalSize::new(
+    main_window.window.set_inner_size(LogicalSize::new(
         config.appearance.window_width,
         std::cmp::min(
             count as u32 * config.appearance.results_item_height,

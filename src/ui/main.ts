@@ -5,7 +5,7 @@ import Main from "./windows/Main.vue";
 
 const routes = [
   {
-    path: "/main",
+    path: "/",
     component: Main,
   },
 ];

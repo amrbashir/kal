@@ -3,11 +3,11 @@ use std::{collections::HashMap, fs, path::Path};
 
 use crate::CONFIG_FILE;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub general: GeneralConfig,
     pub appearance: AppearanceConfig,
-    pub plugins: HashMap<String, serde_json::Value>,
+    pub plugins: HashMap<String, toml::Table>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -59,7 +59,7 @@ impl Config {
         let path = path.as_ref();
         let config = if path.exists() {
             let config_json = fs::read_to_string(path)?;
-            match serde_json::from_str::<Config>(&config_json) {
+            match toml::from_str::<Config>(&config_json) {
                 Ok(c) => c,
                 Err(e) => {
                     tracing::error!("Failed to deserialize config, falling back to default: {e}",);
@@ -80,21 +80,15 @@ impl Config {
         T: Default,
         for<'de> T: Deserialize<'de>,
     {
-        let default = serde_json::Value::default();
-        serde_json::from_value::<T>(
-            self.plugins
-                .get(name)
-                .unwrap_or_else(|| {
-                    tracing::debug!(
-                        "{name} config wasn't found under plugins object, falling back to default",
-                    );
-                    &default
-                })
-                .clone(),
-        )
-        .unwrap_or_else(|e| {
-            tracing::error!("Failed to deserialize {name} config, falling back to default {e}",);
+        if let Some(toml_value) = self.plugins.get(name) {
+            toml::from_str(&toml_value.to_string()).unwrap_or_else(|e| {
+                tracing::error!(
+                    "Failed to deserialize {name} config, failling back to default: {e}"
+                );
+                T::default()
+            })
+        } else {
             T::default()
-        })
+        }
     }
 }

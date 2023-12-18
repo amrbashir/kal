@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
 use serde::Serialize;
-use wry::{application::window::WindowId, webview::WebView};
+use tao::window::WindowId;
+use wry::WebView;
 
 use crate::config::Config;
 
