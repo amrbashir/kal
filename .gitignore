@@ -12,3 +12,5 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+kal.toml
+.TODO
