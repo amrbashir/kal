@@ -21,6 +21,19 @@ use wry::{
     WebView, WebViewAttributes, WebViewBuilder,
 };
 
+macro_rules! bail500 {
+    ($res:expr) => {
+        match $res {
+            Ok(r) => r,
+            Err(e) => Response::builder()
+                .status(500)
+                .body(e.to_string().as_bytes().to_vec())
+                .unwrap()
+                .map(Into::into),
+        }
+    };
+}
+
 pub struct WebviewWindow {
     pub window: Window,
     pub webview: WebView,
@@ -54,30 +67,12 @@ impl WebviewWindow {
 
         #[cfg(not(debug_assertions))]
         {
-            builder =
-                builder.with_custom_protocol("kal".into(), move |request| {
-                    match kal_protocol(request) {
-                        Ok(r) => r,
-                        Err(e) => Response::builder()
-                            .status(500)
-                            .body(e.to_string().as_bytes().to_vec())
-                            .unwrap()
-                            .map(Into::into),
-                    }
-                });
+            builder = builder
+                .with_custom_protocol("kal".into(), move |request| bail500!(kal_protocol(request)));
         }
-        builder =
-            builder.with_custom_protocol(
-                "kalasset".into(),
-                move |request| match kal_asset_protocol(request) {
-                    Ok(r) => r,
-                    Err(e) => Response::builder()
-                        .status(500)
-                        .body(e.to_string().as_bytes().to_vec())
-                        .unwrap()
-                        .map(Into::into),
-                },
-            );
+        builder = builder.with_custom_protocol("kalasset".into(), move |request| {
+            bail500!(kal_asset_protocol(request))
+        });
 
         let proxy = event_loop.create_proxy();
         let window_id = window.id();
@@ -123,6 +118,7 @@ impl WebviewWindow {
                 )?;
             }
         }
+
         Ok(WebviewWindow { window, webview })
     }
 }
@@ -143,6 +139,7 @@ impl DerefMut for WebviewWindow {
 
 const EMPTY_BODY: [u8; 0] = [0_u8; 0];
 
+#[inline]
 #[cfg(not(debug_assertions))]
 fn kal_protocol<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
     let path = &request.uri().path()[1..];
@@ -168,6 +165,7 @@ fn kal_protocol<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>
         .map_err(Into::into)
 }
 
+#[inline]
 fn kal_asset_protocol<'a>(
     request: Request<Vec<u8>>,
 ) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {

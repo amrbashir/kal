@@ -61,12 +61,12 @@ impl Config {
             true => {
                 let config_toml = fs::read_to_string(path)?;
                 toml::from_str::<Config>(&config_toml).unwrap_or_else(|e| {
-                    tracing::error!("Failed to deserialize config, falling back to default: {e}",);
+                    tracing::error!("Failed to deserialize config, falling back to default: {e}");
                     Config::default()
                 })
             }
             false => {
-                tracing::debug!("Config file wasn't found, falling back to default");
+                tracing::error!("Config file wasn't found, falling back to default");
                 Config::default()
             }
         };

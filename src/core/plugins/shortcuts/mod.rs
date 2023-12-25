@@ -15,18 +15,76 @@ use url::Url;
 #[path = "windows.rs"]
 mod platform;
 
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum ShortcutKind {
+    Path {
+        path: PathBuf,
+    },
+    Url {
+        url: Url,
+    },
+    Shell {
+        shell: Option<String>,
+        script: String,
+        working_directory: Option<String>,
+        hidden: Option<bool>,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Shortcut {
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(flatten)]
+    pub lind: ShortcutKind,
+    // TODO: add needs_confirmation
+}
+
+impl Shortcut {
+    pub fn icon(&self) -> Icon {
+        match &self.lind {
+            ShortcutKind::Path { path } => {
+                if path.is_file() {
+                    Defaults::File.icon()
+                } else {
+                    Defaults::Folder.icon()
+                }
+            }
+            ShortcutKind::Url { .. } => Defaults::Url.icon(),
+            ShortcutKind::Shell { .. } => Defaults::Shell.icon(),
+        }
+    }
+}
+
+impl Display for Shortcut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(desc) = &self.description {
+            write!(f, "{}", desc)
+        } else {
+            match &self.lind {
+                ShortcutKind::Path { path } => {
+                    write!(f, "[Path] {}", path.display())
+                }
+                ShortcutKind::Url { url } => write!(f, "[URL] {}", &url),
+                ShortcutKind::Shell { script, .. } => write!(f, "[Shell] {}", { script }),
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ShortcutsPlugin {
     name: String,
     enabled: bool,
-    shortcuts: Vec<ShortCut>,
+    shortcuts: Vec<Shortcut>,
     cached_shortcuts: Vec<SearchResultItem>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ShortcutsPluginConfig {
     pub enabled: bool,
-    pub shortcuts: Vec<ShortCut>,
+    pub shortcuts: Vec<Shortcut>,
 }
 
 impl Default for ShortcutsPluginConfig {
@@ -85,10 +143,10 @@ impl Plugin for ShortcutsPlugin {
     fn execute(&self, item: &SearchResultItem, elevated: bool) {
         let index = item.execution_args.as_u64().unwrap();
         if let Some(shortcut) = self.shortcuts.get(index as usize) {
-            match &shortcut.r#type {
-                ShortCutType::Path { path } => platform::open_path(path),
-                ShortCutType::Url { url } => platform::open_url(url),
-                ShortCutType::Shell {
+            match &shortcut.lind {
+                ShortcutKind::Path { path } => platform::open_path(path),
+                ShortcutKind::Url { url } => platform::open_url(url),
+                ShortcutKind::Shell {
                     shell,
                     script,
                     working_directory,
@@ -101,67 +159,9 @@ impl Plugin for ShortcutsPlugin {
     fn open_location(&self, item: &SearchResultItem) {
         let index = item.execution_args.as_u64().unwrap();
         if let Some(shortcut) = self.shortcuts.get(index as usize) {
-            if let ShortCutType::Path { path } = &shortcut.r#type {
+            if let ShortcutKind::Path { path } = &shortcut.lind {
                 platform::open_location(path);
             }
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ShortCut {
-    pub name: String,
-    pub description: Option<String>,
-    #[serde(flatten)]
-    pub r#type: ShortCutType,
-    // TODO: add needs_confirmation
-}
-
-impl ShortCut {
-    pub fn icon(&self) -> Icon {
-        match &self.r#type {
-            ShortCutType::Path { path } => {
-                if path.is_file() {
-                    Defaults::File.icon()
-                } else {
-                    Defaults::Folder.icon()
-                }
-            }
-            ShortCutType::Url { .. } => Defaults::Url.icon(),
-            ShortCutType::Shell { .. } => Defaults::Shell.icon(),
-        }
-    }
-}
-
-impl Display for ShortCut {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(desc) = &self.description {
-            write!(f, "{}", desc)
-        } else {
-            match &self.r#type {
-                ShortCutType::Path { path } => {
-                    write!(f, "[Path] {}", path.to_string_lossy())
-                }
-                ShortCutType::Url { url } => write!(f, "[URL] {}", url.clone()),
-                ShortCutType::Shell { script, .. } => write!(f, "[Shell] {}", { script }),
-            }
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", tag = "type")]
-pub enum ShortCutType {
-    Path {
-        path: PathBuf,
-    },
-    Url {
-        url: Url,
-    },
-    Shell {
-        shell: Option<String>,
-        script: String,
-        working_directory: Option<String>,
-        hidden: Option<bool>,
-    },
 }

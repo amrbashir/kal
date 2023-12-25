@@ -45,7 +45,7 @@ impl Defaults {
     }
 
     pub fn bytes(path: &str) -> &'static [u8] {
-        let icon = path.split('/').rev().next().unwrap();
+        let icon = path.split('/').next_back().unwrap();
         match icon {
             // TODO: replace with svgs
             #[cfg(windows)]

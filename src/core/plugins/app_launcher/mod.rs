@@ -75,26 +75,27 @@ impl Plugin for AppLauncherPlugin {
     fn name(&self) -> &str {
         &self.name
     }
+
     fn refresh(&mut self, config: &Config) {
         let config = config.plugin_config::<AppLauncherPluginConfig>(&self.name);
         self.enabled = config.enabled;
         self.paths = config.paths;
         self.extensions = config.extensions;
 
-        let mut apps = Vec::new();
-        for path in &self.paths {
-            let path = utils::resolve_env_vars(path);
-            apps.extend(filter_path_entries_by_extensions(path, &self.extensions));
-        }
-
-        self.cached_apps = apps
+        let apps = self
+            .paths
             .iter()
+            .filter_map(|path| {
+                let path = utils::resolve_env_vars(path);
+                filter_path_entries_by_extensions(path, &self.extensions).ok()
+            })
+            .flatten()
             .map(|e| {
                 let file = e.path();
 
                 let icon_path = self
                     .icons_dir
-                    .join(&*file.file_stem().unwrap_or_default().to_string_lossy())
+                    .join(file.file_stem().unwrap_or_default())
                     .with_extension("png");
 
                 let app_name = file
@@ -102,6 +103,7 @@ impl Plugin for AppLauncherPlugin {
                     .unwrap_or_default()
                     .to_string_lossy()
                     .into_owned();
+
                 let path = file.to_string_lossy().into_owned();
 
                 SearchResultItem {
@@ -117,14 +119,11 @@ impl Plugin for AppLauncherPlugin {
             })
             .collect::<Vec<SearchResultItem>>();
 
+        self.cached_apps = apps.clone();
+
         let _ = std::fs::create_dir_all(&self.icons_dir);
-        let apps = self.cached_apps.clone();
         thread::spawn(move || {
-            platform::extract_png(
-                apps.into_iter()
-                    .map(|a| (a.execution_args.as_str().unwrap().to_string(), a.icon.data))
-                    .collect(),
-            );
+            platform::extract_png(apps);
         });
     }
 
@@ -141,36 +140,34 @@ impl Plugin for AppLauncherPlugin {
     }
 }
 
-fn filter_path_entries_by_extensions<P: AsRef<Path>>(
+fn filter_path_entries_by_extensions<P>(
     path: P,
-    extensions: &Vec<String>,
-) -> Vec<fs::DirEntry> {
+    extensions: &[String],
+) -> anyhow::Result<Vec<fs::DirEntry>>
+where
+    P: AsRef<Path>,
+{
     let mut filtered = Vec::new();
-    if let Ok(entries) = fs::read_dir(path) {
-        let entries = entries
-            .filter_map(|e| if let Ok(e) = e { Some(e) } else { None })
-            .collect::<Vec<fs::DirEntry>>();
-        for entry in entries {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() {
-                    if extensions.contains(
-                        &entry
-                            .path()
-                            .extension()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .into_owned(),
-                    ) {
-                        filtered.push(entry);
-                    }
-                } else {
-                    let filtered_entries =
-                        filter_path_entries_by_extensions(entry.path(), extensions);
-                    filtered.extend(filtered_entries);
+
+    let entries = fs::read_dir(path)?;
+    for entry in entries.flatten() {
+        if let Ok(metadata) = entry.metadata() {
+            if metadata.is_file() {
+                let path = entry.path();
+                let extension = path
+                    .extension()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+                if extensions.contains(&extension) {
+                    filtered.push(entry);
                 }
+            } else {
+                let filtered_entries = filter_path_entries_by_extensions(entry.path(), extensions)?;
+                filtered.extend(filtered_entries);
             }
         }
     }
 
-    filtered
+    Ok(filtered)
 }

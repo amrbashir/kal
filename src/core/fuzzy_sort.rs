@@ -19,7 +19,7 @@ impl CanBeFuzzed for SearchResultItem {
 }
 
 /// Sorts a vector of structs by field
-pub fn fuzzy_sort<T: CanBeFuzzed>(matcher: &SkimMatcherV2, items: &mut Vec<T>, query: &str) {
+pub fn fuzzy_sort<T: CanBeFuzzed>(matcher: &SkimMatcherV2, items: &mut [T], query: &str) {
     items.sort_by_cached_key(|item| matcher.fuzzy_match(item.key(), query));
     items.reverse();
 }

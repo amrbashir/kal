@@ -1,24 +1,8 @@
-use std::fmt::Display;
-
 use serde::Serialize;
 use tao::window::WindowId;
 use wry::WebView;
 
 use crate::config::Config;
-
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum AppEvent {
-    /// An Ipc event from the webview
-    Ipc(WindowId, String),
-    /// Describes an event from a [`WebView`]
-    WebviewEvent {
-        event: WebviewEvent,
-        window_id: WindowId,
-    },
-    /// Describes an event from a spawned thread
-    ThreadEvent(ThreadEvent),
-}
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -39,37 +23,49 @@ pub enum ThreadEvent {
     UpdateConfig(Config),
 }
 
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum AppEvent {
+    /// An Ipc event from the webview
+    Ipc(WindowId, String),
+    /// Describes an event from a [`WebView`]
+    WebviewEvent {
+        event: WebviewEvent,
+        window_id: WindowId,
+    },
+    /// Describes an event from a spawned thread
+    ThreadEvent(ThreadEvent),
+}
+
+pub const EMPTY_ARGS: Option<()> = None;
+
 /// Emits an event to a window
 ///
 /// This invokes the js handlers registred through `window.KAL.ipc.on()`
-pub fn emit_event(webview: &WebView, event: impl Display, payload: &impl Serialize) {
-    if let Err(e) = webview.evaluate_script(
-        format!(
-            r#"
-              (function(){{
-                window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
-                  handler({});
-                }});
-              }})()
-            "#,
-            event,
-            serialize_to_javascript::Serialized::new(
-                &serde_json::value::to_raw_value(payload).unwrap_or_default(),
-                &serialize_to_javascript::Options::default()
-            ),
-        )
-        .as_str(),
-    ) {
+pub fn emit_event<S: AsRef<str>>(webview: &WebView, event: S, payload: impl Serialize) {
+    let script = format!(
+        r#"(function(){{
+        window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
+          handler({});
+        }});
+      }})()"#,
+        event.as_ref(),
+        serialize_to_javascript::Serialized::new(
+            &serde_json::value::to_raw_value(&payload).unwrap_or_default(),
+            &serialize_to_javascript::Options::default()
+        ),
+    );
+
+    if let Err(e) = webview.evaluate_script(&script) {
         tracing::error!("{e}");
     }
 }
 
-pub const KAL_IPC_INIT_SCRIPT: &str = r#"
-  Object.defineProperty(window, "KAL", {
+pub const KAL_IPC_INIT_SCRIPT: &str = r#"Object.defineProperty(window, "KAL", {
     value: {
       ipc: {
         send: (eventName, ...payload) => {
-          window.ipc.postMessage(`${eventName}::${JSON.stringify(payload)}`);
+          window.ipc.postMessage(`${eventName}::${JSON.stringify(payload.length === 1 ? payload[0] : payload)}`);
         },
         __event_handlers: {},
         on: function (eventName, event_handler) {
@@ -79,5 +75,4 @@ pub const KAL_IPC_INIT_SCRIPT: &str = r#"
         },
       },
     },
-  });
-"#;
+  });"#;

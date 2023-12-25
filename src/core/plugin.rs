@@ -20,5 +20,5 @@ pub trait Plugin: Debug {
     /// Called when `Enter` or `Shift + Enter` are pressed
     fn execute(&self, item: &SearchResultItem, elevated: bool);
     /// Called when `CtrlLeft + O` are pressed
-    fn open_location(&self, item: &SearchResultItem);
+    fn open_location(&self, #[allow(unused)] item: &SearchResultItem) {}
 }

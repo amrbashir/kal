@@ -69,24 +69,24 @@ impl Plugin for DirectoryIndexerPlugin {
         self.enabled = config.enabled;
         self.paths = config.paths;
 
-        let mut dir_entries = Vec::new();
-        for path in &self.paths {
-            let path = utils::resolve_env_vars(path);
-            dir_entries.extend(read_dir(path));
-        }
-
-        self.cached_dir_entries = dir_entries
+        let dir_entries = self
+            .paths
             .iter()
+            .filter_map(|path| {
+                let path = utils::resolve_env_vars(path);
+                read_dir(path).ok()
+            })
+            .flatten()
             .map(|e| {
                 let file = e.path();
 
                 let icon = if e.metadata().map(|e| e.is_dir()).unwrap_or(false) {
                     Defaults::Folder.icon()
                 } else {
-                    let mut p = self
+                    let p = self
                         .icons_dir
-                        .join(&*file.file_stem().unwrap_or_default().to_string_lossy());
-                    p.set_extension("png");
+                        .join(file.file_stem().unwrap_or_default())
+                        .with_extension("png");
                     Icon {
                         data: p.to_string_lossy().into_owned(),
                         r#type: IconType::Path,
@@ -110,21 +110,17 @@ impl Plugin for DirectoryIndexerPlugin {
             })
             .collect::<Vec<SearchResultItem>>();
 
+        self.cached_dir_entries = dir_entries.clone();
+
         let _ = std::fs::create_dir_all(&self.icons_dir);
-        let dir_entries = self.cached_dir_entries.clone();
         thread::spawn(move || {
-            platform::extract_png(
-                dir_entries
-                    .into_iter()
-                    .filter_map(|a| {
-                        if a.icon.r#type == IconType::Path {
-                            Some((a.execution_args.as_str().unwrap().to_string(), a.icon.data))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect(),
-            );
+            platform::extract_png(dir_entries.into_iter().filter_map(|i| {
+                if i.icon.r#type == IconType::Path {
+                    Some(i)
+                } else {
+                    None
+                }
+            }));
         });
     }
 
@@ -141,32 +137,26 @@ impl Plugin for DirectoryIndexerPlugin {
     }
 }
 
-fn read_dir<P: AsRef<Path>>(path: P) -> Vec<fs::DirEntry> {
-    match fs::read_dir(path) {
-        Ok(entries) => entries
-            .filter_map(|e| {
-                if let Ok(e) = e {
-                    #[cfg(windows)]
-                    {
-                        use std::os::windows::fs::MetadataExt;
-                        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
-                        if e.metadata()
-                            .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN) != 0)
-                            .unwrap_or(false)
-                        {
-                            return None;
-                        }
-                    }
-
-                    Some(e)
-                } else {
-                    None
+fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<fs::DirEntry>> {
+    let entries = fs::read_dir(path)?;
+    let entries = entries
+        .flatten()
+        .filter_map(|e| {
+            #[cfg(windows)]
+            {
+                use std::os::windows::fs::MetadataExt;
+                use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
+                if e.metadata()
+                    .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN) != 0)
+                    .unwrap_or(false)
+                {
+                    return None;
                 }
-            })
-            .collect(),
-        Err(e) => {
-            tracing::error!("{e}");
-            Vec::new()
-        }
-    }
+            }
+
+            Some(e)
+        })
+        .collect();
+
+    Ok(entries)
 }
