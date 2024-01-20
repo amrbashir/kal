@@ -1,6 +1,6 @@
 use crate::{
     common::{
-        icon::{Icon, IconType},
+        icon::{Icon, IconKind},
         SearchResultItem,
     },
     config::Config,
@@ -113,8 +113,9 @@ impl Plugin for AppLauncherPlugin {
                     plugin_name: self.name.clone(),
                     icon: Icon {
                         data: icon_path.to_string_lossy().into_owned(),
-                        r#type: IconType::Path,
+                        kind: IconKind::Path,
                     },
+                    needs_confirmation: false,
                 }
             })
             .collect::<Vec<SearchResultItem>>();

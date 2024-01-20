@@ -1,13 +1,15 @@
 <script lang="ts" setup>
 import { watch, onMounted, ref } from "vue";
-import { SearchResultItem, IPCEvent, Icon, IconType } from "../../common";
+import { SearchResultItem, IPCEvent, Icon, IconKind } from "../../common";
 import SearchIcon from "../icons/SearchIcon.vue";
 import RefreshingIcon from "../icons/RefreshingIcon.vue";
+import ConfirmationIcon from "../icons/ConfirmationIcon.vue";
 
 let results = ref<SearchResultItem[]>([]);
 let currentQuery = ref("");
 let currentSelection = ref(0);
 let refreshingIndex = ref(false);
+let gettingConfirmation = ref(false);
 
 // handlers
 function search(query: string) {
@@ -22,6 +24,13 @@ function search(query: string) {
 watch(currentQuery, (query) => search(query));
 
 function onkeydown(e: KeyboardEvent) {
+  if (gettingConfirmation.value && e.key === "Escape") {
+    gettingConfirmation.value = false;
+    return;
+  }
+
+  if (gettingConfirmation.value && e.key !== "Enter") return;
+
   if (e.key === "Escape") {
     e.preventDefault();
     window.KAL.ipc.send(IPCEvent.HideMainWindow);
@@ -48,7 +57,15 @@ function onkeydown(e: KeyboardEvent) {
 
   if (e.key === "Enter") {
     e.preventDefault();
-    window.KAL.ipc.send(IPCEvent.Execute, currentSelection.value, e.shiftKey);
+
+    const confirm = results.value[currentSelection.value].needs_confirmation;
+    if (!gettingConfirmation.value && confirm) {
+      gettingConfirmation.value = true;
+      return;
+    } else {
+      gettingConfirmation.value = false;
+      window.KAL.ipc.send(IPCEvent.Execute, currentSelection.value, e.shiftKey);
+    }
   }
 
   if (e.ctrlKey && e.key === "o") {
@@ -90,11 +107,11 @@ function convertFileSrc(protocol: string, filePath: string): string {
 }
 
 function getIconHtml(icon: Icon): string {
-  switch (icon.type) {
-    case IconType.Default:
-    case IconType.Path:
+  switch (icon.kind) {
+    case IconKind.Default:
+    case IconKind.Path:
       return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
-    case IconType.Svg:
+    case IconKind.Svg:
       return icon.data;
     default:
       return "<span>TODO: empty icon</span>";
@@ -122,8 +139,11 @@ function getIconHtml(icon: Icon): string {
       />
 
       <Transition name="slide-fade">
-        <div v-if="refreshingIndex" id="refreshing_icon-container">
+        <div v-if="refreshingIndex" class="right-icon-container">
           <RefreshingIcon id="refreshing_icon" />
+        </div>
+        <div v-else-if="gettingConfirmation" class="right-icon-container">
+          <ConfirmationIcon id="confirmation_icon" />
         </div>
       </Transition>
     </div>
@@ -173,6 +193,7 @@ main {
   width: 100%;
   height: 60px;
   display: flex;
+  padding-right: 10px;
 }
 
 #search-input {
@@ -191,11 +212,10 @@ main {
 }
 
 #search-input_icon-container,
-#refreshing_icon-container {
+.right-icon-container {
   display: grid;
   place-items: center;
   height: 100%;
-  width: 50px;
   color: var(--text-primary);
 }
 

@@ -9,4 +9,6 @@ export interface SearchResultItem {
   plugin_name: string;
   /** The icon to display next to this item */
   icon: Icon;
+  /** Whether execution of this item, requires confirmation or not */
+  needs_confirmation: boolean;
 }

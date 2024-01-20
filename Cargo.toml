@@ -42,4 +42,5 @@ features = [
   "Win32_Graphics_Dwm",
   "Win32_UI_WindowsAndMessaging",
   "Win32_Storage_FileSystem",
+  "Win32_System_Power",
 ]

@@ -37,13 +37,13 @@ pub struct Shortcut {
     pub name: String,
     pub description: Option<String>,
     #[serde(flatten)]
-    pub lind: ShortcutKind,
+    pub kind: ShortcutKind,
     // TODO: add needs_confirmation
 }
 
 impl Shortcut {
     pub fn icon(&self) -> Icon {
-        match &self.lind {
+        match &self.kind {
             ShortcutKind::Path { path } => {
                 if path.is_file() {
                     Defaults::File.icon()
@@ -62,7 +62,7 @@ impl Display for Shortcut {
         if let Some(desc) = &self.description {
             write!(f, "{}", desc)
         } else {
-            match &self.lind {
+            match &self.kind {
                 ShortcutKind::Path { path } => {
                     write!(f, "[Path] {}", path.display())
                 }
@@ -132,6 +132,7 @@ impl Plugin for ShortcutsPlugin {
                 plugin_name: self.name.clone(),
                 execution_args: serde_json::Value::Number(serde_json::Number::from(i)),
                 icon: shortcut.icon(),
+                needs_confirmation: false,
             })
             .collect();
     }
@@ -143,7 +144,7 @@ impl Plugin for ShortcutsPlugin {
     fn execute(&self, item: &SearchResultItem, elevated: bool) {
         let index = item.execution_args.as_u64().unwrap();
         if let Some(shortcut) = self.shortcuts.get(index as usize) {
-            match &shortcut.lind {
+            match &shortcut.kind {
                 ShortcutKind::Path { path } => platform::open_path(path),
                 ShortcutKind::Url { url } => platform::open_url(url),
                 ShortcutKind::Shell {
@@ -159,7 +160,7 @@ impl Plugin for ShortcutsPlugin {
     fn open_location(&self, item: &SearchResultItem) {
         let index = item.execution_args.as_u64().unwrap();
         if let Some(shortcut) = self.shortcuts.get(index as usize) {
-            if let ShortcutKind::Path { path } = &shortcut.lind {
+            if let ShortcutKind::Path { path } = &shortcut.kind {
                 platform::open_location(path);
             }
         }

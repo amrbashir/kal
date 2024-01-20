@@ -1,6 +1,6 @@
 use crate::{
     common::{
-        icon::{Defaults, Icon, IconType},
+        icon::{Defaults, Icon, IconKind},
         SearchResultItem,
     },
     config::Config,
@@ -89,7 +89,7 @@ impl Plugin for DirectoryIndexerPlugin {
                         .with_extension("png");
                     Icon {
                         data: p.to_string_lossy().into_owned(),
-                        r#type: IconType::Path,
+                        kind: IconKind::Path,
                     }
                 };
 
@@ -106,6 +106,7 @@ impl Plugin for DirectoryIndexerPlugin {
                     execution_args: serde_json::Value::String(path),
                     plugin_name: self.name.clone(),
                     icon,
+                    needs_confirmation: false,
                 }
             })
             .collect::<Vec<SearchResultItem>>();
@@ -115,7 +116,7 @@ impl Plugin for DirectoryIndexerPlugin {
         let _ = std::fs::create_dir_all(&self.icons_dir);
         thread::spawn(move || {
             platform::extract_png(dir_entries.into_iter().filter_map(|i| {
-                if i.icon.r#type == IconType::Path {
+                if i.icon.kind == IconKind::Path {
                     Some(i)
                 } else {
                     None

@@ -13,4 +13,6 @@ pub struct SearchResultItem {
     pub plugin_name: String,
     /// The icon to display next to this item
     pub icon: Icon,
+    /// Whether execution of this item, requires confirmation or not
+    pub needs_confirmation: bool,
 }

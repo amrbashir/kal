@@ -121,10 +121,15 @@ for ($i=0; $i -lt $len; $i++) {{
         &srcs.join(","),
         &outs.join(",")
     );
-    if let Err(e) =
-        std::process::Command::new("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe")
-            .args(["-Command", &script])
-            .spawn()
+
+    let powershell_path = std::env::var("SYSTEMROOT").map_or_else(
+        |_| "powershell.exe".to_string(),
+        |p| format!("{p}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"),
+    );
+
+    if let Err(e) = std::process::Command::new(powershell_path)
+        .args(["-Command", &script])
+        .spawn()
     {
         tracing::error!("Failed to extract icons: {e}");
     }

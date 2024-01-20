@@ -3,14 +3,12 @@ use serde::Serialize;
 #[derive(Serialize, Debug, Clone)]
 pub struct Icon {
     pub data: String,
-    pub r#type: IconType,
+    pub kind: IconKind,
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
-pub enum IconType {
+pub enum IconKind {
     Path,
-    // TODO: remove this allow
-    #[allow(unused)]
     Svg,
     Default,
 }
@@ -20,6 +18,11 @@ pub enum Defaults {
     Url,
     File,
     Shell,
+    Shutdown,
+    Restart,
+    SignOut,
+    Hibernate,
+    Sleep,
 }
 
 impl Defaults {
@@ -29,18 +32,41 @@ impl Defaults {
             Defaults::Url => "icons/defaults/url",
             Defaults::File => "icons/defaults/file",
             Defaults::Shell => "icons/defaults/shell",
+            _ => unreachable!(),
         }
     }
 
     pub fn icon(&self) -> Icon {
-        Icon {
-            data: match self {
-                Defaults::Folder => self.path().to_string(),
-                Defaults::Url => self.path().to_string(),
-                Defaults::File => self.path().to_string(),
-                Defaults::Shell => self.path().to_string(),
+        match self {
+            #[cfg(windows)]
+            Defaults::Shutdown => Icon {
+                data: include_str!("./icons/windows/shutdown.svg").into(),
+                kind: IconKind::Svg,
             },
-            r#type: IconType::Default,
+            #[cfg(windows)]
+            Defaults::Restart => Icon {
+                data: include_str!("./icons/windows/restart.svg").into(),
+                kind: IconKind::Svg,
+            },
+            #[cfg(windows)]
+            Defaults::SignOut => Icon {
+                data: include_str!("./icons/windows/signout.svg").into(),
+                kind: IconKind::Svg,
+            },
+            #[cfg(windows)]
+            Defaults::Hibernate => Icon {
+                data: include_str!("./icons/windows/hibernate.svg").into(),
+                kind: IconKind::Svg,
+            },
+            #[cfg(windows)]
+            Defaults::Sleep => Icon {
+                data: include_str!("./icons/windows/sleep.svg").into(),
+                kind: IconKind::Svg,
+            },
+            _ => Icon {
+                data: self.path().to_string(),
+                kind: IconKind::Default,
+            },
         }
     }
 

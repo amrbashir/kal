@@ -1,10 +1,10 @@
 export interface Icon {
-  /** Could be a path or an svg based on the {@link type} field */
+  /** Could be a path or an svg based on the {@link kind} field */
   data: string;
-  type: IconType;
+  kind: IconKind;
 }
 
-export enum IconType {
+export enum IconKind {
   Path = "Path",
   Svg = "Svg",
   Default = "Default",
