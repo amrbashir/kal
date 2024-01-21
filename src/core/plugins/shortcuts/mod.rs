@@ -38,7 +38,8 @@ pub struct Shortcut {
     pub description: Option<String>,
     #[serde(flatten)]
     pub kind: ShortcutKind,
-    // TODO: add needs_confirmation
+    #[serde(default)]
+    pub needs_confirmation: bool,
 }
 
 impl Shortcut {
@@ -132,7 +133,7 @@ impl Plugin for ShortcutsPlugin {
                 plugin_name: self.name.clone(),
                 execution_args: serde_json::Value::Number(serde_json::Number::from(i)),
                 icon: shortcut.icon(),
-                needs_confirmation: false,
+                needs_confirmation: shortcut.needs_confirmation,
             })
             .collect();
     }

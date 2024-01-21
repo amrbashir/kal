@@ -3,7 +3,7 @@ import { watch, onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent, Icon, IconKind } from "../../common";
 import SearchIcon from "../icons/SearchIcon.vue";
 import RefreshingIcon from "../icons/RefreshingIcon.vue";
-import ConfirmationIcon from "../icons/ConfirmationIcon.vue";
+import InfoIcon from "../icons/InfoIcon.vue";
 
 let results = ref<SearchResultItem[]>([]);
 let currentQuery = ref("");
@@ -24,12 +24,9 @@ function search(query: string) {
 watch(currentQuery, (query) => search(query));
 
 function onkeydown(e: KeyboardEvent) {
-  if (gettingConfirmation.value && e.key === "Escape") {
+  if (gettingConfirmation.value && e.key !== "Enter") {
     gettingConfirmation.value = false;
-    return;
   }
-
-  if (gettingConfirmation.value && e.key !== "Enter") return;
 
   if (e.key === "Escape") {
     e.preventDefault();
@@ -51,7 +48,7 @@ function onkeydown(e: KeyboardEvent) {
     }
 
     document
-      .getElementById(`search-results_item_#${currentSelection}`)
+      .getElementById(`search-results_item_#${currentSelection.value}`)
       ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -108,13 +105,12 @@ function convertFileSrc(protocol: string, filePath: string): string {
 
 function getIconHtml(icon: Icon): string {
   switch (icon.kind) {
-    case IconKind.Default:
-    case IconKind.Path:
-      return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
     case IconKind.Svg:
       return icon.data;
+    case IconKind.Default:
+    case IconKind.Path:
     default:
-      return "<span>TODO: empty icon</span>";
+      return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
   }
 }
 </script>
@@ -143,7 +139,12 @@ function getIconHtml(icon: Icon): string {
           <RefreshingIcon id="refreshing_icon" />
         </div>
         <div v-else-if="gettingConfirmation" class="right-icon-container">
-          <ConfirmationIcon id="confirmation_icon" />
+          <div id="confirmation-container">
+            <InfoIcon
+              :style="{ color: '#dd902e', width: '24px', height: '24px' }"
+            />
+            <span> Proceed? </span>
+          </div>
         </div>
       </Transition>
     </div>
@@ -193,7 +194,7 @@ main {
   width: 100%;
   height: 60px;
   display: flex;
-  padding-right: 10px;
+  padding: 0 10px;
 }
 
 #search-input {
@@ -242,6 +243,13 @@ main {
   to {
     transform: rotate(359deg);
   }
+}
+
+#confirmation-container {
+  display: flex;
+  align-items: center;
+  justify-items: center;
+  gap: 2px;
 }
 
 #search-results_container {
