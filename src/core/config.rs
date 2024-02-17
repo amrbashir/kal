@@ -1,51 +1,73 @@
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::Path};
 
-use crate::CONFIG_FILE;
+use crate::{vibrancy::Vibrancy, CONFIG_FILE};
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct Config {
-    pub general: GeneralConfig,
-    pub appearance: AppearanceConfig,
-    pub plugins: HashMap<String, toml::Table>,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AppearanceConfig {
+    #[serde(default)]
+    pub window_width: u32,
+    #[serde(default)]
+    pub input_height: u32,
+    #[serde(default)]
+    pub results_height: u32,
+    #[serde(default)]
+    pub results_item_height: u32,
+    #[serde(default)]
+    pub transparent: bool,
+    #[serde(default = "default_true")]
+    pub shadows: bool,
+    pub vibrancy: Option<Vibrancy>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+impl Default for AppearanceConfig {
+    fn default() -> Self {
+        Self {
+            window_width: 600,
+            input_height: 60,
+            results_height: 480,
+            results_item_height: 60,
+            transparent: true,
+            shadows: true,
+            vibrancy: None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeneralConfig {
     /// A tuple of (Modifier, Key)
+    #[serde(default)]
     pub hotkey: (String, String),
     /// A vector of glob patterns
+    #[serde(default)]
     pub blacklist: Vec<String>,
+    #[serde(default)]
     pub max_search_results: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AppearanceConfig {
-    pub window_width: u32,
-    pub input_height: u32,
-    pub results_height: u32,
-    pub results_item_height: u32,
-    pub transparent: bool,
-}
-
-impl Default for Config {
+impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
-            general: GeneralConfig {
-                hotkey: ("AltLeft".into(), "Space".into()),
-                blacklist: Vec::new(),
-                max_search_results: 24,
-            },
-            appearance: AppearanceConfig {
-                window_width: 600,
-                input_height: 60,
-                results_height: 480,
-                results_item_height: 60,
-                transparent: true,
-            },
-            plugins: HashMap::new(),
+            hotkey: ("AltLeft".into(), "Space".into()),
+            blacklist: Vec::new(),
+            max_search_results: 24,
         }
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Config {
+    #[serde(default)]
+    pub general: GeneralConfig,
+    #[serde(default)]
+    pub appearance: AppearanceConfig,
+    #[serde(default)]
+    pub plugins: HashMap<String, toml::Table>,
 }
 
 impl Config {

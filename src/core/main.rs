@@ -15,7 +15,7 @@ use plugins::{
 };
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
-    event::{DeviceEvent, ElementState, Event, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy},
     window::WindowAttributes,
 };
@@ -40,6 +40,7 @@ mod fuzzy_sort;
 mod plugin;
 mod plugins;
 mod utils;
+mod vibrancy;
 mod webview_window;
 
 static KAL_DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
@@ -125,6 +126,18 @@ fn create_main_window(
     #[cfg(any(windows, target_os = "linux"))]
     main_window.window.set_skip_taskbar(true);
 
+    if let Some(vibrancy) = &config.appearance.vibrancy {
+        vibrancy.apply(&main_window);
+    }
+
+    let _ = main_window.webview.evaluate_script(&format!(
+        "window.KAL.config = {}",
+        serialize_to_javascript::Serialized::new(
+            &serde_json::value::to_raw_value(&config).unwrap_or_default(),
+            &serialize_to_javascript::Options::default()
+        )
+    ));
+
     Ok(main_window)
 }
 
@@ -177,6 +190,27 @@ struct AppState<T: 'static> {
     modifier_pressed: bool,
     proxy: EventLoopProxy<T>,
     fuzzy_matcher: SkimMatcherV2,
+}
+
+impl<T: 'static> AppState<T> {
+    fn new(
+        config: Config,
+        main_window: WebviewWindow,
+        plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
+        proxy: EventLoopProxy<T>,
+    ) -> Self {
+        Self {
+            config,
+            main_window,
+            #[cfg(windows)]
+            previously_foreground_hwnd: 0,
+            plugins,
+            current_results: Default::default(),
+            modifier_pressed: false,
+            proxy,
+            fuzzy_matcher: SkimMatcherV2::default(),
+        }
+    }
 }
 
 fn process_ipc_events(
@@ -307,6 +341,13 @@ fn process_events(
     app_state: &RefCell<AppState<AppEvent>>,
 ) -> anyhow::Result<()> {
     match event {
+        // clear window surface on windows for transparent windows
+        #[cfg(windows)]
+        Event::NewEvents(StartCause::Init) | Event::RedrawRequested(_) => {
+            let mut app_state = app_state.borrow_mut();
+            webview_window::clear_window_surface(&mut app_state.main_window);
+        }
+
         // handle hotkey
         Event::DeviceEvent {
             event: DeviceEvent::Key(k),
@@ -409,17 +450,7 @@ fn run() -> anyhow::Result<()> {
     let main_window = create_main_window(&config, &event_loop)?;
     let main_window_id = main_window.window.id();
 
-    let app_state = AppState {
-        config,
-        main_window,
-        #[cfg(windows)]
-        previously_foreground_hwnd: 0,
-        plugins,
-        current_results: Default::default(),
-        modifier_pressed: false,
-        proxy: event_loop.create_proxy(),
-        fuzzy_matcher: SkimMatcherV2::default(),
-    };
+    let app_state = AppState::new(config, main_window, plugins, event_loop.create_proxy());
     let app_state = RefCell::new(app_state);
 
     event_loop.run(move |event, _event_loop, control_flow| {

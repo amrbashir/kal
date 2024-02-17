@@ -4,6 +4,12 @@
 declare interface Window {
   ipc: { postMessage(msg: string): void };
   KAL: {
+    config?: {
+      appearance: {
+        transparent?: boolean;
+      };
+    };
+
     ipc: {
       send<T>(
         event: import("../common/ipc_event").IPCEvent,

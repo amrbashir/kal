@@ -1,9 +1,14 @@
 <script lang="ts" setup>
 import { watch, onMounted, ref } from "vue";
-import { SearchResultItem, IPCEvent, Icon, IconKind } from "../../common";
+import { SearchResultItem, IPCEvent } from "../../common";
+import { getIconHtml } from "../utils";
 import SearchIcon from "../icons/SearchIcon.vue";
 import RefreshingIcon from "../icons/RefreshingIcon.vue";
 import InfoIcon from "../icons/InfoIcon.vue";
+
+const primaryColor = window.KAL.config?.appearance.transparent
+  ? "rgba(0, 0, 0, 0)"
+  : "rgba(21, 20, 20, 0.75)";
 
 let results = ref<SearchResultItem[]>([]);
 let currentQuery = ref("");
@@ -11,7 +16,6 @@ let currentSelection = ref(0);
 let refreshingIndex = ref(false);
 let gettingConfirmation = ref(false);
 
-// handlers
 function search(query: string) {
   if (query) {
     window.KAL.ipc.send(IPCEvent.Search, query);
@@ -94,25 +98,6 @@ onMounted(() => {
     search(currentQuery.value);
   });
 });
-
-// utils
-function convertFileSrc(protocol: string, filePath: string): string {
-  const path = encodeURIComponent(filePath);
-  return navigator.userAgent.includes("Windows")
-    ? `http://${protocol}.localhost/${path}`
-    : `${protocol}://${path}`;
-}
-
-function getIconHtml(icon: Icon): string {
-  switch (icon.kind) {
-    case IconKind.Svg:
-      return icon.data;
-    case IconKind.Default:
-    case IconKind.Path:
-    default:
-      return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
-  }
-}
 </script>
 
 <template>
@@ -173,7 +158,6 @@ function getIconHtml(icon: Icon): string {
 
 <style>
 :root {
-  --primary: rgba(21, 20, 20, 0.75);
   --accent: rgba(70, 140, 210, 0.5);
   --accent-lighter: rgba(90, 163, 235, 0.5);
   --text-primary: rgba(180, 180, 180);
@@ -190,7 +174,7 @@ main {
 
 #search-input_container {
   appearance: none;
-  background-color: var(--primary);
+  background-color: v-bind(primaryColor);
   width: 100%;
   height: 60px;
   display: flex;
@@ -254,9 +238,9 @@ main {
 
 #search-results_container {
   overflow-x: hidden;
-  background-color: var(--primary);
+  background-color: v-bind(primaryColor);
   width: 100%;
-  height: 400px;
+  height: calc(100% - 60px);
   border-radius: 0 0 10px 10px;
 }
 
