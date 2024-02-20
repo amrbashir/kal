@@ -5,13 +5,15 @@ use crate::{vibrancy::Vibrancy, CONFIG_FILE};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppearanceConfig {
-    #[serde(default)]
+    #[serde(default = "default_window_width")]
     pub window_width: u32,
-    #[serde(default)]
+    #[serde(default = "default_input_height")]
     pub input_height: u32,
-    #[serde(default)]
+    #[serde(default = "default_results_height")]
     pub results_height: u32,
-    #[serde(default)]
+    #[serde(default = "default_footer_height")]
+    pub footer_height: u32,
+    #[serde(default = "default_results_item_height")]
     pub results_item_height: u32,
     #[serde(default)]
     pub transparent: bool,
@@ -20,6 +22,21 @@ pub struct AppearanceConfig {
     pub vibrancy: Option<Vibrancy>,
 }
 
+fn default_window_width() -> u32 {
+    600
+}
+fn default_input_height() -> u32 {
+    60
+}
+fn default_results_height() -> u32 {
+    480
+}
+fn default_footer_height() -> u32 {
+    45
+}
+fn default_results_item_height() -> u32 {
+    60
+}
 fn default_true() -> bool {
     true
 }
@@ -27,10 +44,11 @@ fn default_true() -> bool {
 impl Default for AppearanceConfig {
     fn default() -> Self {
         Self {
-            window_width: 600,
-            input_height: 60,
-            results_height: 480,
-            results_item_height: 60,
+            window_width: default_window_width(),
+            input_height: default_input_height(),
+            results_height: default_results_height(),
+            footer_height: default_footer_height(),
+            results_item_height: default_results_item_height(),
             transparent: true,
             shadows: true,
             vibrancy: None,

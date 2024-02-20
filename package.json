@@ -16,6 +16,7 @@
     "deps:up": "pnpm update --latest && cargo update"
   },
   "dependencies": {
+    "@fluentui/web-components": "^2.5.16",
     "vue": "3.4.19",
     "vue-router": "4.2.5"
   },

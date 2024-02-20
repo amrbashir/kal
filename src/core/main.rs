@@ -25,12 +25,15 @@ use wry::WebViewAttributes;
 use crate::{
     common::{IPCEvent, SearchResultItem},
     config::Config,
-    event::{emit_event, AppEvent, ThreadEvent, WebviewEvent, KAL_IPC_INIT_SCRIPT},
+    event::{emit_event, AppEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
     fuzzy_sort::fuzzy_sort,
     plugin::Plugin,
     plugins::app_launcher::AppLauncherPlugin,
     webview_window::WebviewWindow,
 };
+
+#[cfg(not(debug_assertions))]
+use crate::event::WebviewEvent;
 
 #[path = "../common/mod.rs"]
 mod common;
@@ -71,11 +74,6 @@ fn create_main_window(
     config: &Config,
     event_loop: &EventLoop<AppEvent>,
 ) -> anyhow::Result<WebviewWindow> {
-    #[cfg(target_os = "linux")]
-    use tao::platform::linux::WindowExtWindows;
-    #[cfg(windows)]
-    use tao::platform::windows::WindowExtWindows;
-
     let (m_size, m_pos) = {
         let monitor = event_loop
             .primary_monitor()
@@ -96,7 +94,7 @@ fn create_main_window(
             inner_size: Some(
                 LogicalSize::new(
                     config.appearance.window_width,
-                    config.appearance.input_height,
+                    config.appearance.input_height + config.appearance.footer_height,
                 )
                 .into(),
             ),
@@ -116,27 +114,34 @@ fn create_main_window(
         WebViewAttributes {
             url: Some(url.parse().unwrap()),
             transparent: config.appearance.transparent,
-            initialization_scripts: vec![KAL_IPC_INIT_SCRIPT.to_string()],
+            initialization_scripts: vec![
+                KAL_IPC_INIT_SCRIPT.to_string(),
+                format!(
+                    "(function () {{ window.KAL.config = {} }})()",
+                    serialize_to_javascript::Serialized::new(
+                        &serde_json::value::to_raw_value(&config).unwrap_or_default(),
+                        &serialize_to_javascript::Options::default()
+                    )
+                ),
+            ],
             devtools: cfg!(debug_assertions),
             ..Default::default()
         },
         event_loop,
     )?;
 
-    #[cfg(any(windows, target_os = "linux"))]
-    main_window.window.set_skip_taskbar(true);
+    #[cfg(all(not(debug_assertions), any(windows, target_os = "linux")))]
+    {
+        #[cfg(target_os = "linux")]
+        use tao::platform::linux::WindowExtWindows;
+        #[cfg(windows)]
+        use tao::platform::windows::WindowExtWindows;
+        main_window.window.set_skip_taskbar(true);
+    }
 
     if let Some(vibrancy) = &config.appearance.vibrancy {
         vibrancy.apply(&main_window);
     }
-
-    let _ = main_window.webview.evaluate_script(&format!(
-        "window.KAL.config = {}",
-        serialize_to_javascript::Serialized::new(
-            &serde_json::value::to_raw_value(&config).unwrap_or_default(),
-            &serialize_to_javascript::Options::default()
-        )
-    ));
 
     Ok(main_window)
 }
@@ -176,7 +181,8 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
         std::cmp::min(
             count as u32 * config.appearance.results_item_height,
             config.appearance.results_height,
-        ) + config.appearance.input_height,
+        ) + config.appearance.input_height
+            + config.appearance.footer_height,
     ));
 }
 
@@ -373,7 +379,7 @@ fn process_events(
             }
         }
 
-        #[cfg(not(windows))]
+        #[cfg(all(not(windows), not(debug_assertions)))]
         Event::WindowEvent {
             event, window_id, ..
         } => {
@@ -391,7 +397,7 @@ fn process_events(
         }
 
         Event::UserEvent(event) => match event {
-            #[cfg(windows)]
+            #[cfg(all(windows, not(debug_assertions)))]
             AppEvent::WebviewEvent { event, window_id } => match event {
                 WebviewEvent::Focus(focus) => {
                     let app_state = app_state.borrow();
@@ -419,6 +425,8 @@ fn process_events(
                     app_state.borrow_mut().config = c.clone();
                 }
             },
+
+            _ => {}
         },
 
         _ => {}

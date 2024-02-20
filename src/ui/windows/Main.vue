@@ -2,9 +2,11 @@
 import { watch, onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent } from "../../common";
 import { getIconHtml } from "../utils";
-import SearchIcon from "../icons/SearchIcon.vue";
-import RefreshingIcon from "../icons/RefreshingIcon.vue";
-import InfoIcon from "../icons/InfoIcon.vue";
+import { neutralForegroundHover } from "@fluentui/web-components";
+
+const neutralForegroundHover10percent = `${neutralForegroundHover
+  .getValueFor(document.documentElement)
+  .toColorString()}1A`;
 
 const primaryColor = window.KAL.config?.appearance.transparent
   ? "rgba(0, 0, 0, 0)"
@@ -26,6 +28,14 @@ function search(query: string) {
 }
 
 watch(currentQuery, (query) => search(query));
+
+function onChange(e: InputEvent) {
+  if (e.target && "value" in e.target && e.target.value === "") {
+    gettingConfirmation.value = false;
+    currentQuery.value = "";
+    currentSelection.value = 0;
+  }
+}
 
 function onkeydown(e: KeyboardEvent) {
   if (gettingConfirmation.value && e.key !== "Enter") {
@@ -51,9 +61,16 @@ function onkeydown(e: KeyboardEvent) {
           : currentSelection.value - 1;
     }
 
+    const block: ScrollLogicalPosition =
+      currentSelection.value === 0
+        ? "end"
+        : currentSelection.value === results.value.length - 1
+          ? "start"
+          : "nearest";
+
     document
       .getElementById(`search-results_item_#${currentSelection.value}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      ?.scrollIntoView({ behavior: "smooth", block });
   }
 
   if (e.key === "Enter") {
@@ -108,62 +125,71 @@ onMounted(() => {
         'border-radius': results.length === 0 ? '10px 10px' : '10px 10px 0 0',
       }"
     >
-      <div id="search-input_icon-container">
-        <SearchIcon id="search-input_icon" />
-      </div>
-
-      <input
+      <fluent-search
         id="search-input"
         placeholder="Search..."
         v-model="currentQuery"
         @keydown="onkeydown"
+        @change="onChange"
       />
-
-      <Transition name="slide-fade">
-        <div v-if="refreshingIndex" class="right-icon-container">
-          <RefreshingIcon id="refreshing_icon" />
-        </div>
-        <div v-else-if="gettingConfirmation" class="right-icon-container">
-          <div id="confirmation-container">
-            <InfoIcon
-              :style="{ color: '#dd902e', width: '24px', height: '24px' }"
-            />
-            <span> Proceed? </span>
-          </div>
-        </div>
-      </Transition>
     </div>
 
-    <div id="search-results_container">
-      <ul>
-        <li
-          v-for="(item, index) in results"
-          :id="`search-results_item_#${index}`"
-          class="search-results_item"
-          :class="{ selected: index === currentSelection }"
-        >
-          <div
-            class="search-results_item_left"
-            v-html="getIconHtml(item.icon)"
-          ></div>
-          <div class="search-results_item_right">
-            <span class="text-primary">{{ item.primary_text }}</span>
-            <span class="text-secondary">{{ item.secondary_text }}</span>
-          </div>
-        </li>
-      </ul>
+    <fluent-divider />
+
+    <ul id="search-results_container">
+      <fluent-option
+        v-for="(item, index) in results"
+        :id="`search-results_item_#${index}`"
+        class="search-results_item"
+        :class="{ selected: index === currentSelection }"
+        :aria-selected="index === currentSelection"
+      >
+        <div
+          class="search-results_item_left"
+          v-html="getIconHtml(item.icon)"
+        ></div>
+        <div class="search-results_item_center">
+          <span>
+            {{ item.primary_text }}
+          </span>
+          <span class="text-hint">
+            {{ item.secondary_text }}
+          </span>
+        </div>
+        <div class="search-results_item_right">
+          <Transition name="slide-fade">
+            <span
+              class="text-warning"
+              v-if="gettingConfirmation && currentSelection == index"
+            >
+              Are your sure?
+            </span>
+          </Transition>
+        </div>
+      </fluent-option>
+    </ul>
+
+    <fluent-divider v-if="results.length > 0" />
+
+    <div id="search-footer-container">
+      <span></span>
+      <Transition name="slide-fade">
+        <p class="text-hint" v-if="refreshingIndex">Refreshing...</p>
+      </Transition>
     </div>
   </main>
 </template>
 
 <style>
-:root {
-  --accent: rgba(70, 140, 210, 0.5);
-  --accent-lighter: rgba(90, 163, 235, 0.5);
-  --text-primary: rgba(180, 180, 180);
-  --text-secondary: rgb(100, 100, 100);
-  --text-primary-on-accent: rgba(255, 255, 255);
-  --text-secondary-on-accent: rgb(160, 160, 160);
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background-color: var(--neutral-fill-strong-rest);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--neutral-fill-strong-hover);
 }
 
 main {
@@ -172,90 +198,79 @@ main {
   height: 100vh;
 }
 
+.text-warning {
+  color: rgb(255, 181, 125);
+}
+
+.text-hint {
+  color: var(--neutral-fill-strong-hover);
+}
+
 #search-input_container {
-  appearance: none;
-  background-color: v-bind(primaryColor);
-  width: 100%;
-  height: 60px;
   display: flex;
-  padding: 0 10px;
+  gap: 10px;
+  padding: 10px;
+  height: 60px;
+  background-color: v-bind(primaryColor);
 }
 
 #search-input {
-  flex-grow: 1;
-  background: transparent;
+  width: 100%;
   height: 100%;
-  outline: none;
-  border: none;
-  font-size: larger;
-  color: var(--text-primary);
-  padding: 1rem;
-}
-
-#search-input::placeholder {
-  color: var(--text-secondary);
-}
-
-#search-input_icon-container,
-.right-icon-container {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  color: var(--text-primary);
-}
-
-.slide-fade-leave-active,
-.slide-fade-enter-active {
   transition: all 0.3s ease-out;
 }
 
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  transform: translateX(20px);
-  opacity: 0;
-}
-
-#refreshing_icon {
-  animation: rotation 1s infinite linear;
-}
-
-@keyframes rotation {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(359deg);
-  }
-}
-
-#confirmation-container {
-  display: flex;
-  align-items: center;
-  justify-items: center;
-  gap: 2px;
+#search-input::part(root) {
+  height: 100% !important;
 }
 
 #search-results_container {
   overflow-x: hidden;
+  padding: 10px;
   background-color: v-bind(primaryColor);
   width: 100%;
-  height: calc(100% - 60px);
-  border-radius: 0 0 10px 10px;
+  height: calc(100% - 60px - 45px);
 }
 
-.search-results_item {
+#search-results_container:empty {
+  padding: 0;
+}
+
+.search-results_item,
+.search-results_item::part(content) {
   overflow: hidden;
   padding: 0 10px;
-  list-style: none;
   display: flex;
   width: 100%;
   height: 60px;
 }
 
-.search-results_item:hover,
-.search-results_item.selected {
-  background-color: var(--accent);
+/** Gap between items without flex */
+.search-results_item {
+  margin-bottom: 5px;
+}
+.search-results_item:last-child {
+  margin-bottom: 0px;
+}
+
+/**
+ Fallback rules when aria-selected="true" effects doesn't work initially
+ TODO: find out why and remove these hacks, except semi-transparent background
+ */
+fluent-option[aria-selected="false"].search-results_item {
+  background-color: transparent;
+}
+fluent-option[aria-selected="false"].search-results_item.selected,
+.search-results_item.selected,
+fluent-option[aria-selected="false"].search-results_item:hover,
+.search-results_item:hover {
+  background: v-bind(neutralForegroundHover10percent);
+}
+fluent-option[aria-selected="false"].search-results_item.selected::before,
+.search-results_item.selected::before,
+fluent-option[aria-selected="false"].search-results_item:hover::before,
+.search-results_item:hover::before {
+  background: var(--accent-fill-rest);
 }
 
 .search-results_item_left {
@@ -271,33 +286,44 @@ main {
   height: 50%;
 }
 
-.search-results_item_right {
+.search-results_item_center {
   overflow: hidden;
   height: 100%;
   display: flex;
+  flex: 1;
   flex-direction: column;
   justify-content: center;
 }
 
-.search-results_item_right span {
+.search-results_item_center span {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.text-primary {
-  color: var(--text-primary);
+.search-results_item_right {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.text-secondary {
-  color: var(--text-secondary);
+#search-footer-container {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 10px;
+  height: 45px;
+  background-color: v-bind(primaryColor);
+  border-radius: 0 0 10px 10px;
 }
 
-.search-results_item.selected .text-primary {
-  color: var(--text-primary-on-accent);
+.slide-fade-leave-active,
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
 }
 
-.search-results_item.selected .text-secondary {
-  color: var(--text-secondary-on-accent);
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
 }
 </style>
