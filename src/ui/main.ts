@@ -1,5 +1,5 @@
 import { createApp } from "vue";
-import { createRouter, createWebHistory } from "vue-router";
+import { router } from "./router";
 import {
   allComponents,
   provideFluentDesignSystem,
@@ -7,24 +7,12 @@ import {
   baseLayerLuminance,
 } from "@fluentui/web-components";
 import App from "./App.vue";
-import Main from "./windows/Main.vue";
+import "uno.css";
 
 provideFluentDesignSystem().register(allComponents);
 baseLayerLuminance.setValueFor(
   document.documentElement,
   StandardLuminance.DarkMode,
 );
-
-const routes = [
-  {
-    path: "/",
-    component: Main,
-  },
-];
-
-const router = createRouter({
-  routes,
-  history: createWebHistory(),
-});
 
 createApp(App).use(router).mount("#app");

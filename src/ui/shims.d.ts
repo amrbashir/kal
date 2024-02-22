@@ -7,6 +7,8 @@ declare interface Window {
     config?: {
       appearance: {
         transparent?: boolean;
+        input_height: number;
+        results_item_height: number;
       };
     };
 
