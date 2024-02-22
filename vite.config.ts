@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import { join } from "node:path";
 import vue from "@vitejs/plugin-vue";
+import svgLoader from "vite-svg-loader";
 
 export default defineConfig({
   plugins: [
@@ -11,6 +12,7 @@ export default defineConfig({
         },
       },
     }),
+    svgLoader(),
   ],
   root: join(__dirname, "src", "ui"),
   clearScreen: false,

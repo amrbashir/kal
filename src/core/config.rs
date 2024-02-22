@@ -11,8 +11,6 @@ pub struct AppearanceConfig {
     pub input_height: u32,
     #[serde(default = "default_results_height")]
     pub results_height: u32,
-    #[serde(default = "default_footer_height")]
-    pub footer_height: u32,
     #[serde(default = "default_results_item_height")]
     pub results_item_height: u32,
     #[serde(default)]
@@ -31,9 +29,6 @@ fn default_input_height() -> u32 {
 fn default_results_height() -> u32 {
     480
 }
-fn default_footer_height() -> u32 {
-    45
-}
 fn default_results_item_height() -> u32 {
     60
 }
@@ -47,7 +42,6 @@ impl Default for AppearanceConfig {
             window_width: default_window_width(),
             input_height: default_input_height(),
             results_height: default_results_height(),
-            footer_height: default_footer_height(),
             results_item_height: default_results_item_height(),
             transparent: true,
             shadows: true,

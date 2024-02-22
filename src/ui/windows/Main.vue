@@ -3,6 +3,7 @@ import { watch, onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent } from "../../common";
 import { getIconHtml } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
+import RestartIcon from "../../common/icons/windows/restart.svg";
 
 const neutralForegroundHover10percent = `${neutralForegroundHover
   .getValueFor(document.documentElement)
@@ -131,7 +132,18 @@ onMounted(() => {
         v-model="currentQuery"
         @keydown="onkeydown"
         @change="onChange"
-      />
+      >
+        <Transition name="fade">
+          <span id="refresh-icon" slot="clear-button" v-if="refreshingIndex">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M5.463 4.433A9.961 9.961 0 0 1 12 2c5.523 0 10 4.477 10 10c0 2.136-.67 4.116-1.81 5.74L17 12h3A8 8 0 0 0 6.46 6.228l-.997-1.795zm13.074 15.134A9.961 9.961 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.136.67-4.116 1.81-5.74L7 12H4a8 8 0 0 0 13.54 5.772l.997 1.795z"
+              ></path>
+            </svg>
+          </span>
+        </Transition>
+      </fluent-search>
     </div>
 
     <fluent-divider />
@@ -149,10 +161,10 @@ onMounted(() => {
           v-html="getIconHtml(item.icon)"
         ></div>
         <div class="search-results_item_center">
-          <span>
+          <span class="text-big">
             {{ item.primary_text }}
           </span>
-          <span class="text-hint">
+          <span class="text-hint text-small">
             {{ item.secondary_text }}
           </span>
         </div>
@@ -170,13 +182,6 @@ onMounted(() => {
     </ul>
 
     <fluent-divider v-if="results.length > 0" />
-
-    <div id="search-footer-container">
-      <span></span>
-      <Transition name="slide-fade">
-        <p class="text-hint" v-if="refreshingIndex">Refreshing...</p>
-      </Transition>
-    </div>
   </main>
 </template>
 
@@ -206,6 +211,13 @@ main {
   color: var(--neutral-fill-strong-hover);
 }
 
+.text-big {
+  font-size: medium;
+}
+.text-small {
+  font-size: small;
+}
+
 #search-input_container {
   display: flex;
   gap: 10px;
@@ -224,12 +236,30 @@ main {
   height: 100% !important;
 }
 
+#refresh-icon svg {
+  width: 100%;
+  height: 100%;
+  padding: 20%;
+}
+#refresh-icon svg {
+  animation: rotate 1s infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 #search-results_container {
   overflow-x: hidden;
   padding: 10px;
   background-color: v-bind(primaryColor);
   width: 100%;
-  height: calc(100% - 60px - 45px);
+  height: calc(100% - 60px);
 }
 
 #search-results_container:empty {
@@ -239,7 +269,6 @@ main {
 .search-results_item,
 .search-results_item::part(content) {
   overflow: hidden;
-  padding: 0 10px;
   display: flex;
   width: 100%;
   height: 60px;
@@ -307,23 +336,13 @@ fluent-option[aria-selected="false"].search-results_item:hover::before,
   align-items: center;
 }
 
-#search-footer-container {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 10px;
-  height: 45px;
-  background-color: v-bind(primaryColor);
-  border-radius: 0 0 10px 10px;
+.fade-leave-active,
+.fade-enter-active {
+  transition: opacity 0.3s ease-out;
 }
 
-.slide-fade-leave-active,
-.slide-fade-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  transform: translateX(20px);
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>

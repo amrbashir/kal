@@ -94,7 +94,7 @@ fn create_main_window(
             inner_size: Some(
                 LogicalSize::new(
                     config.appearance.window_width,
-                    config.appearance.input_height + config.appearance.footer_height,
+                    config.appearance.input_height,
                 )
                 .into(),
             ),
@@ -181,8 +181,7 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
         std::cmp::min(
             count as u32 * config.appearance.results_item_height,
             config.appearance.results_height,
-        ) + config.appearance.input_height
-            + config.appearance.footer_height,
+        ) + config.appearance.input_height,
     ));
 }
 
