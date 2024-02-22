@@ -190,10 +190,10 @@ onMounted(() => {
           </span>
         </div>
 
-        <div class="flex justify-center items-center">
+        <div class="flex justify-center items-center p-2">
           <Transition name="slide-fade">
             <span
-              class="text-orange"
+              class="text-orange-300"
               v-if="gettingConfirmation && currentSelection == index"
             >
               Are your sure?
@@ -246,6 +246,15 @@ ul fluent-option::part(content) {
 }
 .fade-enter-from,
 .fade-leave-to {
+  opacity: 0;
+}
+.slide-fade-leave-active,
+.slide-fade-enter-active {
+  transition: all 0.3s ease-out;
+}
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateX(20px);
   opacity: 0;
 }
 </style>
