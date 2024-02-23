@@ -89,6 +89,37 @@ fn create_main_window(
     #[cfg(not(debug_assertions))]
     let url = "kal://localhost";
 
+    let serialize_options = serialize_to_javascript::Options::default();
+    let mut initialization_scripts = vec![
+        KAL_IPC_INIT_SCRIPT.to_string(),
+        format!(
+            "(function () {{ window.KAL.config = {}; }})()",
+            serialize_to_javascript::Serialized::new(
+                &serde_json::value::to_raw_value(&config).unwrap_or_default(),
+                &serialize_options,
+            ),
+        ),
+    ];
+
+    if let Some(file) = &config.appearance.custom_css_file {
+        if let Some(file) = CONFIG_FILE.parent().map(|p| p.join(file)) {
+            let contents = std::fs::read_to_string(file)?;
+            initialization_scripts.push(format!(
+                r#"(function () {{
+                  window.addEventListener("DOMContentLoaded", () => {{
+                    const style = document.createElement("style");
+                    style.textContent = {};
+                    const head = document.head ?? document.querySelector('head') ?? document.body;
+                    head.appendChild(style)
+                  }})
+                }})()"#,
+                serialize_to_javascript::Serialized::new(
+                    &serde_json::value::to_raw_value(&contents).unwrap_or_default(),
+                    &serialize_options,
+                ),
+            ));
+        }
+    }
     let main_window = WebviewWindow::new(
         WindowAttributes {
             inner_size: Some(
@@ -114,16 +145,7 @@ fn create_main_window(
         WebViewAttributes {
             url: Some(url.parse().unwrap()),
             transparent: config.appearance.transparent,
-            initialization_scripts: vec![
-                KAL_IPC_INIT_SCRIPT.to_string(),
-                format!(
-                    "(function () {{ window.KAL.config = {} }})()",
-                    serialize_to_javascript::Serialized::new(
-                        &serde_json::value::to_raw_value(&config).unwrap_or_default(),
-                        &serialize_to_javascript::Options::default()
-                    )
-                ),
-            ],
+            initialization_scripts,
             devtools: cfg!(debug_assertions),
             ..Default::default()
         },

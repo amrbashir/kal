@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::{vibrancy::Vibrancy, CONFIG_FILE};
 
@@ -18,6 +22,7 @@ pub struct AppearanceConfig {
     #[serde(default = "default_true")]
     pub shadows: bool,
     pub vibrancy: Option<Vibrancy>,
+    pub custom_css_file: Option<PathBuf>,
 }
 
 fn default_window_width() -> u32 {
@@ -46,6 +51,7 @@ impl Default for AppearanceConfig {
             transparent: true,
             shadows: true,
             vibrancy: None,
+            custom_css_file: None,
         }
     }
 }
