@@ -47,6 +47,7 @@ impl Shortcut {
         match &self.kind {
             ShortcutKind::Path { path } => {
                 if path.is_file() {
+                    // TODO: generate from file
                     Defaults::File.icon()
                 } else {
                     Defaults::Folder.icon()

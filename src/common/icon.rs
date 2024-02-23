@@ -63,6 +63,16 @@ impl Defaults {
                 data: include_str!("./icons/windows/sleep.svg").into(),
                 kind: IconKind::Svg,
             },
+            #[cfg(windows)]
+            Defaults::Folder => Icon {
+                data: include_str!("./icons/windows/folder.svg").into(),
+                kind: IconKind::Svg,
+            },
+            #[cfg(windows)]
+            Defaults::File => Icon {
+                data: include_str!("./icons/windows/file.svg").into(),
+                kind: IconKind::Svg,
+            },
             _ => Icon {
                 data: self.path().to_string(),
                 kind: IconKind::Default,
@@ -74,10 +84,6 @@ impl Defaults {
         let icon = path.split('/').next_back().unwrap();
         match icon {
             // TODO: replace with svgs
-            #[cfg(windows)]
-            "folder" => include_bytes!("./icons/windows/folder.png"),
-            #[cfg(windows)]
-            "file" => include_bytes!("./icons/windows/file.png"),
             #[cfg(windows)]
             "url" => include_bytes!("./icons/windows/url.png"),
             #[cfg(windows)]
