@@ -4,25 +4,70 @@ import { SearchResultItem, IPCEvent } from "../../common";
 import { getIconHtml } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
 
-const neutralForegroundHover10percent = `${neutralForegroundHover
-  .getValueFor(document.documentElement)
-  .toColorString()}1A`;
-const bgPrimaryColor = window.KAL.config?.appearance.transparent
-  ? "bg-transparent"
-  : "bg-[rgba(21,_20,_20,_0.75)]";
-
-const inputHeight = window.KAL.config?.appearance.input_height;
-const resultsItemHeight = window.KAL.config?.appearance.results_item_height;
-const resultsItemHeightPx = `${resultsItemHeight}px`;
-
 let inputRef = ref<HTMLInputElement | null>(null);
-let resultItemRefs = ref<(HTMLElement | null)[]>([]);
+onMounted(() =>
+  window.KAL.ipc.on(IPCEvent.FocusInput, () => {
+    inputRef.value?.focus();
+    inputRef.value?.select();
+  }),
+);
+
+let refreshingIndex = ref(false);
+onMounted(() =>
+  window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
+    setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for nicer animation
+    search(currentQuery.value);
+  }),
+);
+
+let gettingConfirmation = ref(false);
+let gettingConfirmationIndex = ref(0);
+function resetConfirm() {
+  gettingConfirmation.value = false;
+  gettingConfirmationIndex.value = 0;
+}
+
+let currentSelection = ref(0);
+function updateSelection(e: KeyboardEvent) {
+  if (e.key === "ArrowDown") {
+    currentSelection.value =
+      currentSelection.value === results.value.length - 1
+        ? 0
+        : currentSelection.value + 1;
+  } else {
+    currentSelection.value =
+      currentSelection.value === 0
+        ? results.value.length - 1
+        : currentSelection.value - 1;
+  }
+}
+
+function scrollSelected() {
+  const block: ScrollLogicalPosition =
+    currentSelection.value === 0
+      ? "end"
+      : currentSelection.value === results.value.length - 1
+        ? "start"
+        : "nearest";
+
+  resultItemRefs.value[currentSelection.value]?.scrollIntoView({
+    behavior: "smooth",
+    block,
+  });
+}
 
 let results = ref<SearchResultItem[]>([]);
+let resultItemRefs = ref<(HTMLElement | null)[]>([]);
+
+onMounted(() =>
+  window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
+    currentSelection.value = 0;
+    results.value = payload;
+  }),
+);
+
 let currentQuery = ref("");
-let currentSelection = ref(0);
-let refreshingIndex = ref(false);
-let gettingConfirmation = ref(false);
+watch(currentQuery, (query) => search(query));
 
 function search(query: string) {
   if (query) {
@@ -33,19 +78,42 @@ function search(query: string) {
   }
 }
 
-watch(currentQuery, (query) => search(query));
+function resetQuery() {
+  currentQuery.value = "";
+  currentSelection.value = 0;
+}
+
+function executeItem(e: { shiftKey: boolean }, index: number) {
+  const confirm = results.value[index].needs_confirmation;
+
+  if (
+    (!confirm && gettingConfirmation.value) ||
+    (confirm &&
+      gettingConfirmation.value &&
+      gettingConfirmationIndex.value !== index)
+  ) {
+    resetConfirm();
+  }
+
+  if (confirm && !gettingConfirmation.value) {
+    gettingConfirmation.value = true;
+    gettingConfirmationIndex.value = index;
+  } else {
+    resetConfirm();
+    window.KAL.ipc.send(IPCEvent.Execute, index, e.shiftKey);
+  }
+}
 
 function onChange(e: InputEvent) {
   if (e.target && "value" in e.target && e.target.value === "") {
-    gettingConfirmation.value = false;
-    currentQuery.value = "";
-    currentSelection.value = 0;
+    resetConfirm();
+    resetQuery();
   }
 }
 
 function onkeydown(e: KeyboardEvent) {
   if (gettingConfirmation.value && e.key !== "Enter") {
-    gettingConfirmation.value = false;
+    resetConfirm();
   }
 
   if (e.key === "Escape") {
@@ -55,42 +123,13 @@ function onkeydown(e: KeyboardEvent) {
 
   if (["ArrowDown", "ArrowUp"].includes(e.key)) {
     e.preventDefault();
-    if (e.key === "ArrowDown") {
-      currentSelection.value =
-        currentSelection.value === results.value.length - 1
-          ? 0
-          : currentSelection.value + 1;
-    } else {
-      currentSelection.value =
-        currentSelection.value === 0
-          ? results.value.length - 1
-          : currentSelection.value - 1;
-    }
-
-    const block: ScrollLogicalPosition =
-      currentSelection.value === 0
-        ? "end"
-        : currentSelection.value === results.value.length - 1
-          ? "start"
-          : "nearest";
-
-    resultItemRefs.value[currentSelection.value]?.scrollIntoView({
-      behavior: "smooth",
-      block,
-    });
+    updateSelection(e);
+    scrollSelected();
   }
 
   if (e.key === "Enter") {
     e.preventDefault();
-
-    const confirm = results.value[currentSelection.value].needs_confirmation;
-    if (!gettingConfirmation.value && confirm) {
-      gettingConfirmation.value = true;
-      return;
-    } else {
-      gettingConfirmation.value = false;
-      window.KAL.ipc.send(IPCEvent.Execute, currentSelection.value, e.shiftKey);
-    }
+    executeItem(e, currentSelection.value);
   }
 
   if (e.ctrlKey && e.key === "o") {
@@ -105,22 +144,17 @@ function onkeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
-  window.KAL.ipc.on(IPCEvent.FocusInput, () => {
-    inputRef.value?.focus();
-    inputRef.value?.select();
-  });
+// styles
+const neutralForegroundHover10percent = `${neutralForegroundHover
+  .getValueFor(document.documentElement)
+  .toColorString()}1A`;
+const bgPrimaryColor = window.KAL.config?.appearance.transparent
+  ? "bg-transparent"
+  : "bg-[rgba(21,_20,_20,_0.75)]";
 
-  window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
-    currentSelection.value = 0;
-    results.value = payload;
-  });
-
-  window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
-    setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for transition purposes
-    search(currentQuery.value);
-  });
-});
+const inputHeight = window.KAL.config?.appearance.input_height;
+const resultsItemHeight = window.KAL.config?.appearance.results_item_height;
+const resultsItemHeightPx = `${resultsItemHeight}px`;
 </script>
 
 <template>
@@ -167,6 +201,7 @@ onMounted(() => {
     >
       <fluent-option
         v-for="(item, index) in results"
+        @click="(e: MouseEvent) => executeItem(e, index)"
         ref="resultItemRefs"
         :style="{ height: `${resultsItemHeight}px` }"
         class="overflow-hidden flex w-full part:content:overflow-hidden mb-1 last:mb-0 part:content:flex part:content:w-full"
@@ -194,7 +229,7 @@ onMounted(() => {
           <Transition name="slide-fade">
             <span
               class="text-orange-300"
-              v-if="gettingConfirmation && currentSelection == index"
+              v-if="gettingConfirmation && gettingConfirmationIndex == index"
             >
               Are your sure?
             </span>
