@@ -2,5 +2,7 @@
 
 echo ">> Running \"cargo fmt --all --check\" in $(pwd)"
 cargo fmt --all --check
+echo ">> Running \"cargo clippy\" in $(pwd)"
+cargo clippy -- -Dwarnings
 echo ">> Running \"pnpm format:check\" in $(pwd)"
 pnpm format:check
