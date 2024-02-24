@@ -4,22 +4,17 @@ use crate::{
         SearchResultItem,
     },
     config::Config,
-    plugin::Plugin,
-    utils, KAL_DATA_DIR,
+    utils::{self, thread},
+    KAL_DATA_DIR,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
-    thread,
 };
 
-#[cfg(windows)]
-#[path = "windows.rs"]
-mod platform;
-
 #[derive(Debug)]
-pub struct DirectoryIndexerPlugin {
+pub struct Plugin {
     name: String,
     enabled: bool,
     paths: Vec<String>,
@@ -28,12 +23,12 @@ pub struct DirectoryIndexerPlugin {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct DirectoryIndexerPluginConfig {
+struct PluginConfig {
     enabled: bool,
     paths: Vec<String>,
 }
 
-impl Default for DirectoryIndexerPluginConfig {
+impl Default for PluginConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -42,10 +37,10 @@ impl Default for DirectoryIndexerPluginConfig {
     }
 }
 
-impl Plugin for DirectoryIndexerPlugin {
+impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
         let name = "DirectoryIndexer".to_string();
-        let config = config.plugin_config::<DirectoryIndexerPluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(&name);
 
         Ok(Box::new(Self {
             name,
@@ -64,8 +59,8 @@ impl Plugin for DirectoryIndexerPlugin {
         &self.name
     }
 
-    fn refresh(&mut self, config: &Config) {
-        let config = config.plugin_config::<DirectoryIndexerPluginConfig>(&self.name);
+    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+        let config = config.plugin_config::<PluginConfig>(&self.name);
         self.enabled = config.enabled;
         self.paths = config.paths;
 
@@ -115,26 +110,34 @@ impl Plugin for DirectoryIndexerPlugin {
 
         let _ = std::fs::create_dir_all(&self.icons_dir);
         thread::spawn(move || {
-            platform::extract_png(dir_entries.into_iter().filter_map(|i| {
+            utils::extract_pngs(dir_entries.into_iter().filter_map(|i| {
                 if i.icon.kind == IconKind::Path {
                     Some(i)
                 } else {
                     None
                 }
-            }));
+            }))
         });
+
+        Ok(())
     }
 
-    fn results(&self, _query: &str) -> &[SearchResultItem] {
-        &self.cached_dir_entries
+    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
+        Ok(&self.cached_dir_entries)
     }
 
-    fn execute(&self, item: &SearchResultItem, elevated: bool) {
-        platform::execute(item, elevated)
+    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()> {
+        let path = item.path()?;
+        utils::execute(path, elevated);
+        Ok(())
     }
 
-    fn open_location(&self, item: &SearchResultItem) {
-        platform::open_location(item);
+    fn open_location(&self, item: &SearchResultItem) -> anyhow::Result<()> {
+        let path = item.path()?;
+        if let Some(parent) = path.parent() {
+            utils::open_path(parent);
+        }
+        Ok(())
     }
 }
 
@@ -146,9 +149,9 @@ fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<fs::DirEntry>> {
             #[cfg(windows)]
             {
                 use std::os::windows::fs::MetadataExt;
-                use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
+                use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
                 if e.metadata()
-                    .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN) != 0)
+                    .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN.0) != 0)
                     .unwrap_or(false)
                 {
                     return None;

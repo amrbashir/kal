@@ -1,38 +1,19 @@
 use std::{
-    borrow::Cow,
     fmt::Debug,
     ops::{Deref, DerefMut},
-    path::PathBuf,
     rc::Rc,
 };
 
 use crate::{
-    common::icon,
     event::{AppEvent, WebviewEvent},
-    KAL_DATA_DIR,
+    protocols,
 };
 
 use tao::{
     event_loop::EventLoop,
     window::{Window, WindowAttributes},
 };
-use wry::{
-    http::{header::CONTENT_TYPE, Request, Response},
-    WebView, WebViewAttributes, WebViewBuilder,
-};
-
-macro_rules! bail500 {
-    ($res:expr) => {
-        match $res {
-            Ok(r) => r,
-            Err(e) => Response::builder()
-                .status(500)
-                .body(e.to_string().as_bytes().to_vec())
-                .unwrap()
-                .map(Into::into),
-        }
-    };
-}
+use wry::{http::Response, WebView, WebViewAttributes, WebViewBuilder};
 
 pub struct WebviewWindow {
     pub window: Rc<Window>,
@@ -57,6 +38,20 @@ impl Debug for WebviewWindow {
 impl tao::rwh_06::HasWindowHandle for WebviewWindow {
     fn window_handle(&self) -> Result<tao::rwh_06::WindowHandle<'_>, tao::rwh_06::HandleError> {
         self.window.window_handle()
+    }
+}
+
+impl Deref for WebviewWindow {
+    type Target = WebView;
+
+    fn deref(&self) -> &Self::Target {
+        &self.webview
+    }
+}
+
+impl DerefMut for WebviewWindow {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.webview
     }
 }
 
@@ -86,11 +81,12 @@ impl WebviewWindow {
 
         #[cfg(not(debug_assertions))]
         {
-            builder = builder
-                .with_custom_protocol("kal".into(), move |request| bail500!(kal_protocol(request)));
+            builder = builder.with_custom_protocol("kal".into(), move |request| {
+                protocols::bail500!(protocols::kal(request))
+            });
         }
         builder = builder.with_custom_protocol("kalasset".into(), move |request| {
-            bail500!(kal_asset_protocol(request))
+            protocols::bail500!(protocols::kal_asset(request))
         });
 
         let proxy = event_loop.create_proxy();
@@ -138,10 +134,10 @@ impl WebviewWindow {
             }
         }
 
-        #[cfg_attr(not(windows), allow(unused_mut))]
         let mut webview_window = WebviewWindow {
             window,
             webview,
+
             #[cfg(windows)]
             is_transparent,
             #[cfg(windows)]
@@ -151,102 +147,22 @@ impl WebviewWindow {
         };
 
         #[cfg(windows)]
-        clear_window_surface(&mut webview_window);
+        webview_window.clear_window_surface();
 
         Ok(webview_window)
     }
-}
 
-impl Deref for WebviewWindow {
-    type Target = WebView;
-
-    fn deref(&self) -> &Self::Target {
-        &self.webview
-    }
-}
-
-impl DerefMut for WebviewWindow {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.webview
-    }
-}
-
-const EMPTY_BODY: [u8; 0] = [0_u8; 0];
-
-#[inline]
-#[cfg(not(debug_assertions))]
-/// `kal://` protocol
-fn kal_protocol<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
-    let path = &request.uri().path()[1..];
-    let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
-
-    let file = crate::EmbededAssets::get(&path)
-        .unwrap_or_else(|| crate::EmbededAssets::get("index.html").unwrap());
-
-    let path = PathBuf::from(&*path);
-    let mimetype = match path.extension().unwrap_or_default().to_str() {
-        Some("html") | Some("htm") => "text/html",
-        Some("js") | Some("mjs") => "text/javascript",
-        Some("css") => "text/css",
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("svg") => "image/svg+xml",
-        _ => "text/html",
-    };
-
-    Response::builder()
-        .header(CONTENT_TYPE, mimetype)
-        .body(Cow::from(file.data))
-        .map_err(Into::into)
-}
-
-#[inline]
-/// `kalasset://` protocol
-fn kal_asset_protocol<'a>(
-    request: Request<Vec<u8>>,
-) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
-    let path = &request.uri().path()[1..];
-    let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
-
-    if path.starts_with("icons/defaults") {
-        return Response::builder()
-            .header(CONTENT_TYPE, "image/png")
-            .body(Cow::from(icon::Defaults::bytes(&path)))
-            .map_err(Into::into);
-    }
-
-    let path = dunce::canonicalize(PathBuf::from(&*path))?;
-
-    if path.starts_with(&*KAL_DATA_DIR) {
-        let mimetype = match path.extension().unwrap_or_default().to_str() {
-            Some("png") => "image/png",
-            Some("jpg") | Some("jpeg") => "image/jpeg",
-            Some("svg") => "image/svg+xml",
-            _ => "text/html",
-        };
-
-        Response::builder()
-            .header(CONTENT_TYPE, mimetype)
-            .body(Cow::from(std::fs::read(path)?))
-            .map_err(Into::into)
-    } else {
-        Response::builder()
-            .status(403)
-            .body(Cow::from(&EMPTY_BODY[..]))
-            .map_err(Into::into)
-    }
-}
-
-#[cfg(windows)]
-pub fn clear_window_surface(window: &mut WebviewWindow) {
-    let size = window.window.inner_size();
-    if let (Some(width), Some(height)) = (
-        std::num::NonZeroU32::new(size.width),
-        std::num::NonZeroU32::new(size.height),
-    ) {
-        window.sb_surface.resize(width, height).unwrap();
-        let mut buffer = window.sb_surface.buffer_mut().unwrap();
-        buffer.fill(0);
-        let _ = buffer.present();
+    #[cfg(windows)]
+    pub fn clear_window_surface(&mut self) {
+        let size = self.window.inner_size();
+        if let (Some(width), Some(height)) = (
+            std::num::NonZeroU32::new(size.width),
+            std::num::NonZeroU32::new(size.height),
+        ) {
+            self.sb_surface.resize(width, height).unwrap();
+            let mut buffer = self.sb_surface.buffer_mut().unwrap();
+            buffer.fill(0);
+            let _ = buffer.present();
+        }
     }
 }

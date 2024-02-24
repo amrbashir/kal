@@ -15,8 +15,8 @@ pub enum Vibrancy {
 }
 
 impl Vibrancy {
-    pub fn apply(&self, window: &WebviewWindow) {
-        let _ = match self {
+    pub fn apply(&self, window: &WebviewWindow) -> anyhow::Result<()> {
+        match self {
             #[cfg(windows)]
             Vibrancy::Mica => window_vibrancy::apply_mica(window, None),
             #[cfg(windows)]
@@ -35,7 +35,8 @@ impl Vibrancy {
             Vibrancy::Blur => window_vibrancy::apply_blur(window, None),
 
             #[allow(unreachable_patterns)]
-            _ => return,
-        };
+            _ => Ok(()),
+        }
+        .map_err(Into::into)
     }
 }

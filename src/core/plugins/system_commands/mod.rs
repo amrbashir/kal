@@ -1,4 +1,4 @@
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, process::Command, str::FromStr};
 
 use crate::{
     common::{
@@ -6,13 +6,9 @@ use crate::{
         SearchResultItem,
     },
     config::Config,
-    plugin::Plugin,
 };
 use serde::{Deserialize, Serialize};
-
-#[cfg(windows)]
-#[path = "windows.rs"]
-mod platform;
+use windows::Win32::System::Power::SetSuspendState;
 
 #[derive(Clone, Copy)]
 enum SystemCommand {
@@ -133,30 +129,59 @@ impl SystemCommand {
             },
         }
     }
+
+    const fn shutdown_bin_args(&self) -> &[&str] {
+        match self {
+            Self::Shutdown => &["/s", "/t", "5000"],
+            Self::Restart => &["/r", "/t", "5000"],
+            Self::SignOut => &["/l"],
+            Self::Hibernate => &["/h"],
+            Self::Sleep => unreachable!(),
+        }
+    }
+
+    fn execute(&self) -> anyhow::Result<()> {
+        match self {
+            SystemCommand::Sleep => {
+                unsafe { SetSuspendState(false, false, false) };
+            }
+            _ => {
+                let shutdown_bin = std::env::var("SYSTEMROOT").map_or_else(
+                    |_| "shutdown.exe".to_string(),
+                    |p| format!("{p}\\System32\\shutdown.exe"),
+                );
+                Command::new(shutdown_bin)
+                    .args(self.shutdown_bin_args())
+                    .spawn()?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
-pub struct SystemCommandsPlugin {
+pub struct Plugin {
     name: String,
     enabled: bool,
     results: Vec<SearchResultItem>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct SystemCommandsPluginConfig {
+struct PluginConfig {
     enabled: bool,
 }
 
-impl Default for SystemCommandsPluginConfig {
+impl Default for PluginConfig {
     fn default() -> Self {
         Self { enabled: true }
     }
 }
 
-impl Plugin for SystemCommandsPlugin {
+impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
         let name = "SystemCommands".to_string();
-        let config = config.plugin_config::<SystemCommandsPluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(&name);
         let results = SystemCommand::all().iter().map(|c| c.item(&name)).collect();
 
         Ok(Box::new(Self {
@@ -174,16 +199,18 @@ impl Plugin for SystemCommandsPlugin {
         &self.name
     }
 
-    fn refresh(&mut self, config: &Config) {
-        let config = config.plugin_config::<SystemCommandsPluginConfig>(&self.name);
+    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+        let config = config.plugin_config::<PluginConfig>(&self.name);
         self.enabled = config.enabled;
+        Ok(())
     }
 
-    fn results(&self, _query: &str) -> &[SearchResultItem] {
-        &self.results
+    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
+        Ok(&self.results)
     }
 
-    fn execute(&self, item: &SearchResultItem, _elevated: bool) {
-        platform::execute(item)
+    fn execute(&self, item: &SearchResultItem, _elevated: bool) -> anyhow::Result<()> {
+        let command: SystemCommand = item.str()?.parse()?;
+        command.execute()
     }
 }

@@ -12,8 +12,8 @@ name = "kal"
 path = "src/core/main.rs"
 
 [dependencies]
-wry = "0.36"
-tao = { version = "0.25", features = ["rwh_05"] }
+wry = "0.37"
+tao = { version = "0.26" }
 serde = "1"
 serde_json = "1"
 toml = "0.8"
@@ -30,12 +30,13 @@ tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 url = { version = "2.5", features = ["serde"] }
 window-vibrancy = "0.5"
+global-hotkey = "0.4.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"
 webview2-com = "0.28"
 
-[target.'cfg(target_os = "windows")'.dependencies.windows-sys]
+[target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.52"
 features = [
   "Win32_UI_Shell",
@@ -44,4 +45,7 @@ features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_Storage_FileSystem",
   "Win32_System_Power",
+  "Management_Deployment",
+  "ApplicationModel",
+  "Foundation_Collections",
 ]

@@ -1,19 +1,14 @@
-use std::{fmt::Display, path::PathBuf};
-
 use crate::{
     common::{
         icon::{Defaults, Icon},
         SearchResultItem,
     },
     config::Config,
-    plugin::Plugin,
+    utils,
 };
 use serde::{Deserialize, Serialize};
+use std::{fmt::Display, path::PathBuf};
 use url::Url;
-
-#[cfg(windows)]
-#[path = "windows.rs"]
-mod platform;
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
@@ -76,7 +71,7 @@ impl Display for Shortcut {
 }
 
 #[derive(Debug)]
-pub struct ShortcutsPlugin {
+pub struct Plugin {
     name: String,
     enabled: bool,
     shortcuts: Vec<Shortcut>,
@@ -84,12 +79,12 @@ pub struct ShortcutsPlugin {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ShortcutsPluginConfig {
+pub struct PluginConfig {
     pub enabled: bool,
     pub shortcuts: Vec<Shortcut>,
 }
 
-impl Default for ShortcutsPluginConfig {
+impl Default for PluginConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -98,10 +93,10 @@ impl Default for ShortcutsPluginConfig {
     }
 }
 
-impl Plugin for ShortcutsPlugin {
+impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
         let name = "Shortcuts".to_string();
-        let config = config.plugin_config::<ShortcutsPluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(&name);
 
         Ok(Box::new(Self {
             name,
@@ -119,8 +114,8 @@ impl Plugin for ShortcutsPlugin {
         &self.name
     }
 
-    fn refresh(&mut self, config: &Config) {
-        let config = config.plugin_config::<ShortcutsPluginConfig>(&self.name);
+    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+        let config = config.plugin_config::<PluginConfig>(&self.name);
         self.enabled = config.enabled;
         self.shortcuts = config.shortcuts;
 
@@ -137,34 +132,38 @@ impl Plugin for ShortcutsPlugin {
                 needs_confirmation: shortcut.needs_confirmation,
             })
             .collect();
+
+        Ok(())
     }
 
-    fn results(&self, _query: &str) -> &[SearchResultItem] {
-        &self.cached_shortcuts
+    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
+        Ok(&self.cached_shortcuts)
     }
 
-    fn execute(&self, item: &SearchResultItem, elevated: bool) {
-        let index = item.execution_args.as_u64().unwrap();
+    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()> {
+        let index = item.index()?;
         if let Some(shortcut) = self.shortcuts.get(index as usize) {
             match &shortcut.kind {
-                ShortcutKind::Path { path } => platform::open_path(path),
-                ShortcutKind::Url { url } => platform::open_url(url),
+                ShortcutKind::Path { path } => utils::open_path(path),
+                ShortcutKind::Url { url } => utils::open_url(url),
                 ShortcutKind::Shell {
                     shell,
                     script,
                     working_directory,
                     hidden,
-                } => platform::execute_in_shell(shell, script, working_directory, hidden, elevated),
+                } => utils::execute_in_shell(shell, script, working_directory, hidden, elevated)?,
             }
         }
+        Ok(())
     }
 
-    fn open_location(&self, item: &SearchResultItem) {
-        let index = item.execution_args.as_u64().unwrap();
+    fn open_location(&self, item: &SearchResultItem) -> anyhow::Result<()> {
+        let index = item.index()?;
         if let Some(shortcut) = self.shortcuts.get(index as usize) {
             if let ShortcutKind::Path { path } = &shortcut.kind {
-                platform::open_location(path);
+                utils::open_path(path);
             }
         }
+        Ok(())
     }
 }

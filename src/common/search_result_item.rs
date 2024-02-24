@@ -1,4 +1,7 @@
+use std::path::PathBuf;
+
 use super::icon::Icon;
+use anyhow::Context;
 use serde::Serialize;
 
 #[derive(Serialize, Debug, Clone)]
@@ -15,4 +18,24 @@ pub struct SearchResultItem {
     pub icon: Icon,
     /// Whether execution of this item, requires confirmation or not
     pub needs_confirmation: bool,
+}
+
+impl SearchResultItem {
+    pub fn str(&self) -> anyhow::Result<&str> {
+        self.execution_args
+            .as_str()
+            .with_context(|| "JSON value not a str")
+    }
+
+    pub fn path(&self) -> anyhow::Result<PathBuf> {
+        self.str().map(PathBuf::from)
+    }
+
+    pub fn index(&self) -> anyhow::Result<u64> {
+        let index = self
+            .execution_args
+            .as_u64()
+            .with_context(|| "JSON value not u64")?;
+        Ok(index)
+    }
 }

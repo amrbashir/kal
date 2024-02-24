@@ -1,34 +1,30 @@
 use std::{
     cell::RefCell,
     path::PathBuf,
-    sync::{Arc, Mutex},
-    thread,
+    sync::{Arc, Mutex, MutexGuard},
 };
 
 use anyhow::Context;
-use event::EMPTY_ARGS;
 use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_sort::FuzzySort;
+use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use once_cell::sync::Lazy;
-use plugins::{
-    directory_indexer::DirectoryIndexerPlugin, shortcuts::ShortcutsPlugin,
-    system_commands::SystemCommandsPlugin,
-};
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
-    event::{DeviceEvent, ElementState, Event, StartCause, WindowEvent},
+    event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy},
     window::WindowAttributes,
 };
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+use windows::Win32::Foundation::HWND;
 use wry::WebViewAttributes;
 
 use crate::{
     common::{IPCEvent, SearchResultItem},
     config::Config,
     event::{emit_event, AppEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
-    fuzzy_sort::fuzzy_sort,
     plugin::Plugin,
-    plugins::app_launcher::AppLauncherPlugin,
+    utils::thread,
     webview_window::WebviewWindow,
 };
 
@@ -42,6 +38,7 @@ mod event;
 mod fuzzy_sort;
 mod plugin;
 mod plugins;
+mod protocols;
 mod utils;
 mod vibrancy;
 mod webview_window;
@@ -162,33 +159,35 @@ fn create_main_window(
     }
 
     if let Some(vibrancy) = &config.appearance.vibrancy {
-        vibrancy.apply(&main_window);
+        vibrancy.apply(&main_window)?;
     }
 
     Ok(main_window)
 }
 
 // Saves the current foreground window then shows the main window
-fn show_main_window(app_state: &mut AppState<AppEvent>) {
+#[tracing::instrument]
+fn show_main_window(app_state: &mut AppState<AppEvent>) -> anyhow::Result<()> {
     #[cfg(windows)]
     {
-        use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+        use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
         app_state.previously_foreground_hwnd = unsafe { GetForegroundWindow() };
     }
 
     let main_window = &app_state.main_window;
     main_window.window.set_visible(true);
     main_window.window.set_focus();
-    emit_event(main_window, IPCEvent::FocusInput, EMPTY_ARGS);
+    emit_event(main_window, IPCEvent::FocusInput, ())
 }
 
 /// Hides the main window and restores focus to the previous foreground window if needed
+#[tracing::instrument]
 fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
     app_state.main_window.window.set_visible(false);
 
     #[cfg(windows)]
     {
-        use windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+        use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
 
         if restore_focus {
             unsafe { SetForegroundWindow(app_state.previously_foreground_hwnd) };
@@ -197,6 +196,7 @@ fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: 
 }
 
 // Resizes the main window based on the number of current results and user config
+#[tracing::instrument]
 fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
     main_window.window.set_inner_size(LogicalSize::new(
         config.appearance.window_width,
@@ -211,12 +211,29 @@ struct AppState<T: 'static> {
     config: Config,
     main_window: WebviewWindow,
     #[cfg(windows)]
-    previously_foreground_hwnd: windows_sys::Win32::Foundation::HWND,
+    previously_foreground_hwnd: windows::Win32::Foundation::HWND,
     plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
     current_results: Vec<SearchResultItem>,
     modifier_pressed: bool,
     proxy: EventLoopProxy<T>,
     fuzzy_matcher: SkimMatcherV2,
+}
+
+impl<T: 'static> std::fmt::Debug for AppState<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AppState")
+            .field("config", &self.config)
+            .field("main_window", &self.main_window)
+            .field(
+                "previously_foreground_hwnd",
+                &self.previously_foreground_hwnd,
+            )
+            .field("plugins", &self.plugins)
+            .field("current_results", &self.current_results)
+            .field("modifier_pressed", &self.modifier_pressed)
+            .field("proxy", &self.proxy)
+            .finish()
+    }
 }
 
 impl<T: 'static> AppState<T> {
@@ -230,7 +247,7 @@ impl<T: 'static> AppState<T> {
             config,
             main_window,
             #[cfg(windows)]
-            previously_foreground_hwnd: 0,
+            previously_foreground_hwnd: HWND::default(),
             plugins,
             current_results: Default::default(),
             modifier_pressed: false,
@@ -238,8 +255,13 @@ impl<T: 'static> AppState<T> {
             fuzzy_matcher: SkimMatcherV2::default(),
         }
     }
+
+    fn plugins(&self) -> MutexGuard<'_, Vec<Box<dyn Plugin + Send>>> {
+        self.plugins.lock().unwrap()
+    }
 }
 
+#[tracing::instrument]
 fn process_ipc_events(
     app_state: &RefCell<AppState<AppEvent>>,
     request: &str,
@@ -256,30 +278,21 @@ fn process_ipc_events(
             let query = serde_json::from_str::<&str>(payload)?;
 
             let mut results = Vec::new();
-            for plugin in app_state
-                .plugins
-                .lock()
-                .unwrap()
-                .iter()
-                .filter(|p| p.enabled())
             {
-                results.extend_from_slice(plugin.results(query));
+                let plugins = app_state.plugins();
+                let enabled_plugins = plugins.iter().filter(|p| p.enabled());
+                for plugin in enabled_plugins {
+                    let plugin_results = plugin.results(query)?;
+                    results.extend_from_slice(plugin_results);
+                }
             }
+            results.fuzzy_sort(query, &app_state.fuzzy_matcher);
 
-            fuzzy_sort(&app_state.fuzzy_matcher, &mut results, query);
+            let min = std::cmp::min(app_state.config.general.max_search_results, results.len());
+            let final_results = &results[..=min];
 
-            let max_results = results
-                .iter()
-                .take(app_state.config.general.max_search_results as usize)
-                .collect::<Vec<_>>();
-
-            emit_event(&app_state.main_window, IPCEvent::Results, &max_results);
-
-            resize_main_window_for_results(
-                &app_state.main_window,
-                &app_state.config,
-                max_results.len(),
-            );
+            emit_event(&app_state.main_window, IPCEvent::Results, final_results)?;
+            resize_main_window_for_results(&app_state.main_window, &app_state.config, min);
 
             app_state.current_results = results;
         }
@@ -287,18 +300,15 @@ fn process_ipc_events(
         IPCEvent::Execute => {
             let app_state = app_state.borrow();
 
-            let (index, elevated) = serde_json::from_str::<(usize, bool)>(payload).unwrap();
+            let (index, elevated) = serde_json::from_str::<(usize, bool)>(payload)?;
+
             let item = &app_state.current_results[index];
             app_state
-                .plugins
-                .lock()
-                .unwrap()
+                .plugins()
                 .iter()
-                .filter(|p| p.name() == item.plugin_name && p.enabled())
-                .collect::<Vec<&Box<dyn Plugin + Send + 'static>>>()
-                .first()
-                .with_context(|| format!("Failed to find  {}!", item.plugin_name))?
-                .execute(item, elevated);
+                .find(|p| p.name() == item.plugin_name && p.enabled())
+                .ok_or_else(|| anyhow::anyhow!("Failed to find  {}!", item.plugin_name))?
+                .execute(item, elevated)?;
 
             hide_main_window(&app_state, false);
         }
@@ -306,24 +316,23 @@ fn process_ipc_events(
         IPCEvent::OpenLocation => {
             let app_state = app_state.borrow();
 
-            let index = serde_json::from_str::<usize>(payload).unwrap();
+            let index = serde_json::from_str::<usize>(payload)?;
+
             let item = &app_state.current_results[index];
             app_state
-                .plugins
-                .lock()
-                .unwrap()
+                .plugins()
                 .iter()
                 .find(|p| p.name() == item.plugin_name)
-                .with_context(|| format!("Failed to find  {}!", item.plugin_name))?
-                .open_location(item);
+                .ok_or_else(|| anyhow::anyhow!("Failed to find  {}!", item.plugin_name))?
+                .open_location(item)?;
 
             hide_main_window(&app_state, false);
         }
 
         IPCEvent::ClearResults => {
             let mut app_state = app_state.borrow_mut();
-            app_state.current_results.clear();
             resize_main_window_for_results(&app_state.main_window, &app_state.config, 0);
+            app_state.current_results.clear();
         }
 
         IPCEvent::RefreshIndex => {
@@ -331,25 +340,13 @@ fn process_ipc_events(
             let proxy = app_state.proxy.clone();
             let plugins = app_state.plugins.clone();
             thread::spawn(move || {
-                let res = || -> anyhow::Result<()> {
-                    let config = Config::load()?;
-
-                    for plugin in plugins.lock().unwrap().iter_mut() {
-                        plugin.refresh(&config);
-                    }
-
-                    proxy
-                        .send_event(AppEvent::ThreadEvent(ThreadEvent::RefreshingIndexFinished))?;
-                    proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::UpdateConfig(
-                        config.clone(),
-                    )))?;
-
-                    Ok(())
-                };
-
-                if let Err(e) = res() {
-                    tracing::error!("{e}");
+                let config = Config::load()?;
+                for plugin in plugins.lock().unwrap().iter_mut() {
+                    plugin.refresh(&config)?;
                 }
+                proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::RefreshingIndexFinished))?;
+                proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::UpdateConfig(config)))?;
+                Ok(())
             });
         }
 
@@ -363,6 +360,7 @@ fn process_ipc_events(
     Ok(())
 }
 
+#[tracing::instrument]
 fn process_events(
     event: &Event<AppEvent>,
     app_state: &RefCell<AppState<AppEvent>>,
@@ -372,32 +370,7 @@ fn process_events(
         #[cfg(windows)]
         Event::NewEvents(StartCause::Init) | Event::RedrawRequested(_) => {
             let mut app_state = app_state.borrow_mut();
-            webview_window::clear_window_surface(&mut app_state.main_window);
-        }
-
-        // handle hotkey
-        Event::DeviceEvent {
-            event: DeviceEvent::Key(k),
-            ..
-        } => {
-            let mut app_state = app_state.borrow_mut();
-            let (modifier, key) = app_state.config.general.hotkey.clone();
-
-            if k.physical_key.to_string() == modifier {
-                app_state.modifier_pressed = k.state == ElementState::Pressed;
-            }
-
-            if k.physical_key.to_string() == key
-                && k.state == ElementState::Pressed
-                && app_state.modifier_pressed
-            {
-                let window = &app_state.main_window.window;
-                if window.is_visible() {
-                    hide_main_window(&app_state, true);
-                } else {
-                    show_main_window(&mut app_state);
-                }
-            }
+            app_state.main_window.clear_window_surface();
         }
 
         #[cfg(all(not(windows), not(debug_assertions)))]
@@ -430,6 +403,16 @@ fn process_events(
                 }
             },
 
+            AppEvent::HotKey(e) if e.state == HotKeyState::Pressed => {
+                let mut app_state = app_state.borrow_mut();
+                let window = &app_state.main_window.window;
+                if window.is_visible() {
+                    hide_main_window(&app_state, true);
+                } else {
+                    show_main_window(&mut app_state)?;
+                }
+            }
+
             AppEvent::Ipc(_window_id, request) => {
                 process_ipc_events(app_state, request)?;
             }
@@ -439,8 +422,8 @@ fn process_events(
                     emit_event(
                         &app_state.borrow().main_window,
                         IPCEvent::RefreshingIndexFinished,
-                        EMPTY_ARGS,
-                    );
+                        (),
+                    )?;
                 }
                 ThreadEvent::UpdateConfig(c) => {
                     app_state.borrow_mut().config = c.clone();
@@ -458,24 +441,29 @@ fn process_events(
 #[tracing::instrument]
 fn run() -> anyhow::Result<()> {
     let config = Config::load()?;
+    let plugins = Arc::new(Mutex::new(plugins::all(&config)?));
 
-    let plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>> = Arc::new(Mutex::new(vec![
-        AppLauncherPlugin::new(&config)?,
-        DirectoryIndexerPlugin::new(&config)?,
-        ShortcutsPlugin::new(&config)?,
-        SystemCommandsPlugin::new(&config)?,
-    ]));
-
-    let plugins_c = plugins.clone();
     let config_c = config.clone();
+    let plugins_c = plugins.clone();
     thread::spawn(move || {
         for plugin in plugins_c.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
-            plugin.refresh(&config_c);
+            plugin.refresh(&config_c)?;
         }
+        Ok(())
     });
 
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
-    event_loop.set_device_event_filter(DeviceEventFilter::Never);
+    event_loop.set_device_event_filter(DeviceEventFilter::Always);
+
+    let gh_manager = GlobalHotKeyManager::new()?;
+    gh_manager.register(HotKey::try_from(config.general.hotkey.as_str())?)?;
+    let proxy = event_loop.create_proxy();
+    GlobalHotKeyEvent::set_event_handler(Some(move |e| {
+        if let Err(e) = proxy.send_event(AppEvent::HotKey(e)) {
+            tracing::error!("{e}");
+        }
+    }));
+
     let main_window = create_main_window(&config, &event_loop)?;
     let main_window_id = main_window.window.id();
 
@@ -514,8 +502,7 @@ fn main() -> anyhow::Result<()> {
             .with_max_level(LevelFilter::TRACE)
             .finish()
             .with(layer),
-    )
-    .expect("failed to setup logger");
+    )?;
 
-    run()
+    run().inspect_err(|e| tracing::error!("{e}"))
 }

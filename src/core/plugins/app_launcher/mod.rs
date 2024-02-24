@@ -4,22 +4,17 @@ use crate::{
         SearchResultItem,
     },
     config::Config,
-    plugin::Plugin,
-    utils, KAL_DATA_DIR,
+    utils::{self, thread},
+    KAL_DATA_DIR,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
-    thread,
 };
 
-#[cfg(windows)]
-#[path = "windows.rs"]
-mod platform;
-
 #[derive(Debug)]
-pub struct AppLauncherPlugin {
+pub struct Plugin {
     name: String,
     enabled: bool,
     paths: Vec<String>,
@@ -29,13 +24,13 @@ pub struct AppLauncherPlugin {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct AppLauncherPluginConfig {
+struct PluginConfig {
     enabled: bool,
     paths: Vec<String>,
     extensions: Vec<String>,
 }
 
-impl Default for AppLauncherPluginConfig {
+impl Default for PluginConfig {
     fn default() -> Self {
         Self {
             enabled: true,
@@ -53,10 +48,10 @@ impl Default for AppLauncherPluginConfig {
     }
 }
 
-impl Plugin for AppLauncherPlugin {
+impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
         let name = "AppLauncher".to_string();
-        let config = config.plugin_config::<AppLauncherPluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(&name);
 
         Ok(Box::new(Self {
             name,
@@ -76,8 +71,8 @@ impl Plugin for AppLauncherPlugin {
         &self.name
     }
 
-    fn refresh(&mut self, config: &Config) {
-        let config = config.plugin_config::<AppLauncherPluginConfig>(&self.name);
+    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+        let config = config.plugin_config::<PluginConfig>(&self.name);
         self.enabled = config.enabled;
         self.paths = config.paths;
         self.extensions = config.extensions;
@@ -123,21 +118,27 @@ impl Plugin for AppLauncherPlugin {
         self.cached_apps = apps.clone();
 
         let _ = std::fs::create_dir_all(&self.icons_dir);
-        thread::spawn(move || {
-            platform::extract_png(apps);
-        });
+        thread::spawn(move || utils::extract_pngs(apps));
+
+        Ok(())
     }
 
-    fn results(&self, _query: &str) -> &[SearchResultItem] {
-        &self.cached_apps
+    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
+        Ok(&self.cached_apps)
     }
 
-    fn execute(&self, item: &SearchResultItem, elevated: bool) {
-        platform::execute(item, elevated);
+    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()> {
+        let app = item.path()?;
+        utils::execute(app, elevated);
+        Ok(())
     }
 
-    fn open_location(&self, item: &SearchResultItem) {
-        platform::open_location(item);
+    fn open_location(&self, item: &SearchResultItem) -> anyhow::Result<()> {
+        let path = item.path()?;
+        if let Some(parent) = path.parent() {
+            utils::open_path(parent);
+        }
+        Ok(())
     }
 }
 

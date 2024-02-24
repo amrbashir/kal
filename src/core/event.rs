@@ -35,30 +35,8 @@ pub enum AppEvent {
     },
     /// Describes an event from a spawned thread
     ThreadEvent(ThreadEvent),
-}
-
-pub const EMPTY_ARGS: Option<()> = None;
-
-/// Emits an event to a window
-///
-/// This invokes the js handlers registred through `window.KAL.ipc.on()`
-pub fn emit_event<S: AsRef<str>>(webview: &WebView, event: S, payload: impl Serialize) {
-    let script = format!(
-        r#"(function(){{
-        window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
-          handler({});
-        }});
-      }})()"#,
-        event.as_ref(),
-        serialize_to_javascript::Serialized::new(
-            &serde_json::value::to_raw_value(&payload).unwrap_or_default(),
-            &serialize_to_javascript::Options::default()
-        ),
-    );
-
-    if let Err(e) = webview.evaluate_script(&script) {
-        tracing::error!("{e}");
-    }
+    /// A HotKey event.
+    HotKey(global_hotkey::GlobalHotKeyEvent),
 }
 
 pub const KAL_IPC_INIT_SCRIPT: &str = r#"Object.defineProperty(window, "KAL", {
@@ -76,3 +54,27 @@ pub const KAL_IPC_INIT_SCRIPT: &str = r#"Object.defineProperty(window, "KAL", {
       },
     },
   });"#;
+
+/// Emits an event to a window
+///
+/// This invokes the js handlers registred through `window.KAL.ipc.on()`
+pub fn emit_event<S: AsRef<str>>(
+    webview: &WebView,
+    event: S,
+    payload: impl Serialize,
+) -> anyhow::Result<()> {
+    let script = format!(
+        r#"(function(){{
+      window.KAL.ipc.__event_handlers['{}'].forEach(handler => {{
+        handler({});
+      }});
+    }})()"#,
+        event.as_ref(),
+        serialize_to_javascript::Serialized::new(
+            &serde_json::value::to_raw_value(&payload).unwrap_or_default(),
+            &serialize_to_javascript::Options::default()
+        ),
+    );
+
+    webview.evaluate_script(&script).map_err(Into::into)
+}

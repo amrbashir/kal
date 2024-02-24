@@ -14,11 +14,13 @@ pub trait Plugin: Debug {
     /// Gets whether a plugin is enabled or not
     fn enabled(&self) -> bool;
     /// Refreshs the cache and configuration of the plugin
-    fn refresh(&mut self, config: &Config);
+    fn refresh(&mut self, config: &Config) -> anyhow::Result<()>;
     /// Gets [SearchResultItem]s for this query
-    fn results(&self, query: &str) -> &[SearchResultItem];
+    fn results(&self, query: &str) -> anyhow::Result<&[SearchResultItem]>;
     /// Called when `Enter` or `Shift + Enter` are pressed
-    fn execute(&self, item: &SearchResultItem, elevated: bool);
+    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()>;
     /// Called when `CtrlLeft + O` are pressed
-    fn open_location(&self, #[allow(unused)] item: &SearchResultItem) {}
+    fn open_location(&self, #[allow(unused)] item: &SearchResultItem) -> anyhow::Result<()> {
+        Ok(())
+    }
 }

@@ -18,8 +18,18 @@ impl CanBeFuzzed for SearchResultItem {
     }
 }
 
+pub trait FuzzySort {
+    fn fuzzy_sort(&mut self, query: &str, matcher: &SkimMatcherV2);
+}
+
+impl<T: CanBeFuzzed> FuzzySort for [T] {
+    fn fuzzy_sort(&mut self, query: &str, matcher: &SkimMatcherV2) {
+        fuzzy_sort(self, query, matcher)
+    }
+}
+
 /// Sorts a vector of structs by field
-pub fn fuzzy_sort<T: CanBeFuzzed>(matcher: &SkimMatcherV2, items: &mut [T], query: &str) {
+pub fn fuzzy_sort<T: CanBeFuzzed>(items: &mut [T], query: &str, matcher: &SkimMatcherV2) {
     items.sort_by_cached_key(|item| matcher.fuzzy_match(item.key(), query));
     items.reverse();
 }

@@ -58,20 +58,20 @@ impl Default for AppearanceConfig {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeneralConfig {
-    /// A tuple of (Modifier, Key)
+    /// A string of hotkey
     #[serde(default)]
-    pub hotkey: (String, String),
+    pub hotkey: String,
     /// A vector of glob patterns
     #[serde(default)]
     pub blacklist: Vec<String>,
     #[serde(default)]
-    pub max_search_results: u32,
+    pub max_search_results: usize,
 }
 
 impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
-            hotkey: ("AltLeft".into(), "Space".into()),
+            hotkey: "Alt+Space".into(),
             blacklist: Vec::new(),
             max_search_results: 24,
         }
