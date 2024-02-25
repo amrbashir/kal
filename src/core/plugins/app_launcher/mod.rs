@@ -117,7 +117,7 @@ impl crate::plugin::Plugin for Plugin {
 
         self.cached_apps = apps.clone();
 
-        let _ = std::fs::create_dir_all(&self.icons_dir);
+        std::fs::create_dir_all(&self.icons_dir)?;
         thread::spawn(move || utils::extract_pngs(apps));
 
         Ok(())

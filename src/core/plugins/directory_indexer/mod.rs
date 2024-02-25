@@ -108,7 +108,7 @@ impl crate::plugin::Plugin for Plugin {
 
         self.cached_dir_entries = dir_entries.clone();
 
-        let _ = std::fs::create_dir_all(&self.icons_dir);
+        std::fs::create_dir_all(&self.icons_dir)?;
         thread::spawn(move || {
             utils::extract_pngs(dir_entries.into_iter().filter_map(|i| {
                 if i.icon.kind == IconKind::Path {
