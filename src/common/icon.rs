@@ -23,14 +23,13 @@ pub enum Defaults {
     SignOut,
     Hibernate,
     Sleep,
+    Lock,
 }
 
 impl Defaults {
     pub fn path(&self) -> &str {
         match self {
-            Defaults::Folder => "icons/defaults/folder",
             Defaults::Url => "icons/defaults/url",
-            Defaults::File => "icons/defaults/file",
             Defaults::Shell => "icons/defaults/shell",
             _ => unreachable!(),
         }
@@ -71,6 +70,11 @@ impl Defaults {
             #[cfg(windows)]
             Defaults::File => Icon {
                 data: include_str!("./icons/windows/file.svg").into(),
+                kind: IconKind::Svg,
+            },
+            #[cfg(windows)]
+            Defaults::Lock => Icon {
+                data: include_str!("./icons/windows/lock.svg").into(),
                 kind: IconKind::Svg,
             },
             _ => Icon {
