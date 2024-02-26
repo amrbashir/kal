@@ -31,15 +31,11 @@ impl Default for PluginConfig {
         Self {
             enabled: true,
             paths: vec![
-                "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
-                "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+                "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
+                "%APPDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
                 "%USERPROFILE%\\Desktop".to_string(),
             ],
-            extensions: vec![
-                "exe".to_string(),
-                "lnk".to_string(),
-                "appref-ms".to_string(),
-            ],
+            extensions: vec!["exe".to_string(), "lnk".to_string()],
         }
     }
 }
