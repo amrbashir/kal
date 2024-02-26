@@ -176,7 +176,6 @@ impl SystemCommand {
 
 #[derive(Debug)]
 pub struct Plugin {
-    name: String,
     enabled: bool,
     results: Vec<SearchResultItem>,
 }
@@ -192,14 +191,23 @@ impl Default for PluginConfig {
     }
 }
 
+impl Plugin {
+    const NAME: &'static str = "SystemCommands";
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+}
+
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let name = "SystemCommands".to_string();
-        let config = config.plugin_config::<PluginConfig>(&name);
-        let results = SystemCommand::all().iter().map(|c| c.item(&name)).collect();
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let results = SystemCommand::all()
+            .iter()
+            .map(|c| c.item(Self::NAME))
+            .collect();
 
         Ok(Box::new(Self {
-            name,
             enabled: config.enabled,
             results,
         }))
@@ -210,11 +218,11 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn name(&self) -> &str {
-        &self.name
+        self.name()
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(&self.name);
+        let config = config.plugin_config::<PluginConfig>(self.name());
         self.enabled = config.enabled;
         Ok(())
     }

@@ -72,7 +72,6 @@ impl Display for Shortcut {
 
 #[derive(Debug)]
 pub struct Plugin {
-    name: String,
     enabled: bool,
     shortcuts: Vec<Shortcut>,
     cached_shortcuts: Vec<SearchResultItem>,
@@ -93,13 +92,19 @@ impl Default for PluginConfig {
     }
 }
 
+impl Plugin {
+    const NAME: &'static str = "Shortcuts";
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+}
+
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let name = "Shortcuts".to_string();
-        let config = config.plugin_config::<PluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Ok(Box::new(Self {
-            name,
             enabled: config.enabled,
             shortcuts: config.shortcuts,
             cached_shortcuts: Vec::new(),
@@ -111,11 +116,11 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn name(&self) -> &str {
-        &self.name
+        self.name()
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(&self.name);
+        let config = config.plugin_config::<PluginConfig>(self.name());
         self.enabled = config.enabled;
         self.shortcuts = config.shortcuts;
 
@@ -126,7 +131,7 @@ impl crate::plugin::Plugin for Plugin {
             .map(|(i, shortcut)| SearchResultItem {
                 primary_text: shortcut.name.clone(),
                 secondary_text: shortcut.to_string(),
-                plugin_name: self.name.clone(),
+                plugin_name: self.name().to_string(),
                 execution_args: serde_json::Value::Number(serde_json::Number::from(i)),
                 icon: shortcut.icon(),
                 needs_confirmation: shortcut.needs_confirmation,

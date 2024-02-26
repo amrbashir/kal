@@ -6,6 +6,29 @@ pub struct Icon {
     pub kind: IconKind,
 }
 
+impl Icon {
+    pub fn path(data: String) -> Self {
+        Self {
+            data,
+            kind: IconKind::Path,
+        }
+    }
+
+    pub fn default(data: String) -> Self {
+        Self {
+            data,
+            kind: IconKind::Default,
+        }
+    }
+
+    pub fn svg(data: String) -> Self {
+        Self {
+            data,
+            kind: IconKind::Svg,
+        }
+    }
+}
+
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 pub enum IconKind {
     Path,
@@ -37,50 +60,15 @@ impl Defaults {
 
     pub fn icon(&self) -> Icon {
         match self {
-            #[cfg(windows)]
-            Defaults::Shutdown => Icon {
-                data: include_str!("./icons/windows/shutdown.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::Restart => Icon {
-                data: include_str!("./icons/windows/restart.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::SignOut => Icon {
-                data: include_str!("./icons/windows/signout.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::Hibernate => Icon {
-                data: include_str!("./icons/windows/hibernate.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::Sleep => Icon {
-                data: include_str!("./icons/windows/sleep.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::Folder => Icon {
-                data: include_str!("./icons/windows/folder.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::File => Icon {
-                data: include_str!("./icons/windows/file.svg").into(),
-                kind: IconKind::Svg,
-            },
-            #[cfg(windows)]
-            Defaults::Lock => Icon {
-                data: include_str!("./icons/windows/lock.svg").into(),
-                kind: IconKind::Svg,
-            },
-            _ => Icon {
-                data: self.path().to_string(),
-                kind: IconKind::Default,
-            },
+            Defaults::Shutdown => Icon::svg(include_str!("./icons/shutdown.svg").into()),
+            Defaults::Restart => Icon::svg(include_str!("./icons/restart.svg").into()),
+            Defaults::SignOut => Icon::svg(include_str!("./icons/signout.svg").into()),
+            Defaults::Hibernate => Icon::svg(include_str!("./icons/hibernate.svg").into()),
+            Defaults::Sleep => Icon::svg(include_str!("./icons/sleep.svg").into()),
+            Defaults::Folder => Icon::svg(include_str!("./icons/folder.svg").into()),
+            Defaults::File => Icon::svg(include_str!("./icons/file.svg").into()),
+            Defaults::Lock => Icon::svg(include_str!("./icons/lock.svg").into()),
+            _ => Icon::default(self.path().to_string()),
         }
     }
 
@@ -88,10 +76,8 @@ impl Defaults {
         let icon = path.split('/').next_back().unwrap();
         match icon {
             // TODO: replace with svgs
-            #[cfg(windows)]
-            "url" => include_bytes!("./icons/windows/url.png"),
-            #[cfg(windows)]
-            "shell" => include_bytes!("./icons/windows/shell.png"),
+            "url" => include_bytes!("./icons/url.png"),
+            "shell" => include_bytes!("./icons/shell.png"),
             _ => &[],
         }
     }

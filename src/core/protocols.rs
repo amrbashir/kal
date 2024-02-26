@@ -1,10 +1,8 @@
 use std::{borrow::Cow, path::PathBuf};
 
-use crate::{common::icon, KAL_DATA_DIR};
+use crate::common::icon;
 
 use wry::http::{header::CONTENT_TYPE, Request, Response};
-
-const EMPTY_BODY: [u8; 0] = [0_u8; 0];
 
 #[inline]
 #[cfg(not(debug_assertions))]
@@ -50,24 +48,17 @@ pub fn kal_asset<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>
 
     let path = dunce::canonicalize(PathBuf::from(&*path))?;
 
-    if path.starts_with(&*KAL_DATA_DIR) {
-        let mimetype = match path.extension().unwrap_or_default().to_str() {
-            Some("png") => "image/png",
-            Some("jpg") | Some("jpeg") => "image/jpeg",
-            Some("svg") => "image/svg+xml",
-            _ => "text/html",
-        };
+    let mimetype = match path.extension().unwrap_or_default().to_str() {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        _ => "text/html",
+    };
 
-        Response::builder()
-            .header(CONTENT_TYPE, mimetype)
-            .body(Cow::from(std::fs::read(path)?))
-            .map_err(Into::into)
-    } else {
-        Response::builder()
-            .status(403)
-            .body(Cow::from(&EMPTY_BODY[..]))
-            .map_err(Into::into)
-    }
+    Response::builder()
+        .header(CONTENT_TYPE, mimetype)
+        .body(Cow::from(std::fs::read(path)?))
+        .map_err(Into::into)
 }
 
 macro_rules! bail500 {

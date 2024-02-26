@@ -15,7 +15,6 @@ use std::{
 
 #[derive(Debug)]
 pub struct Plugin {
-    name: String,
     enabled: bool,
     paths: Vec<String>,
     cached_dir_entries: Vec<SearchResultItem>,
@@ -37,13 +36,19 @@ impl Default for PluginConfig {
     }
 }
 
+impl Plugin {
+    const NAME: &'static str = "DirectoryIndexer";
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+}
+
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let name = "DirectoryIndexer".to_string();
-        let config = config.plugin_config::<PluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Ok(Box::new(Self {
-            name,
             enabled: config.enabled,
             paths: config.paths,
             cached_dir_entries: Vec::new(),
@@ -56,11 +61,11 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn name(&self) -> &str {
-        &self.name
+        self.name()
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(&self.name);
+        let config = config.plugin_config::<PluginConfig>(self.name());
         self.enabled = config.enabled;
         self.paths = config.paths;
 
@@ -82,10 +87,7 @@ impl crate::plugin::Plugin for Plugin {
                         .icons_dir
                         .join(file.file_stem().unwrap_or_default())
                         .with_extension("png");
-                    Icon {
-                        data: p.to_string_lossy().into_owned(),
-                        kind: IconKind::Path,
-                    }
+                    Icon::path(p.to_string_lossy().into_owned())
                 };
 
                 let app_name = file
@@ -99,7 +101,7 @@ impl crate::plugin::Plugin for Plugin {
                     primary_text: app_name,
                     secondary_text: path.clone(),
                     execution_args: serde_json::Value::String(path),
-                    plugin_name: self.name.clone(),
+                    plugin_name: self.name().to_string(),
                     icon,
                     needs_confirmation: false,
                 }

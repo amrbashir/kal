@@ -1,8 +1,5 @@
 use crate::{
-    common::{
-        icon::{Icon, IconKind},
-        SearchResultItem,
-    },
+    common::{icon::Icon, SearchResultItem},
     config::Config,
     utils::{self, thread},
     KAL_DATA_DIR,
@@ -15,7 +12,6 @@ use std::{
 
 #[derive(Debug)]
 pub struct Plugin {
-    name: String,
     enabled: bool,
     paths: Vec<String>,
     extensions: Vec<String>,
@@ -48,13 +44,19 @@ impl Default for PluginConfig {
     }
 }
 
+impl Plugin {
+    const NAME: &'static str = "AppLauncher";
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+}
+
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let name = "AppLauncher".to_string();
-        let config = config.plugin_config::<PluginConfig>(&name);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Ok(Box::new(Self {
-            name,
             enabled: config.enabled,
             paths: config.paths,
             extensions: config.extensions,
@@ -68,11 +70,11 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn name(&self) -> &str {
-        &self.name
+        self.name()
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(&self.name);
+        let config = config.plugin_config::<PluginConfig>(self.name());
         self.enabled = config.enabled;
         self.paths = config.paths;
         self.extensions = config.extensions;
@@ -105,11 +107,8 @@ impl crate::plugin::Plugin for Plugin {
                     primary_text: app_name,
                     secondary_text: path.clone(),
                     execution_args: serde_json::Value::String(path),
-                    plugin_name: self.name.clone(),
-                    icon: Icon {
-                        data: icon_path.to_string_lossy().into_owned(),
-                        kind: IconKind::Path,
-                    },
+                    plugin_name: self.name().to_string(),
+                    icon: Icon::path(icon_path.to_string_lossy().into_owned()),
                     needs_confirmation: false,
                 }
             })

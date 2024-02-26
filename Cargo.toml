@@ -46,7 +46,11 @@ features = [
   "Win32_Storage_FileSystem",
   "Win32_System_Shutdown",
   "Win32_System_Power",
+  "Win32_Storage_Packaging_Appx",
   "Management_Deployment",
   "ApplicationModel",
   "Foundation_Collections",
 ]
+
+[build-dependencies]
+embed-manifest = "1.4.0"
