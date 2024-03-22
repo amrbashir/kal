@@ -1,11 +1,6 @@
-use crate::{
-    common::{
-        icon::{Defaults, Icon},
-        SearchResultItem,
-    },
-    config::Config,
-    utils::{self, encode_wide},
-};
+use std::ffi::OsString;
+
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
 use windows::{
     core::{w, HSTRING, PCWSTR},
@@ -21,10 +16,67 @@ use windows::{
     },
 };
 
+use crate::{
+    common::{
+        icon::{Defaults, Icon},
+        SearchResultItem,
+    },
+    config::Config,
+    utils,
+};
+
+const PLUGIN_NAME: &str = "PackagedAppLauncher";
+const MS_RESOURCE: &str = "ms-resource:";
+const PACKAGED_APP: &str = "Packaged App";
+
+#[derive(Debug)]
+struct PackagedApp {
+    name: OsString,
+    icon: Option<OsString>,
+    id: String,
+    identifier: String,
+}
+
+impl<'a> From<&'a PackagedApp> for SearchResultItem<'a> {
+    fn from(app: &'a PackagedApp) -> Self {
+        Self {
+            primary_text: app.name.to_string_lossy(),
+            secondary_text: PACKAGED_APP.into(),
+            icon: app
+                .icon
+                .as_ref()
+                .map(|i| Icon::path(i.to_string_lossy()))
+                .unwrap_or_else(|| Defaults::Directory.icon()),
+            needs_confirmation: false,
+            identifier: app.identifier.as_str().into(),
+        }
+    }
+}
+
+impl PackagedApp {
+    fn new(name: OsString, icon: Option<OsString>, id: String) -> Self {
+        let identifier = format!("{PLUGIN_NAME}:{}", name.to_string_lossy());
+        Self {
+            name,
+            id,
+            icon,
+            identifier,
+        }
+    }
+
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
+        let name = self.name.to_string_lossy();
+        matcher.fuzzy_match(&name, query).is_some()
+    }
+
+    fn execute(&self, elevated: bool) -> anyhow::Result<()> {
+        utils::execute(format!("shell:AppsFolder\\{}", self.id), elevated)
+    }
+}
+
 #[derive(Debug)]
 pub struct Plugin {
-    enabled: bool,
-    cached_apps: Vec<SearchResultItem>,
+    apps: Vec<PackagedApp>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -38,180 +90,175 @@ impl Default for PluginConfig {
     }
 }
 
-const MS_RESOURCE: &str = "ms-resource:";
 impl Plugin {
-    const NAME: &'static str = "PackagedAppLauncher";
+    fn new() -> Self {
+        Self { apps: Vec::new() }
+    }
 
     fn name(&self) -> &str {
-        Self::NAME
+        PLUGIN_NAME
     }
 
-    /// From: https://github.com/microsoft/PowerToys/blob/fef50971af193a8c04c697022b6c7c880edcdc46/src/modules/launcher/Plugins/Microsoft.Plugin.Program/Programs/UWPApplication.cs#L293
-    fn resource_from_pri(full_name: &str, key: &str) -> anyhow::Result<HSTRING> {
-        let mut fallback_source = None;
+    fn find_packaged_apps(&mut self) -> anyhow::Result<()> {
+        let pm = PackageManager::new()?;
 
-        let source = if key.starts_with("//") {
-            format!("@{{{full_name}? {MS_RESOURCE}{key}}}")
-        } else if key.starts_with('/') {
-            format!("@{{{full_name}? {MS_RESOURCE}//{key}}}")
-        } else if key.to_lowercase().contains("resources") {
-            format!("@{{{full_name}? {MS_RESOURCE}{key}}}")
-        } else {
-            fallback_source.replace(format!("@{{{full_name}? {MS_RESOURCE}///{key}}}"));
-            format!("@{{{full_name}? {MS_RESOURCE}///resources/{key}}}")
-        };
+        let packages = pm.FindPackagesByUserSecurityId(&HSTRING::default())?;
 
-        let source = encode_wide(source);
-        let mut out = vec![0; 128];
-        unsafe {
-            SHLoadIndirectString(PCWSTR::from_raw(source.as_ptr()), &mut out, None).or_else(
-                |_| {
-                    let fallback_source = fallback_source.unwrap_or_default();
-                    let fallback_source = encode_wide(fallback_source);
-                    SHLoadIndirectString(PCWSTR::from_raw(fallback_source.as_ptr()), &mut out, None)
-                },
-            )?;
-        }
+        let factory: IAppxFactory = unsafe { CoCreateInstance(&AppxFactory, None, CLSCTX_ALL)? };
 
-        // remove trailing zeroes
-        if let Some(i) = out.iter().rposition(|x| *x != 0) {
-            out.truncate(i + 1);
-        }
+        self.apps = packages
+            .into_iter()
+            .filter_map(|package| apps_from_package(package, &factory).ok().flatten())
+            .flatten()
+            .collect();
 
-        HSTRING::from_wide(&out).map_err(Into::into)
-    }
-
-    fn app_from_manifest(
-        &self,
-        package: &Package,
-        manifest: &IAppxManifestApplication,
-    ) -> anyhow::Result<Option<SearchResultItem>> {
-        // Skip apps that don't want to be listed
-        let app_list_entry = unsafe { manifest.GetStringValue(w!("AppListEntry"))? };
-        if !app_list_entry.is_null() {
-            let app_list_entry = unsafe { app_list_entry.to_hstring()? };
-            if app_list_entry == "none" {
-                return Ok(None);
-            }
-        }
-
-        let id = unsafe { manifest.GetAppUserModelId()?.to_hstring()? };
-        let mut display_name = unsafe { manifest.GetStringValue(w!("DisplayName"))?.to_hstring()? };
-
-        let full_name = package
-            .Id()
-            .and_then(|i| i.FullName())
-            .map(|s| s.to_string());
-
-        // Handle ms-resources display name
-        if let Ok(full_name) = full_name {
-            if let Some(key) = display_name.to_string().strip_prefix(MS_RESOURCE) {
-                display_name = Self::resource_from_pri(&full_name, key)?;
-            }
-        }
-
-        let logo = package
-            .Logo()
-            .and_then(|uri| uri.RawUri())
-            .map(|u| u.to_string());
-
-        let icon = logo
-            .map(Icon::path)
-            .unwrap_or_else(|_| Defaults::File.icon());
-
-        Ok(Some(SearchResultItem {
-            primary_text: display_name.to_string(),
-            secondary_text: "Packaged Application".to_string(),
-            execution_args: serde_json::Value::String(id.to_string()),
-            plugin_name: self.name().to_string(),
-            icon,
-            needs_confirmation: false,
-        }))
-    }
-
-    fn apps_from_package(
-        &self,
-        package: Package,
-        factory: &IAppxFactory,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem>>> {
-        let path = package.InstalledPath()?;
-        if package.IsFramework()? || path.is_empty() {
-            return Ok(None);
-        }
-
-        let iterator = unsafe {
-            let mut path = path.to_os_string();
-            path.push("/AppxManifest.xml");
-            let path = HSTRING::from(path);
-
-            let stream =
-                SHCreateStreamOnFileEx(&path, STGM_READ.0, FILE_ATTRIBUTE_NORMAL.0, false, None)?;
-
-            let reader = factory.CreateManifestReader(&stream)?;
-            reader.GetApplications()?
-        };
-
-        let mut apps = Vec::new();
-
-        while unsafe { iterator.GetHasCurrent()?.as_bool() } {
-            let manifest = unsafe { iterator.GetCurrent() }?;
-
-            if let Ok(Some(app)) = self.app_from_manifest(&package, &manifest) {
-                apps.push(app);
-            }
-
-            if unsafe { iterator.MoveNext() }.is_err() {
-                break;
-            }
-        }
-
-        Ok(Some(apps))
+        Ok(())
     }
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
-
-        Ok(Box::new(Self {
-            enabled: config.enabled,
-            cached_apps: Vec::new(),
-        }))
-    }
-
-    fn enabled(&self) -> bool {
-        self.enabled
+    fn new(_config: &Config) -> anyhow::Result<Self> {
+        Ok(Self::new())
     }
 
     fn name(&self) -> &str {
         self.name()
     }
 
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(self.name());
-        self.enabled = config.enabled;
+    fn refresh(&mut self, _config: &Config) -> anyhow::Result<()> {
+        self.find_packaged_apps()
+    }
 
-        let pm = PackageManager::new()?;
-        let packages = pm.FindPackagesByUserSecurityId(&HSTRING::default())?;
+    fn results(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+        let filtered = self
+            .apps
+            .iter()
+            .filter(|app| app.fuzzy_match(query, matcher))
+            .map(Into::into)
+            .collect::<Vec<_>>();
 
-        let factory: IAppxFactory = unsafe { CoCreateInstance(&AppxFactory, None, CLSCTX_ALL)? };
+        Ok(filtered)
+    }
 
-        self.cached_apps = packages
-            .into_iter()
-            .filter_map(|package| self.apps_from_package(package, &factory).ok().flatten())
-            .flatten()
-            .collect();
-
+    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+        if let Some(app) = self.apps.iter().find(|app| app.identifier == identifier) {
+            app.execute(elevated)?;
+        }
         Ok(())
     }
+}
 
-    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
-        Ok(&self.cached_apps)
+fn apps_from_package(
+    package: Package,
+    factory: &IAppxFactory,
+) -> anyhow::Result<Option<Vec<PackagedApp>>> {
+    let path = package.InstalledPath()?;
+    if package.IsFramework()? || path.is_empty() {
+        return Ok(None);
     }
 
-    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()> {
-        let id = item.str()?;
-        utils::execute(format!("shell:AppsFolder\\{id}"), elevated);
-        Ok(())
+    let iterator = unsafe {
+        let mut path = path.to_os_string();
+        path.push("/AppxManifest.xml");
+        let path = HSTRING::from(path);
+
+        let stream =
+            SHCreateStreamOnFileEx(&path, STGM_READ.0, FILE_ATTRIBUTE_NORMAL.0, false, None)?;
+
+        let reader = factory.CreateManifestReader(&stream)?;
+        reader.GetApplications()?
+    };
+
+    let mut apps = Vec::new();
+
+    while unsafe { iterator.GetHasCurrent()?.as_bool() } {
+        let manifest = unsafe { iterator.GetCurrent() }?;
+
+        if let Ok(Some(app)) = app_from_manifest(&package, &manifest) {
+            apps.push(app);
+        }
+
+        if unsafe { iterator.MoveNext() }.is_err() {
+            break;
+        }
     }
+
+    Ok(Some(apps))
+}
+
+fn app_from_manifest(
+    package: &Package,
+    manifest: &IAppxManifestApplication,
+) -> anyhow::Result<Option<PackagedApp>> {
+    // Skip apps that don't want to be listed
+    let app_list_entry = unsafe { manifest.GetStringValue(w!("AppListEntry"))? };
+    if !app_list_entry.is_null() {
+        let app_list_entry = unsafe { app_list_entry.to_hstring()? };
+        if app_list_entry == "none" {
+            return Ok(None);
+        }
+    }
+
+    let id = unsafe { manifest.GetAppUserModelId()?.to_hstring()? };
+    let mut display_name = unsafe { manifest.GetStringValue(w!("DisplayName"))?.to_hstring()? };
+
+    let full_name = package
+        .Id()
+        .and_then(|i| i.FullName())
+        .map(|s| s.to_string());
+
+    // Handle ms-resources display name
+    if let Ok(full_name) = full_name {
+        if let Some(key) = display_name.to_string().strip_prefix(MS_RESOURCE) {
+            display_name = resource_from_pri(&full_name, key)?;
+        }
+    }
+
+    let logo = package
+        .Logo()
+        .and_then(|uri| uri.RawUri())
+        .map(|u| u.to_os_string());
+
+    Ok(Some(PackagedApp::new(
+        display_name.to_os_string(),
+        logo.ok(),
+        id.to_string(),
+    )))
+}
+
+/// From: https://github.com/microsoft/PowerToys/blob/fef50971af193a8c04c697022b6c7c880edcdc46/src/modules/launcher/Plugins/Microsoft.Plugin.Program/Programs/UWPApplication.cs#L293
+fn resource_from_pri(full_name: &str, key: &str) -> anyhow::Result<HSTRING> {
+    let mut fallback_source = None;
+
+    let source = if key.starts_with("//") {
+        format!("@{{{full_name}? {MS_RESOURCE}{key}}}")
+    } else if key.starts_with('/') {
+        format!("@{{{full_name}? {MS_RESOURCE}//{key}}}")
+    } else if key.to_lowercase().contains("resources") {
+        format!("@{{{full_name}? {MS_RESOURCE}{key}}}")
+    } else {
+        fallback_source.replace(format!("@{{{full_name}? {MS_RESOURCE}///{key}}}"));
+        format!("@{{{full_name}? {MS_RESOURCE}///resources/{key}}}")
+    };
+
+    let source = HSTRING::from(source);
+    let mut out = vec![0; 128];
+    unsafe {
+        SHLoadIndirectString(PCWSTR::from_raw(source.as_ptr()), &mut out, None).or_else(|_| {
+            let fallback_source = fallback_source.unwrap_or_default();
+            let fallback_source = HSTRING::from(fallback_source);
+            SHLoadIndirectString(PCWSTR::from_raw(fallback_source.as_ptr()), &mut out, None)
+        })?;
+    }
+
+    // remove trailing zeroes
+    if let Some(i) = out.iter().rposition(|x| *x != 0) {
+        out.truncate(i + 1);
+    }
+
+    HSTRING::from_wide(&out).map_err(Into::into)
 }

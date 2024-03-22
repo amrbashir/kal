@@ -4,19 +4,74 @@ use crate::{
     utils::{self, thread},
     KAL_DATA_DIR,
 };
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
 };
 
+const PLUGIN_NAME: &str = "AppLauncher";
+
+#[derive(Debug)]
+struct App {
+    name: OsString,
+    path: PathBuf,
+    icon: PathBuf,
+    identifier: String,
+}
+
+impl<'a> From<&'a App> for SearchResultItem<'a> {
+    fn from(app: &'a App) -> Self {
+        Self {
+            primary_text: app.name.to_string_lossy(),
+            secondary_text: app.path.to_string_lossy(),
+            icon: Icon::path(app.icon.to_string_lossy()),
+            needs_confirmation: false,
+            identifier: app.identifier.as_str().into(),
+        }
+    }
+}
+
+impl App {
+    fn new(path: PathBuf, icons_dir: &Path) -> Self {
+        let name = path.file_stem().unwrap_or_default().to_os_string();
+        let icon = icons_dir.join(&name).with_extension("png");
+        let identifier = format!("{PLUGIN_NAME}:{}", name.to_string_lossy());
+        Self {
+            name,
+            path,
+            icon,
+            identifier,
+        }
+    }
+
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
+        matcher
+            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .is_some()
+            || matcher
+                .fuzzy_match(&self.path.to_string_lossy(), query)
+                .is_some()
+    }
+
+    fn execute(&self, elevated: bool) -> anyhow::Result<()> {
+        utils::execute(&self.path, elevated)
+    }
+
+    fn reveal_in_dir(&self) -> anyhow::Result<()> {
+        utils::reveal_in_dir(&self.path)
+    }
+}
+
 #[derive(Debug)]
 pub struct Plugin {
-    enabled: bool,
     paths: Vec<String>,
     extensions: Vec<String>,
-    cached_apps: Vec<SearchResultItem>,
+
     icons_dir: PathBuf,
+    apps: Vec<App>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,28 +96,42 @@ impl Default for PluginConfig {
 }
 
 impl Plugin {
-    const NAME: &'static str = "AppLauncher";
+    fn new(paths: Vec<String>, extensions: Vec<String>) -> Self {
+        Self {
+            paths,
+            extensions,
+
+            icons_dir: KAL_DATA_DIR.join("icons"),
+            apps: Vec::new(),
+        }
+    }
 
     fn name(&self) -> &str {
-        Self::NAME
+        PLUGIN_NAME
+    }
+
+    fn update_config(&mut self, config: &Config) {
+        let config = config.plugin_config::<PluginConfig>(self.name());
+        self.paths = config.paths;
+        self.extensions = config.extensions;
+    }
+
+    fn find_apps(&mut self) {
+        self.apps = self
+            .paths
+            .iter()
+            .map(utils::resolve_env_vars)
+            .filter_map(|p| filter_path_entries_by_extensions(p, &self.extensions).ok())
+            .flatten()
+            .map(|e| App::new(e.path(), &self.icons_dir))
+            .collect::<Vec<App>>();
     }
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
-
-        Ok(Box::new(Self {
-            enabled: config.enabled,
-            paths: config.paths,
-            extensions: config.extensions,
-            cached_apps: Vec::new(),
-            icons_dir: KAL_DATA_DIR.join("icons"),
-        }))
-    }
-
-    fn enabled(&self) -> bool {
-        self.enabled
+    fn new(config: &Config) -> anyhow::Result<Self> {
+        let config = config.plugin_config::<PluginConfig>(PLUGIN_NAME);
+        Ok(Self::new(config.paths, config.extensions))
     }
 
     fn name(&self) -> &str {
@@ -70,68 +139,51 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(self.name());
-        self.enabled = config.enabled;
-        self.paths = config.paths;
-        self.extensions = config.extensions;
+        self.update_config(config);
+        self.find_apps();
 
-        let apps = self
-            .paths
+        let icons_dir = self.icons_dir.clone();
+        let paths = self
+            .apps
             .iter()
-            .filter_map(|path| {
-                let path = utils::resolve_env_vars(path);
-                filter_path_entries_by_extensions(path, &self.extensions).ok()
-            })
-            .flatten()
-            .map(|e| {
-                let file = e.path();
-
-                let icon_path = self
-                    .icons_dir
-                    .join(file.file_stem().unwrap_or_default())
-                    .with_extension("png");
-
-                let app_name = file
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned();
-
-                let path = file.to_string_lossy().into_owned();
-
-                SearchResultItem {
-                    primary_text: app_name,
-                    secondary_text: path.clone(),
-                    execution_args: serde_json::Value::String(path),
-                    plugin_name: self.name().to_string(),
-                    icon: Icon::path(icon_path.to_string_lossy().into_owned()),
-                    needs_confirmation: false,
-                }
-            })
-            .collect::<Vec<SearchResultItem>>();
-
-        self.cached_apps = apps.clone();
-
-        std::fs::create_dir_all(&self.icons_dir)?;
-        thread::spawn(move || utils::extract_pngs(apps));
+            .map(|app| (app.path.clone(), app.icon.clone()))
+            .collect::<Vec<_>>();
+        thread::spawn(move || {
+            std::fs::create_dir_all(icons_dir)?;
+            // TODO: automatic invalidation based on hash?
+            // or after a period of time? we should avoid
+            // regeneratin the icons on each app start and reload
+            utils::extract_pngs(paths)
+        });
 
         Ok(())
     }
 
-    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
-        Ok(&self.cached_apps)
+    fn results(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+        let filtered = self
+            .apps
+            .iter()
+            .filter(|app| app.fuzzy_match(query, matcher))
+            .map(Into::into)
+            .collect::<Vec<_>>();
+
+        Ok(filtered)
     }
 
-    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()> {
-        let app = item.path()?;
-        utils::execute(app, elevated);
+    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+        if let Some(app) = self.apps.iter().find(|app| app.identifier == identifier) {
+            app.execute(elevated)?;
+        }
         Ok(())
     }
 
-    fn open_location(&self, item: &SearchResultItem) -> anyhow::Result<()> {
-        let path = item.path()?;
-        if let Some(parent) = path.parent() {
-            utils::open_path(parent);
+    fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
+        if let Some(app) = self.apps.iter().find(|app| app.identifier == identifier) {
+            app.reveal_in_dir()?;
         }
         Ok(())
     }

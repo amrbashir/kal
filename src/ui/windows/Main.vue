@@ -1,18 +1,20 @@
 <script lang="ts" setup>
 import { watch, onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent } from "../../common";
-import { getIconHtml } from "../utils";
+import { getIconHtml, isVScrollable } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
 
-let inputRef = ref<HTMLInputElement | null>(null);
+const inputRef = ref<Element | null>(null);
 onMounted(() =>
   window.KAL.ipc.on(IPCEvent.FocusInput, () => {
-    inputRef.value?.focus();
-    inputRef.value?.select();
+    const shadowRoot = inputRef.value?.shadowRoot;
+    const input = shadowRoot?.querySelector<HTMLInputElement>("#control");
+    input?.focus();
+    input?.select();
   }),
 );
 
-let refreshingIndex = ref(false);
+const refreshingIndex = ref(false);
 onMounted(() =>
   window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
     setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for nicer animation
@@ -20,14 +22,14 @@ onMounted(() =>
   }),
 );
 
-let gettingConfirmation = ref(false);
-let gettingConfirmationIndex = ref(0);
+const gettingConfirmation = ref(false);
+const gettingConfirmationIndex = ref(0);
 function resetConfirm() {
   gettingConfirmation.value = false;
   gettingConfirmationIndex.value = 0;
 }
 
-let currentSelection = ref(0);
+const currentSelection = ref(0);
 function updateSelection(e: KeyboardEvent) {
   if (e.key === "ArrowDown") {
     currentSelection.value =
@@ -42,7 +44,11 @@ function updateSelection(e: KeyboardEvent) {
   }
 }
 
+const resultsContainerRef = ref<Element | null>(null);
 function scrollSelected() {
+  // avoid scrolling if container is not scrollable atm
+  if (!isVScrollable(resultsContainerRef.value)) return;
+
   const block: ScrollLogicalPosition =
     currentSelection.value === 0
       ? "end"
@@ -56,9 +62,8 @@ function scrollSelected() {
   });
 }
 
-let results = ref<SearchResultItem[]>([]);
-let resultItemRefs = ref<(HTMLElement | null)[]>([]);
-
+const results = ref<SearchResultItem[]>([]);
+const resultItemRefs = ref<(HTMLElement | null)[]>([]);
 onMounted(() =>
   window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
     currentSelection.value = 0;
@@ -66,7 +71,7 @@ onMounted(() =>
   }),
 );
 
-let currentQuery = ref("");
+const currentQuery = ref("");
 watch(currentQuery, (query) => search(query));
 
 function search(query: string) {
@@ -84,7 +89,8 @@ function resetQuery() {
 }
 
 function executeItem(e: { shiftKey: boolean }, index: number) {
-  const confirm = results.value[index].needs_confirmation;
+  let item = results.value[index];
+  const confirm = item.needs_confirmation;
 
   if (
     (!confirm && gettingConfirmation.value) ||
@@ -100,8 +106,14 @@ function executeItem(e: { shiftKey: boolean }, index: number) {
     gettingConfirmationIndex.value = index;
   } else {
     resetConfirm();
-    window.KAL.ipc.send(IPCEvent.Execute, index, e.shiftKey);
+    console.log(item);
+    window.KAL.ipc.send(IPCEvent.Execute, item.identifier, e.shiftKey);
   }
+}
+
+function showItemInDir(index: number) {
+  let item = results.value[index];
+  window.KAL.ipc.send(IPCEvent.OpenLocation, item.identifier);
 }
 
 function onChange(e: InputEvent) {
@@ -134,7 +146,7 @@ function onkeydown(e: KeyboardEvent) {
 
   if (e.ctrlKey && e.key === "o") {
     e.preventDefault();
-    window.KAL.ipc.send(IPCEvent.OpenLocation, currentSelection.value);
+    showItemInDir(currentSelection.value);
   }
 
   if (e.ctrlKey && e.key === "r") {
@@ -195,6 +207,7 @@ const resultsItemHeightPx = `${resultsItemHeight}px`;
     <fluent-divider />
 
     <ul
+      ref="resultsContainerRef"
       :style="{ height: `calc(100% - ${inputHeight}px)` }"
       class="overflow-x-hidden p-2 w-full"
       :class="bgPrimaryColor"

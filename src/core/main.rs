@@ -1,14 +1,11 @@
-use std::{
-    cell::RefCell,
-    path::PathBuf,
-    sync::{Arc, Mutex, MutexGuard},
-};
+use std::{cell::RefCell, path::PathBuf};
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_sort::FuzzySort;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use once_cell::sync::Lazy;
+use plugin::PluginStore;
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
     event::{Event, StartCause, WindowEvent},
@@ -20,10 +17,9 @@ use windows::Win32::Foundation::HWND;
 use wry::WebViewAttributes;
 
 use crate::{
-    common::{IPCEvent, SearchResultItem},
+    common::IPCEvent,
     config::Config,
     event::{emit_event, AppEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
-    plugin::Plugin,
     utils::thread,
     webview_window::WebviewWindow,
 };
@@ -198,13 +194,26 @@ fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: 
 // Resizes the main window based on the number of current results and user config
 #[tracing::instrument]
 fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
-    main_window.window.set_inner_size(LogicalSize::new(
-        config.appearance.window_width,
+    let count = count as u32;
+    let gaps = count.saturating_sub(1);
+
+    let results_height = if count == 0 {
+        0
+    } else {
+        // TODO: get height from JS? account for various
+        // css units and DPI scaling? because we also need to support
+        // custom css?
         std::cmp::min(
-            count as u32 * config.appearance.results_item_height,
+            count * config.appearance.results_item_height + 16  /* padding */ + gaps * 4 /* gap */ + 1, /* divider */
             config.appearance.results_height,
-        ) + config.appearance.input_height,
-    ));
+        )
+    };
+
+    let height = results_height + config.appearance.input_height;
+
+    main_window
+        .window
+        .set_inner_size(LogicalSize::new(config.appearance.window_width, height));
 }
 
 struct AppState<T: 'static> {
@@ -212,8 +221,7 @@ struct AppState<T: 'static> {
     main_window: WebviewWindow,
     #[cfg(windows)]
     previously_foreground_hwnd: windows::Win32::Foundation::HWND,
-    plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
-    current_results: Vec<SearchResultItem>,
+    plugin_store: PluginStore,
     modifier_pressed: bool,
     proxy: EventLoopProxy<T>,
     fuzzy_matcher: SkimMatcherV2,
@@ -228,8 +236,7 @@ impl<T: 'static> std::fmt::Debug for AppState<T> {
                 "previously_foreground_hwnd",
                 &self.previously_foreground_hwnd,
             )
-            .field("plugins", &self.plugins)
-            .field("current_results", &self.current_results)
+            .field("plugins", &self.plugin_store)
             .field("modifier_pressed", &self.modifier_pressed)
             .field("proxy", &self.proxy)
             .finish()
@@ -240,7 +247,7 @@ impl<T: 'static> AppState<T> {
     fn new(
         config: Config,
         main_window: WebviewWindow,
-        plugins: Arc<Mutex<Vec<Box<dyn Plugin + Send + 'static>>>>,
+        plugin_store: PluginStore,
         proxy: EventLoopProxy<T>,
     ) -> Self {
         Self {
@@ -248,16 +255,11 @@ impl<T: 'static> AppState<T> {
             main_window,
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
-            plugins,
-            current_results: Default::default(),
+            plugin_store,
             modifier_pressed: false,
             proxy,
             fuzzy_matcher: SkimMatcherV2::default(),
         }
-    }
-
-    fn plugins(&self) -> MutexGuard<'_, Vec<Box<dyn Plugin + Send>>> {
-        self.plugins.lock().unwrap()
     }
 }
 
@@ -273,77 +275,51 @@ fn process_ipc_events(
 
     match event {
         IPCEvent::Search => {
-            let mut app_state = app_state.borrow_mut();
+            let app_state = app_state.borrow();
 
             let query = serde_json::from_str::<&str>(payload)?;
 
             let mut results = Vec::new();
-            {
-                let plugins = app_state.plugins();
-                let enabled_plugins = plugins.iter().filter(|p| p.enabled());
-                for plugin in enabled_plugins {
-                    let plugin_results = plugin.results(query)?;
-                    results.extend_from_slice(plugin_results);
-                }
+
+            let store = app_state.plugin_store.lock();
+            for plugin in store.plugins() {
+                results.extend(plugin.results(query, &app_state.fuzzy_matcher)?);
             }
             results.fuzzy_sort(query, &app_state.fuzzy_matcher);
 
             let min = std::cmp::min(app_state.config.general.max_search_results, results.len());
-            let final_results = &results[..=min];
+            let final_results = &results[..min];
 
             emit_event(&app_state.main_window, IPCEvent::Results, final_results)?;
             resize_main_window_for_results(&app_state.main_window, &app_state.config, min);
-
-            app_state.current_results = results;
         }
 
         IPCEvent::Execute => {
             let app_state = app_state.borrow();
-
-            let (index, elevated) = serde_json::from_str::<(usize, bool)>(payload)?;
-
-            let item = &app_state.current_results[index];
-            app_state
-                .plugins()
-                .iter()
-                .find(|p| p.name() == item.plugin_name && p.enabled())
-                .ok_or_else(|| anyhow::anyhow!("Failed to find  {}!", item.plugin_name))?
-                .execute(item, elevated)?;
-
+            let (id, elevated) = serde_json::from_str::<(&str, bool)>(payload)?;
+            app_state.plugin_store.execute(id, elevated)?;
             hide_main_window(&app_state, false);
         }
 
         IPCEvent::OpenLocation => {
             let app_state = app_state.borrow();
-
-            let index = serde_json::from_str::<usize>(payload)?;
-
-            let item = &app_state.current_results[index];
-            app_state
-                .plugins()
-                .iter()
-                .find(|p| p.name() == item.plugin_name)
-                .ok_or_else(|| anyhow::anyhow!("Failed to find  {}!", item.plugin_name))?
-                .open_location(item)?;
-
+            let id = serde_json::from_str::<&str>(payload)?;
+            app_state.plugin_store.reveal_in_dir(id)?;
             hide_main_window(&app_state, false);
         }
 
         IPCEvent::ClearResults => {
-            let mut app_state = app_state.borrow_mut();
+            let app_state = app_state.borrow();
             resize_main_window_for_results(&app_state.main_window, &app_state.config, 0);
-            app_state.current_results.clear();
         }
 
         IPCEvent::RefreshIndex => {
             let app_state = app_state.borrow();
             let proxy = app_state.proxy.clone();
-            let plugins = app_state.plugins.clone();
+            let mut plugin_store = app_state.plugin_store.clone();
             thread::spawn(move || {
                 let config = Config::load()?;
-                for plugin in plugins.lock().unwrap().iter_mut() {
-                    plugin.refresh(&config)?;
-                }
+                plugin_store.refresh(&config)?;
                 proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::RefreshingIndexFinished))?;
                 proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::UpdateConfig(config)))?;
                 Ok(())
@@ -441,16 +417,11 @@ fn process_events(
 #[tracing::instrument]
 fn run() -> anyhow::Result<()> {
     let config = Config::load()?;
-    let plugins = Arc::new(Mutex::new(plugins::all(&config)?));
+    let plugin_store = plugins::all(&config)?;
 
     let config_c = config.clone();
-    let plugins_c = plugins.clone();
-    thread::spawn(move || {
-        for plugin in plugins_c.lock().unwrap().iter_mut().filter(|p| p.enabled()) {
-            plugin.refresh(&config_c)?;
-        }
-        Ok(())
-    });
+    let mut plugin_store_c = plugin_store.clone();
+    thread::spawn(move || plugin_store_c.refresh(&config_c));
 
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     event_loop.set_device_event_filter(DeviceEventFilter::Always);
@@ -467,7 +438,7 @@ fn run() -> anyhow::Result<()> {
     let main_window = create_main_window(&config, &event_loop)?;
     let main_window_id = main_window.window.id();
 
-    let app_state = AppState::new(config, main_window, plugins, event_loop.create_proxy());
+    let app_state = AppState::new(config, main_window, plugin_store, event_loop.create_proxy());
     let app_state = RefCell::new(app_state);
 
     event_loop.run(move |event, _event_loop, control_flow| {

@@ -1,11 +1,11 @@
 # kal
 
-Keyboard-driven app launcher and productivity tool..
+Keyboard-driven app launcher and productivity tool.
 
 ## Support
 
-- [X] windows
-- [ ] Linux (soon)
+- [x] windows
+- [ ] Linux
 
 ## Development
 
@@ -23,7 +23,8 @@ Keyboard-driven app launcher and productivity tool..
 
 ## Thanks and Acknowledgement
 
-`kal` is inspired by:
+This project is inspired by:
+
 - [ueli](https://github.com/oliverschwendener/ueli)
 - [wox](https://github.com/Wox-launcher/Wox)
 - [PowerToys Run](https://docs.microsoft.com/en-us/windows/powertoys/run)

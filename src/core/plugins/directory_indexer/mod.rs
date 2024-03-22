@@ -1,24 +1,82 @@
 use crate::{
     common::{
-        icon::{Defaults, Icon, IconKind},
+        icon::{Defaults, Icon},
         SearchResultItem,
     },
     config::Config,
     utils::{self, thread},
     KAL_DATA_DIR,
 };
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
 use std::{
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
 };
 
+const PLUGIN_NAME: &str = "DirectoryIndexer";
+
+#[derive(Debug)]
+struct DirEntry {
+    name: OsString,
+    path: PathBuf,
+    icon: Option<PathBuf>,
+    identifier: String,
+}
+
+impl<'a> From<&'a DirEntry> for SearchResultItem<'a> {
+    fn from(dir: &'a DirEntry) -> Self {
+        Self {
+            primary_text: dir.name.to_string_lossy(),
+            secondary_text: dir.path.to_string_lossy(),
+            icon: match &dir.icon {
+                Some(path) => Icon::path(path.to_string_lossy()),
+                None => Defaults::Directory.icon(),
+            },
+            needs_confirmation: false,
+            identifier: dir.identifier.as_str().into(),
+        }
+    }
+}
+
+impl DirEntry {
+    fn new(path: PathBuf, icons_dir: &Path) -> Self {
+        let name = path.file_stem().unwrap_or_default().to_os_string();
+        let identifier = format!("{PLUGIN_NAME}:{}", name.to_string_lossy());
+        let is_file = path.is_file();
+        let icon = is_file.then(|| icons_dir.join(&name).with_extension("png"));
+        Self {
+            name,
+            path,
+            icon,
+            identifier,
+        }
+    }
+
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
+        matcher
+            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .is_some()
+            || matcher
+                .fuzzy_match(&self.path.to_string_lossy(), query)
+                .is_some()
+    }
+
+    fn execute(&self, elevated: bool) -> anyhow::Result<()> {
+        utils::execute(&self.path, elevated)
+    }
+    fn reveal_in_dir(&self) -> anyhow::Result<()> {
+        utils::reveal_in_dir(&self.path)
+    }
+}
+
 #[derive(Debug)]
 pub struct Plugin {
-    enabled: bool,
     paths: Vec<String>,
-    cached_dir_entries: Vec<SearchResultItem>,
+
     icons_dir: PathBuf,
+    entries: Vec<DirEntry>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,22 +100,33 @@ impl Plugin {
     fn name(&self) -> &str {
         Self::NAME
     }
+
+    fn update_config(&mut self, config: &Config) {
+        let config = config.plugin_config::<PluginConfig>(self.name());
+        self.paths = config.paths;
+    }
+
+    fn find_dirs(&mut self) {
+        self.entries = self
+            .paths
+            .iter()
+            .map(utils::resolve_env_vars)
+            .filter_map(|path| read_dir(path).ok())
+            .flatten()
+            .map(|e| DirEntry::new(e.path(), &self.icons_dir))
+            .collect::<Vec<DirEntry>>();
+    }
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Box<Self>> {
+    fn new(config: &Config) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
-        Ok(Box::new(Self {
-            enabled: config.enabled,
+        Ok(Self {
             paths: config.paths,
-            cached_dir_entries: Vec::new(),
             icons_dir: KAL_DATA_DIR.join("icons"),
-        }))
-    }
-
-    fn enabled(&self) -> bool {
-        self.enabled
+            entries: Vec::new(),
+        })
     }
 
     fn name(&self) -> &str {
@@ -65,79 +134,51 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(self.name());
-        self.enabled = config.enabled;
-        self.paths = config.paths;
+        self.update_config(config);
+        self.find_dirs();
 
-        let dir_entries = self
-            .paths
+        let icons_dir = self.icons_dir.clone();
+        let paths = self
+            .entries
             .iter()
-            .filter_map(|path| {
-                let path = utils::resolve_env_vars(path);
-                read_dir(path).ok()
-            })
-            .flatten()
-            .map(|e| {
-                let file = e.path();
-
-                let icon = if e.metadata().map(|e| e.is_dir()).unwrap_or(false) {
-                    Defaults::Folder.icon()
-                } else {
-                    let p = self
-                        .icons_dir
-                        .join(file.file_stem().unwrap_or_default())
-                        .with_extension("png");
-                    Icon::path(p.to_string_lossy().into_owned())
-                };
-
-                let app_name = file
-                    .file_stem()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .into_owned();
-                let path = file.to_string_lossy().into_owned();
-
-                SearchResultItem {
-                    primary_text: app_name,
-                    secondary_text: path.clone(),
-                    execution_args: serde_json::Value::String(path),
-                    plugin_name: self.name().to_string(),
-                    icon,
-                    needs_confirmation: false,
-                }
-            })
-            .collect::<Vec<SearchResultItem>>();
-
-        self.cached_dir_entries = dir_entries.clone();
-
-        std::fs::create_dir_all(&self.icons_dir)?;
+            .filter_map(|e| e.icon.as_ref().map(|icon| (e.path.clone(), icon.clone())))
+            .collect::<Vec<_>>();
         thread::spawn(move || {
-            utils::extract_pngs(dir_entries.into_iter().filter_map(|i| {
-                if i.icon.kind == IconKind::Path {
-                    Some(i)
-                } else {
-                    None
-                }
-            }))
+            std::fs::create_dir_all(icons_dir)?;
+            // TODO: automatic invalidation based on hash?
+            // or after a period of time? we should avoid
+            // regeneratin the icons on each app start and reload
+            utils::extract_pngs(paths)
         });
 
         Ok(())
     }
 
-    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
-        Ok(&self.cached_dir_entries)
+    fn results(
+        &self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+        let filtered = self
+            .entries
+            .iter()
+            .filter(|entry| entry.fuzzy_match(query, matcher))
+            .map(Into::into)
+            .collect::<Vec<_>>();
+
+        Ok(filtered)
     }
 
-    fn execute(&self, item: &SearchResultItem, elevated: bool) -> anyhow::Result<()> {
-        let path = item.path()?;
-        utils::execute(path, elevated);
+    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+        if let Some(entry) = self.entries.iter().find(|e| e.identifier == identifier) {
+            entry.execute(elevated)?;
+        }
         Ok(())
     }
 
-    fn open_location(&self, item: &SearchResultItem) -> anyhow::Result<()> {
-        let path = item.path()?;
-        if let Some(parent) = path.parent() {
-            utils::open_path(parent);
+    fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
+        if let Some(entry) = self.entries.iter().find(|e| e.identifier == identifier) {
+            entry.reveal_in_dir()?;
         }
         Ok(())
     }

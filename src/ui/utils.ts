@@ -17,3 +17,8 @@ export function getIconHtml(icon: Icon): string {
       return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
   }
 }
+
+export function isVScrollable<T extends Element>(el: T | null): boolean {
+  console.log(el?.scrollHeight, el?.clientHeight);
+  return el ? el.scrollHeight > el.clientHeight : false;
+}

@@ -12,7 +12,7 @@ impl<T: AsRef<str>> CanBeFuzzed for T {
     }
 }
 
-impl CanBeFuzzed for SearchResultItem {
+impl<'a> CanBeFuzzed for SearchResultItem<'a> {
     fn key(&self) -> &str {
         &self.primary_text
     }

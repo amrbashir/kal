@@ -1,4 +1,4 @@
-use std::{fmt::Display, process::Command, str::FromStr};
+use std::process::Command;
 
 use crate::{
     common::{
@@ -7,10 +7,13 @@ use crate::{
     },
     config::Config,
 };
+use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
 use windows::Win32::System::{Power::SetSuspendState, Shutdown::LockWorkStation};
 
-#[derive(Clone, Copy)]
+const PLUGIN_NAME: &str = "SystemCommands";
+
+#[derive(Clone, Copy, Debug)]
 enum SystemCommand {
     Shutdown,
     Restart,
@@ -20,47 +23,25 @@ enum SystemCommand {
     Sleep,
 }
 
-impl Display for SystemCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Shutdown => "Shutdown",
-                Self::Restart => "Restart",
-                Self::SignOut => "SignOut",
-                Self::Lock => "Lock",
-                Self::Hibernate => "Hibernate",
-                Self::Sleep => "Sleep",
-            }
-        )
+impl AsRef<str> for SystemCommand {
+    fn as_ref(&self) -> &str {
+        self.str()
     }
 }
 
-#[derive(Debug)]
-struct SystemCommandParseError(String);
-
-impl Display for SystemCommandParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Unkown system command: {}", self.0)
-    }
-}
-
-impl std::error::Error for SystemCommandParseError {}
-
-impl FromStr for SystemCommand {
-    type Err = SystemCommandParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "Shutdown" => Self::Shutdown,
-            "Restart" => Self::Restart,
-            "SignOut" => Self::SignOut,
-            "Hibernate" => Self::Hibernate,
-            "Sleep" => Self::Sleep,
-            "Lock" => Self::Lock,
-            _ => return Err(SystemCommandParseError(s.to_string())),
-        })
+impl<'a> From<&'a SystemCommand> for SearchResultItem<'a> {
+    fn from(command: &'a SystemCommand) -> Self {
+        let primary_text = command.as_ref().into();
+        let icon = command.icon();
+        let identifier = command.identifier().into();
+        let secondary_text = command.description().into();
+        SearchResultItem {
+            primary_text,
+            secondary_text,
+            icon,
+            needs_confirmation: true,
+            identifier,
+        }
     }
 }
 
@@ -76,6 +57,28 @@ impl SystemCommand {
         ]
     }
 
+    const fn str(&self) -> &str {
+        match self {
+            Self::Shutdown => "Shutdown",
+            Self::Restart => "Restart",
+            Self::SignOut => "SignOut",
+            Self::Lock => "Lock",
+            Self::Hibernate => "Hibernate",
+            Self::Sleep => "Sleep",
+        }
+    }
+
+    const fn description(&self) -> &str {
+        match self {
+            Self::Shutdown => "Shut down computer",
+            Self::Restart => "Restart computer",
+            Self::SignOut => "Sign out current user",
+            Self::Lock => "Lock current user profile",
+            Self::Hibernate => "Put computer to hibernation",
+            Self::Sleep => "Put computer to sleep",
+        }
+    }
+
     fn icon(&self) -> Icon {
         match self {
             Self::Shutdown => Defaults::Shutdown.icon(),
@@ -87,59 +90,14 @@ impl SystemCommand {
         }
     }
 
-    fn item(&self, plugin_name: &str) -> SearchResultItem {
-        let plugin_name = plugin_name.to_string();
-        let icon = self.icon();
-        let execution_args = self.to_string().into();
+    const fn identifier(&self) -> &str {
         match self {
-            Self::Shutdown => SearchResultItem {
-                primary_text: "Shutdown".into(),
-                secondary_text: "Shut down computer".into(),
-                execution_args,
-                icon,
-                plugin_name,
-                needs_confirmation: true,
-            },
-            Self::Restart => SearchResultItem {
-                primary_text: "Restart".into(),
-                secondary_text: "Restart computer".into(),
-                execution_args,
-                icon,
-                plugin_name,
-                needs_confirmation: true,
-            },
-            Self::SignOut => SearchResultItem {
-                primary_text: "Sign Out".into(),
-                secondary_text: "Sign out current user".into(),
-                execution_args,
-                icon,
-                plugin_name,
-                needs_confirmation: true,
-            },
-            Self::Lock => SearchResultItem {
-                primary_text: "Lock".into(),
-                secondary_text: "Lock current user profile".into(),
-                execution_args,
-                icon,
-                plugin_name,
-                needs_confirmation: true,
-            },
-            Self::Hibernate => SearchResultItem {
-                primary_text: "Hibernate".into(),
-                secondary_text: "Put computer to hibernation".into(),
-                execution_args,
-                icon,
-                plugin_name,
-                needs_confirmation: true,
-            },
-            Self::Sleep => SearchResultItem {
-                primary_text: "Sleep".into(),
-                secondary_text: "Put computer to sleep".into(),
-                execution_args,
-                icon,
-                plugin_name,
-                needs_confirmation: true,
-            },
+            Self::Shutdown => "SystemCommands:Shutdown",
+            Self::Restart => "SystemCommands:Restart",
+            Self::SignOut => "SystemCommands:SignOut",
+            Self::Lock => "SystemCommands:Lock",
+            Self::Hibernate => "SystemCommands:Hibernate",
+            Self::Sleep => "SystemCommands:Sleep",
         }
     }
 
@@ -176,8 +134,7 @@ impl SystemCommand {
 
 #[derive(Debug)]
 pub struct Plugin {
-    enabled: bool,
-    results: Vec<SearchResultItem>,
+    commands: [SystemCommand; 6],
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -191,48 +148,44 @@ impl Default for PluginConfig {
     }
 }
 
-impl Plugin {
-    const NAME: &'static str = "SystemCommands";
-
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-}
-
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Box<Self>> {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
-        let results = SystemCommand::all()
-            .iter()
-            .map(|c| c.item(Self::NAME))
-            .collect();
-
-        Ok(Box::new(Self {
-            enabled: config.enabled,
-            results,
-        }))
-    }
-
-    fn enabled(&self) -> bool {
-        self.enabled
+    fn new(_config: &Config) -> anyhow::Result<Self> {
+        Ok(Self {
+            commands: SystemCommand::all(),
+        })
     }
 
     fn name(&self) -> &str {
-        self.name()
+        PLUGIN_NAME
     }
 
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(self.name());
-        self.enabled = config.enabled;
+    fn refresh(&mut self, _config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn results(&self, _query: &str) -> anyhow::Result<&[SearchResultItem]> {
-        Ok(&self.results)
+    fn results(
+        &self,
+        query: &str,
+        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+        let filtered = self
+            .commands
+            .iter()
+            .filter(|c| matcher.fuzzy_match(c.as_ref(), query).is_some())
+            .map(Into::into)
+            .collect();
+
+        Ok(filtered)
     }
 
-    fn execute(&self, item: &SearchResultItem, _elevated: bool) -> anyhow::Result<()> {
-        let command: SystemCommand = item.str()?.parse()?;
-        command.execute()
+    fn execute(&self, identifier: &str, _elevated: bool) -> anyhow::Result<()> {
+        if let Some(command) = self
+            .commands
+            .iter()
+            .find(|command| command.identifier() == identifier)
+        {
+            command.execute()?;
+        }
+        Ok(())
     }
 }
