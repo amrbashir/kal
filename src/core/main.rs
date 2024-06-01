@@ -2,18 +2,25 @@ use std::{cell::RefCell, path::PathBuf};
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_sort::FuzzySort;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use once_cell::sync::Lazy;
 use plugin::PluginStore;
+use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
+
+#[cfg(windows)]
+use windows::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
+
+#[cfg(target_os = "linux")]
+use tao::platform::linux::WindowExtUnix;
+#[cfg(windows)]
+use tao::platform::windows::WindowExtWindows;
+
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
     event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy},
     window::WindowAttributes,
 };
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
-use windows::Win32::Foundation::HWND;
 use wry::WebViewAttributes;
 
 use crate::{
@@ -31,10 +38,9 @@ use crate::event::WebviewEvent;
 mod common;
 mod config;
 mod event;
-mod fuzzy_sort;
 mod plugin;
 mod plugins;
-mod protocols;
+mod protocol;
 mod utils;
 mod vibrancy;
 mod webview_window;
@@ -145,14 +151,8 @@ fn create_main_window(
         event_loop,
     )?;
 
-    #[cfg(all(not(debug_assertions), any(windows, target_os = "linux")))]
-    {
-        #[cfg(target_os = "linux")]
-        use tao::platform::linux::WindowExtWindows;
-        #[cfg(windows)]
-        use tao::platform::windows::WindowExtWindows;
-        main_window.window.set_skip_taskbar(true);
-    }
+    #[cfg(any(windows, target_os = "linux"))]
+    main_window.window().set_skip_taskbar(true);
 
     if let Some(vibrancy) = &config.appearance.vibrancy {
         vibrancy.apply(&main_window)?;
@@ -165,29 +165,22 @@ fn create_main_window(
 #[tracing::instrument]
 fn show_main_window(app_state: &mut AppState<AppEvent>) -> anyhow::Result<()> {
     #[cfg(windows)]
-    {
-        use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-        app_state.previously_foreground_hwnd = unsafe { GetForegroundWindow() };
-    }
+    app_state.store_foreground_hwnd();
 
     let main_window = &app_state.main_window;
-    main_window.window.set_visible(true);
-    main_window.window.set_focus();
-    emit_event(main_window, IPCEvent::FocusInput, ())
+    main_window.window().set_visible(true);
+    main_window.window().set_focus();
+    emit_event(main_window.webview(), IPCEvent::FocusInput, ())
 }
 
 /// Hides the main window and restores focus to the previous foreground window if needed
 #[tracing::instrument]
-fn hide_main_window<T>(app_state: &AppState<T>, #[allow(unused)] restore_focus: bool) {
-    app_state.main_window.window.set_visible(false);
+fn hide_main_window(app_state: &AppState<AppEvent>, #[allow(unused)] restore_focus: bool) {
+    app_state.main_window.window().set_visible(false);
 
     #[cfg(windows)]
-    {
-        use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
-
-        if restore_focus {
-            unsafe { SetForegroundWindow(app_state.previously_foreground_hwnd) };
-        }
+    if restore_focus {
+        app_state.restore_prev_foreground_hwnd();
     }
 }
 
@@ -200,9 +193,6 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
     let results_height = if count == 0 {
         0
     } else {
-        // TODO: get height from JS? account for various
-        // css units and DPI scaling? because we also need to support
-        // custom css?
         std::cmp::min(
             count * config.appearance.results_item_height + 16  /* padding */ + gaps * 4 /* gap */ + 1, /* divider */
             config.appearance.results_height,
@@ -212,7 +202,7 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
     let height = results_height + config.appearance.input_height;
 
     main_window
-        .window
+        .window()
         .set_inner_size(LogicalSize::new(config.appearance.window_width, height));
 }
 
@@ -220,7 +210,7 @@ struct AppState<T: 'static> {
     config: Config,
     main_window: WebviewWindow,
     #[cfg(windows)]
-    previously_foreground_hwnd: windows::Win32::Foundation::HWND,
+    previously_foreground_hwnd: HWND,
     plugin_store: PluginStore,
     modifier_pressed: bool,
     proxy: EventLoopProxy<T>,
@@ -261,6 +251,16 @@ impl<T: 'static> AppState<T> {
             fuzzy_matcher: SkimMatcherV2::default(),
         }
     }
+
+    #[cfg(windows)]
+    fn store_foreground_hwnd(&mut self) {
+        self.previously_foreground_hwnd = unsafe { GetForegroundWindow() };
+    }
+
+    #[cfg(windows)]
+    fn restore_prev_foreground_hwnd(&self) {
+        unsafe { SetForegroundWindow(self.previously_foreground_hwnd) };
+    }
 }
 
 #[tracing::instrument]
@@ -285,12 +285,18 @@ fn process_ipc_events(
             for plugin in store.plugins() {
                 results.extend(plugin.results(query, &app_state.fuzzy_matcher)?);
             }
-            results.fuzzy_sort(query, &app_state.fuzzy_matcher);
+
+            // sort results in reverse so higher scores are first
+            results.sort_by(|a, b| b.score.cmp(&a.score));
 
             let min = std::cmp::min(app_state.config.general.max_search_results, results.len());
             let final_results = &results[..min];
 
-            emit_event(&app_state.main_window, IPCEvent::Results, final_results)?;
+            emit_event(
+                app_state.main_window.webview(),
+                IPCEvent::Results,
+                final_results,
+            )?;
             resize_main_window_for_results(&app_state.main_window, &app_state.config, min);
         }
 
@@ -346,7 +352,7 @@ fn process_events(
         #[cfg(windows)]
         Event::NewEvents(StartCause::Init) | Event::RedrawRequested(_) => {
             let mut app_state = app_state.borrow_mut();
-            app_state.main_window.clear_window_surface();
+            app_state.main_window.clear_window_surface()?;
         }
 
         #[cfg(all(not(windows), not(debug_assertions)))]
@@ -381,8 +387,7 @@ fn process_events(
 
             AppEvent::HotKey(e) if e.state == HotKeyState::Pressed => {
                 let mut app_state = app_state.borrow_mut();
-                let window = &app_state.main_window.window;
-                if window.is_visible() {
+                if app_state.main_window.window().is_visible() {
                     hide_main_window(&app_state, true);
                 } else {
                     show_main_window(&mut app_state)?;
@@ -396,7 +401,7 @@ fn process_events(
             AppEvent::ThreadEvent(event) => match event {
                 ThreadEvent::RefreshingIndexFinished => {
                     emit_event(
-                        &app_state.borrow().main_window,
+                        app_state.borrow().main_window.webview(),
                         IPCEvent::RefreshingIndexFinished,
                         (),
                     )?;
@@ -436,7 +441,7 @@ fn run() -> anyhow::Result<()> {
     }));
 
     let main_window = create_main_window(&config, &event_loop)?;
-    let main_window_id = main_window.window.id();
+    let main_window_id = main_window.window().id();
 
     let app_state = AppState::new(config, main_window, plugin_store, event_loop.create_proxy());
     let app_state = RefCell::new(app_state);

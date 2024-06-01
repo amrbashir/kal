@@ -1,10 +1,10 @@
 use crate::{
     common::{
         icon::{Defaults, Icon},
-        SearchResultItem,
+        IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
-    utils::{self, thread},
+    utils::{self, thread, ResolveEnvVars},
     KAL_DATA_DIR,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
@@ -25,21 +25,6 @@ struct DirEntry {
     identifier: String,
 }
 
-impl<'a> From<&'a DirEntry> for SearchResultItem<'a> {
-    fn from(dir: &'a DirEntry) -> Self {
-        Self {
-            primary_text: dir.name.to_string_lossy(),
-            secondary_text: dir.path.to_string_lossy(),
-            icon: match &dir.icon {
-                Some(path) => Icon::path(path.to_string_lossy()),
-                None => Defaults::Directory.icon(),
-            },
-            needs_confirmation: false,
-            identifier: dir.identifier.as_str().into(),
-        }
-    }
-}
-
 impl DirEntry {
     fn new(path: PathBuf, icons_dir: &Path) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
@@ -54,20 +39,31 @@ impl DirEntry {
         }
     }
 
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
-        matcher
-            .fuzzy_match(&self.name.to_string_lossy(), query)
-            .is_some()
-            || matcher
-                .fuzzy_match(&self.path.to_string_lossy(), query)
-                .is_some()
-    }
-
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         utils::execute(&self.path, elevated)
     }
+
     fn reveal_in_dir(&self) -> anyhow::Result<()> {
         utils::reveal_in_dir(&self.path)
+    }
+}
+
+impl IntoSearchResultItem for DirEntry {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+        matcher
+            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
+            .map(|score| SearchResultItem {
+                primary_text: self.name.to_string_lossy(),
+                secondary_text: self.path.to_string_lossy(),
+                icon: match &self.icon {
+                    Some(path) => Icon::path(path.to_string_lossy()),
+                    None => Defaults::Directory.icon(),
+                },
+                needs_confirmation: false,
+                identifier: self.identifier.as_str().into(),
+                score,
+            })
     }
 }
 
@@ -110,7 +106,7 @@ impl Plugin {
         self.entries = self
             .paths
             .iter()
-            .map(utils::resolve_env_vars)
+            .map(ResolveEnvVars::resolve_vars)
             .filter_map(|path| read_dir(path).ok())
             .flatten()
             .map(|e| DirEntry::new(e.path(), &self.icons_dir))
@@ -143,11 +139,9 @@ impl crate::plugin::Plugin for Plugin {
             .iter()
             .filter_map(|e| e.icon.as_ref().map(|icon| (e.path.clone(), icon.clone())))
             .collect::<Vec<_>>();
+
         thread::spawn(move || {
             std::fs::create_dir_all(icons_dir)?;
-            // TODO: automatic invalidation based on hash?
-            // or after a period of time? we should avoid
-            // regeneratin the icons on each app start and reload
             utils::extract_pngs(paths)
         });
 
@@ -159,14 +153,11 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &SkimMatcherV2,
     ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
-        let filtered = self
+        Ok(self
             .entries
             .iter()
-            .filter(|entry| entry.fuzzy_match(query, matcher))
-            .map(Into::into)
-            .collect::<Vec<_>>();
-
-        Ok(filtered)
+            .filter_map(|entry| entry.fuzzy_match(query, matcher))
+            .collect::<Vec<_>>())
     }
 
     fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
@@ -189,6 +180,7 @@ fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<fs::DirEntry>> {
     let entries = entries
         .flatten()
         .filter_map(|e| {
+            // skip hidden files and directories on Windows
             #[cfg(windows)]
             {
                 use std::os::windows::fs::MetadataExt;

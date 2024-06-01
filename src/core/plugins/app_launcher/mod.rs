@@ -1,7 +1,7 @@
 use crate::{
-    common::{icon::Icon, SearchResultItem},
+    common::{icon::Icon, IntoSearchResultItem, SearchResultItem},
     config::Config,
-    utils::{self, thread},
+    utils::{self, thread, ResolveEnvVars},
     KAL_DATA_DIR,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
@@ -22,18 +22,6 @@ struct App {
     identifier: String,
 }
 
-impl<'a> From<&'a App> for SearchResultItem<'a> {
-    fn from(app: &'a App) -> Self {
-        Self {
-            primary_text: app.name.to_string_lossy(),
-            secondary_text: app.path.to_string_lossy(),
-            icon: Icon::path(app.icon.to_string_lossy()),
-            needs_confirmation: false,
-            identifier: app.identifier.as_str().into(),
-        }
-    }
-}
-
 impl App {
     fn new(path: PathBuf, icons_dir: &Path) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
@@ -47,21 +35,28 @@ impl App {
         }
     }
 
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
-        matcher
-            .fuzzy_match(&self.name.to_string_lossy(), query)
-            .is_some()
-            || matcher
-                .fuzzy_match(&self.path.to_string_lossy(), query)
-                .is_some()
-    }
-
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         utils::execute(&self.path, elevated)
     }
 
     fn reveal_in_dir(&self) -> anyhow::Result<()> {
         utils::reveal_in_dir(&self.path)
+    }
+}
+
+impl IntoSearchResultItem for App {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+        matcher
+            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
+            .map(|score| SearchResultItem {
+                primary_text: self.name.to_string_lossy(),
+                secondary_text: self.path.to_string_lossy(),
+                icon: Icon::path(self.icon.to_string_lossy()),
+                needs_confirmation: false,
+                identifier: self.identifier.as_str().into(),
+                score,
+            })
     }
 }
 
@@ -120,7 +115,7 @@ impl Plugin {
         self.apps = self
             .paths
             .iter()
-            .map(utils::resolve_env_vars)
+            .map(ResolveEnvVars::resolve_vars)
             .filter_map(|p| filter_path_entries_by_extensions(p, &self.extensions).ok())
             .flatten()
             .map(|e| App::new(e.path(), &self.icons_dir))
@@ -148,11 +143,9 @@ impl crate::plugin::Plugin for Plugin {
             .iter()
             .map(|app| (app.path.clone(), app.icon.clone()))
             .collect::<Vec<_>>();
+
         thread::spawn(move || {
             std::fs::create_dir_all(icons_dir)?;
-            // TODO: automatic invalidation based on hash?
-            // or after a period of time? we should avoid
-            // regeneratin the icons on each app start and reload
             utils::extract_pngs(paths)
         });
 
@@ -164,14 +157,11 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &SkimMatcherV2,
     ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
-        let filtered = self
+        Ok(self
             .apps
             .iter()
-            .filter(|app| app.fuzzy_match(query, matcher))
-            .map(Into::into)
-            .collect::<Vec<_>>();
-
-        Ok(filtered)
+            .filter_map(|app| app.fuzzy_match(query, matcher))
+            .collect::<Vec<_>>())
     }
 
     fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {

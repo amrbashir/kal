@@ -1,7 +1,7 @@
 use crate::{
     common::{
         icon::{Defaults, Icon},
-        SearchResultItem,
+        IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
     utils,
@@ -42,18 +42,6 @@ struct Shortcut {
     needs_confirmation: bool,
 }
 
-impl<'a> From<&'a Shortcut> for SearchResultItem<'a> {
-    fn from(shortcut: &'a Shortcut) -> Self {
-        SearchResultItem {
-            primary_text: shortcut.name.as_str().into(),
-            identifier: shortcut.identifier.as_str().into(),
-            secondary_text: shortcut.description.as_deref().unwrap_or_default().into(),
-            icon: shortcut.icon(),
-            needs_confirmation: shortcut.needs_confirmation,
-        }
-    }
-}
-
 impl Shortcut {
     fn icon(&self) -> Icon {
         match &self.kind {
@@ -70,18 +58,9 @@ impl Shortcut {
         }
     }
 
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
-        matcher.fuzzy_match(&self.name, query).is_some()
-            || self
-                .description
-                .as_ref()
-                .map(|description| matcher.fuzzy_match(description, query).is_some())
-                .unwrap_or(false)
-    }
-
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         match &self.kind {
-            ShortcutKind::Path { path } => utils::open_path(path),
+            ShortcutKind::Path { path } => utils::execute(path, elevated),
             ShortcutKind::Url { url } => utils::open_url(url),
             ShortcutKind::Shell {
                 shell,
@@ -94,10 +73,30 @@ impl Shortcut {
 
     fn reveal_in_dir(&self) -> anyhow::Result<()> {
         if let ShortcutKind::Path { path } = &self.kind {
-            utils::open_path(path)?;
+            utils::reveal_in_dir(path)?;
         }
 
         Ok(())
+    }
+}
+
+impl IntoSearchResultItem for Shortcut {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+        matcher
+            .fuzzy_match(&self.name, query)
+            .or_else(|| {
+                self.description
+                    .as_ref()
+                    .and_then(|description| matcher.fuzzy_match(description, query))
+            })
+            .map(|score| SearchResultItem {
+                primary_text: self.name.as_str().into(),
+                identifier: self.identifier.as_str().into(),
+                secondary_text: self.description.as_deref().unwrap_or_default().into(),
+                icon: self.icon(),
+                needs_confirmation: self.needs_confirmation,
+                score,
+            })
     }
 }
 
@@ -169,14 +168,11 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
     ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
-        let filtered = self
+        Ok(self
             .shortcuts
             .iter()
-            .filter(|shortcut| shortcut.fuzzy_match(query, matcher))
-            .map(Into::into)
-            .collect::<Vec<_>>();
-
-        Ok(filtered)
+            .filter_map(|shortcut| shortcut.fuzzy_match(query, matcher))
+            .collect::<Vec<_>>())
     }
 
     fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {

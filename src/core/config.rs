@@ -94,16 +94,21 @@ impl Config {
         Self::load_from_path(&*CONFIG_FILE)
     }
 
+    fn from_toml(toml: &str) -> Self {
+        toml::from_str(toml)
+            .inspect_err(|e| {
+                tracing::error!("Failed to deserialize config, falling back to default: {e}")
+            })
+            .unwrap_or_default()
+    }
+
     /// Loads the config from a path
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {
         let path = path.as_ref();
         let config = match path.exists() {
             true => {
-                let config_toml = fs::read_to_string(path)?;
-                toml::from_str::<Config>(&config_toml).unwrap_or_else(|e| {
-                    tracing::error!("Failed to deserialize config, falling back to default: {e}");
-                    Config::default()
-                })
+                let toml = fs::read_to_string(path)?;
+                Self::from_toml(&toml)
             }
             false => {
                 tracing::error!("Config file wasn't found, falling back to default");
@@ -122,13 +127,14 @@ impl Config {
     {
         self.plugins
             .get(name)
-            .map(|toml_value| {
-                toml::from_str(&toml_value.to_string()).unwrap_or_else(|e| {
-                    tracing::error!(
-                        "Failed to deserialize {name} config, failling back to default: {e}"
-                    );
-                    T::default()
-                })
+            .and_then(|toml_value| {
+                toml::from_str(&toml_value.to_string())
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            "Failed to deserialize {name} config, failling back to default: {e}"
+                        );
+                    })
+                    .ok()
             })
             .unwrap_or_default()
     }

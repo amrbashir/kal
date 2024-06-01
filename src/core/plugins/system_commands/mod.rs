@@ -3,11 +3,11 @@ use std::process::Command;
 use crate::{
     common::{
         icon::{Defaults, Icon},
-        SearchResultItem,
+        IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
 };
-use fuzzy_matcher::FuzzyMatcher;
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
 use windows::Win32::System::{Power::SetSuspendState, Shutdown::LockWorkStation};
 
@@ -26,22 +26,6 @@ enum SystemCommand {
 impl AsRef<str> for SystemCommand {
     fn as_ref(&self) -> &str {
         self.str()
-    }
-}
-
-impl<'a> From<&'a SystemCommand> for SearchResultItem<'a> {
-    fn from(command: &'a SystemCommand) -> Self {
-        let primary_text = command.as_ref().into();
-        let icon = command.icon();
-        let identifier = command.identifier().into();
-        let secondary_text = command.description().into();
-        SearchResultItem {
-            primary_text,
-            secondary_text,
-            icon,
-            needs_confirmation: true,
-            identifier,
-        }
     }
 }
 
@@ -132,6 +116,25 @@ impl SystemCommand {
     }
 }
 
+impl IntoSearchResultItem for SystemCommand {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+        matcher.fuzzy_match(self.as_ref(), query).map(|score| {
+            let primary_text = self.as_ref().into();
+            let icon = self.icon();
+            let identifier = self.identifier().into();
+            let secondary_text = self.description().into();
+            SearchResultItem {
+                primary_text,
+                secondary_text,
+                icon,
+                needs_confirmation: true,
+                identifier,
+                score,
+            }
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Plugin {
     commands: [SystemCommand; 6],
@@ -168,14 +171,11 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
     ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
-        let filtered = self
+        Ok(self
             .commands
             .iter()
-            .filter(|c| matcher.fuzzy_match(c.as_ref(), query).is_some())
-            .map(Into::into)
-            .collect();
-
-        Ok(filtered)
+            .filter_map(|c| c.fuzzy_match(query, matcher))
+            .collect())
     }
 
     fn execute(&self, identifier: &str, _elevated: bool) -> anyhow::Result<()> {

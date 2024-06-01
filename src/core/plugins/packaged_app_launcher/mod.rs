@@ -19,7 +19,7 @@ use windows::{
 use crate::{
     common::{
         icon::{Defaults, Icon},
-        SearchResultItem,
+        IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
     utils,
@@ -37,22 +37,6 @@ struct PackagedApp {
     identifier: String,
 }
 
-impl<'a> From<&'a PackagedApp> for SearchResultItem<'a> {
-    fn from(app: &'a PackagedApp) -> Self {
-        Self {
-            primary_text: app.name.to_string_lossy(),
-            secondary_text: PACKAGED_APP.into(),
-            icon: app
-                .icon
-                .as_ref()
-                .map(|i| Icon::path(i.to_string_lossy()))
-                .unwrap_or_else(|| Defaults::Directory.icon()),
-            needs_confirmation: false,
-            identifier: app.identifier.as_str().into(),
-        }
-    }
-}
-
 impl PackagedApp {
     fn new(name: OsString, icon: Option<OsString>, id: String) -> Self {
         let identifier = format!("{PLUGIN_NAME}:{}", name.to_string_lossy());
@@ -64,13 +48,27 @@ impl PackagedApp {
         }
     }
 
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> bool {
-        let name = self.name.to_string_lossy();
-        matcher.fuzzy_match(&name, query).is_some()
-    }
-
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         utils::execute(format!("shell:AppsFolder\\{}", self.id), elevated)
+    }
+}
+
+impl IntoSearchResultItem for PackagedApp {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+        matcher
+            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .map(|score| SearchResultItem {
+                primary_text: self.name.to_string_lossy(),
+                secondary_text: PACKAGED_APP.into(),
+                icon: self
+                    .icon
+                    .as_ref()
+                    .map(|i| Icon::path(i.to_string_lossy()))
+                    .unwrap_or_else(|| Defaults::Directory.icon()),
+                needs_confirmation: false,
+                identifier: self.identifier.as_str().into(),
+                score,
+            })
     }
 }
 
@@ -134,14 +132,11 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &SkimMatcherV2,
     ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
-        let filtered = self
+        Ok(self
             .apps
             .iter()
-            .filter(|app| app.fuzzy_match(query, matcher))
-            .map(Into::into)
-            .collect::<Vec<_>>();
-
-        Ok(filtered)
+            .filter_map(|app| app.fuzzy_match(query, matcher))
+            .collect::<Vec<_>>())
     }
 
     fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {

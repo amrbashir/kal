@@ -21,8 +21,6 @@ pub trait Plugin: Debug {
     fn name(&self) -> &str;
     /// Refreshs the cache and configuration of the plugin
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()>;
-    // TODO: return matched queries with score
-    // to avoid recalculating the score and then sorting
     /// Gets [SearchResultItem]s for this query
     fn results(
         &self,
