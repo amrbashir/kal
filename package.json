@@ -28,5 +28,6 @@
     "vite": "^5.2",
     "vite-svg-loader": "^5.1",
     "vue-tsc": "^2.0"
-  }
+  },
+  "packageManager": "pnpm@9.1.4"
 }

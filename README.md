@@ -2,18 +2,18 @@
 
 Keyboard-driven app launcher and productivity tool.
 
-## Support
+## Platforms
 
 - [x] windows
-- [ ] Linux
+- [ ] Linux (maybe...)
 
 ## Development
 
 ### Prerequisites:
 
-1. Node.js and pnpm
-2. Rust and Cargo
-3. Webview2 runtime
+1. [Node.js](https://nodejs.org)
+2. [Rust and Cargo](https://rustup.rs/)
+3. [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/?form=MA13LH)
 
 #### Scripts:
 
