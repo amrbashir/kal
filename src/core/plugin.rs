@@ -11,6 +11,7 @@ use serde::Deserialize;
 
 use crate::{common::SearchResultItem, config::Config};
 
+#[allow(unused_variables)]
 pub trait Plugin: Debug {
     fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self>
     where
@@ -19,19 +20,23 @@ pub trait Plugin: Debug {
     ///
     /// usually used to identify the origin of a [`SearchResultItem`]
     /// and the plugin to exceute it.
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
     /// Refreshs the cache and configuration of the plugin
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()>;
+    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+        Ok(())
+    }
     /// Gets [SearchResultItem]s for this query
     fn results(
-        &self,
+        &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Vec<SearchResultItem<'_>>>;
+    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>>;
     /// Called when `Enter` or `Shift + Enter` are pressed
-    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()>;
+    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+        Ok(())
+    }
     /// Called when `CtrlLeft + O` are pressed
-    fn reveal_in_dir(&self, #[allow(unused)] identifier: &str) -> anyhow::Result<()> {
+    fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -91,15 +96,18 @@ impl PluginStoreInner {
         self.plugins.push(PluginEntry::new(plugin))
     }
 
-    pub fn find_plugin<F: FnMut(&&PluginEntry) -> bool>(
-        &self,
+    pub fn find_plugin<F: FnMut(&&mut PluginEntry) -> bool>(
+        &mut self,
         f: F,
-    ) -> anyhow::Result<&PluginEntry> {
-        self.plugins.iter().find(f).context("Couldn't find plugin")
+    ) -> anyhow::Result<&mut PluginEntry> {
+        self.plugins
+            .iter_mut()
+            .find(f)
+            .context("Couldn't find plugin")
     }
 
-    pub fn plugins(&self) -> Vec<&PluginEntry> {
-        self.plugins.iter().filter(|p| p.enabled).collect()
+    pub fn plugins(&mut self) -> Vec<&mut PluginEntry> {
+        self.plugins.iter_mut().filter(|p| p.enabled).collect()
     }
 
     pub fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
@@ -117,12 +125,12 @@ impl PluginStoreInner {
         Ok(())
     }
 
-    pub fn execute(&self, id: &str, elevated: bool) -> anyhow::Result<()> {
+    pub fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
         let plugin = self.find_plugin(|p| id.starts_with(p.name()))?;
         plugin.execute(id, elevated)
     }
 
-    pub fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
+    pub fn reveal_in_dir(&mut self, id: &str) -> anyhow::Result<()> {
         let plugin = self.find_plugin(|p| id.starts_with(p.name()))?;
         plugin.reveal_in_dir(id)
     }
@@ -147,7 +155,7 @@ impl PluginStore {
         self.lock().refresh(config)
     }
 
-    pub fn execute(&self, id: &str, elevated: bool) -> anyhow::Result<()> {
+    pub fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
         self.lock().execute(id, elevated)
     }
 

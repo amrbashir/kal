@@ -6,12 +6,11 @@ use crate::{
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
+    utils::IteratorExt,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
 use windows::Win32::System::{Power::SetSuspendState, Shutdown::LockWorkStation};
-
-const PLUGIN_NAME: &str = "SystemCommands";
 
 #[derive(Clone, Copy, Debug)]
 enum SystemCommand {
@@ -140,6 +139,10 @@ pub struct Plugin {
     commands: [SystemCommand; 6],
 }
 
+impl Plugin {
+    const NAME: &'static str = "SystemCommands";
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct PluginConfig {
     enabled: bool,
@@ -158,8 +161,8 @@ impl crate::plugin::Plugin for Plugin {
         })
     }
 
-    fn name(&self) -> &str {
-        PLUGIN_NAME
+    fn name(&self) -> &'static str {
+        Self::NAME
     }
 
     fn refresh(&mut self, _config: &Config) -> anyhow::Result<()> {
@@ -167,18 +170,18 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn results(
-        &self,
+        &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
         Ok(self
             .commands
             .iter()
             .filter_map(|c| c.fuzzy_match(query, matcher))
-            .collect())
+            .collect_non_empty())
     }
 
-    fn execute(&self, identifier: &str, _elevated: bool) -> anyhow::Result<()> {
+    fn execute(&mut self, identifier: &str, _elevated: bool) -> anyhow::Result<()> {
         if let Some(command) = self
             .commands
             .iter()

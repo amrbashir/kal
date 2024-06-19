@@ -129,7 +129,7 @@ impl Config {
                 Config::default()
             }
         };
-        tracing::info!("Config loaded");
+        tracing::info!("Config loaded: {config:?}");
         Ok(config)
     }
 

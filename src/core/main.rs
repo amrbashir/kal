@@ -49,7 +49,7 @@ mod webview_window;
 #[folder = "dist"]
 pub(crate) struct EmbededAssets;
 
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn create_main_window(
     config: &Config,
     event_loop: &EventLoop<AppEvent>,
@@ -142,7 +142,7 @@ fn create_main_window(
 }
 
 // Saves the current foreground window then shows the main window
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn show_main_window(app_state: &mut AppState<AppEvent>) -> anyhow::Result<()> {
     #[cfg(windows)]
     app_state.store_foreground_hwnd();
@@ -154,7 +154,7 @@ fn show_main_window(app_state: &mut AppState<AppEvent>) -> anyhow::Result<()> {
 }
 
 /// Hides the main window and restores focus to the previous foreground window if needed
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn hide_main_window(app_state: &AppState<AppEvent>, #[allow(unused)] restore_focus: bool) {
     app_state.main_window.window().set_visible(false);
 
@@ -165,7 +165,7 @@ fn hide_main_window(app_state: &AppState<AppEvent>, #[allow(unused)] restore_foc
 }
 
 // Resizes the main window based on the number of current results and user config
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
     let count = count as u32;
     let gaps = count.saturating_sub(1);
@@ -255,10 +255,10 @@ impl<T: 'static> AppState<T> {
     }
 }
 
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn process_ipc_events(
-    app_state: &RefCell<AppState<AppEvent>>,
     request: &str,
+    app_state: &RefCell<AppState<AppEvent>>,
 ) -> anyhow::Result<()> {
     let (event, payload) = request
         .split_once("::")
@@ -273,9 +273,18 @@ fn process_ipc_events(
 
             let mut results = Vec::new();
 
-            let store = app_state.plugin_store.lock();
+            let mut store = app_state.plugin_store.lock();
             for plugin in store.plugins() {
-                results.extend(plugin.results(query, &app_state.fuzzy_matcher)?);
+                let plugin_name = plugin.name();
+                let res = match plugin.results(query, &app_state.fuzzy_matcher) {
+                    Ok(Some(res)) => res,
+                    Err(err) => {
+                        tracing::error!("[{plugin_name}] {err}");
+                        continue;
+                    }
+                    _ => continue,
+                };
+                results.extend(res);
             }
 
             // sort results in reverse so higher scores are first
@@ -293,7 +302,7 @@ fn process_ipc_events(
         }
 
         IPCEvent::Execute => {
-            let app_state = app_state.borrow();
+            let mut app_state = app_state.borrow_mut();
             let (id, elevated) = serde_json::from_str::<(&str, bool)>(payload)?;
             app_state.plugin_store.execute(id, elevated)?;
             hide_main_window(&app_state, false);
@@ -335,7 +344,7 @@ fn process_ipc_events(
     Ok(())
 }
 
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn process_events(
     event: &Event<AppEvent>,
     app_state: &RefCell<AppState<AppEvent>>,
@@ -388,7 +397,7 @@ fn process_events(
             }
 
             AppEvent::Ipc(_window_id, request) => {
-                process_ipc_events(app_state, request)?;
+                process_ipc_events(request, app_state)?;
             }
 
             AppEvent::ThreadEvent(event) => match event {
@@ -412,7 +421,7 @@ fn process_events(
     Ok(())
 }
 
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn run(data_dir: PathBuf) -> anyhow::Result<()> {
     #[cfg(debug_assertions)]
     let config_file = std::env::current_dir()
@@ -473,7 +482,7 @@ fn run(data_dir: PathBuf) -> anyhow::Result<()> {
     });
 }
 
-#[tracing::instrument]
+#[tracing::instrument(level = "trace")]
 fn main() -> anyhow::Result<()> {
     let data_dir = dirs::data_local_dir()
         .context("Failed to get $data_local_dir path")?
@@ -485,13 +494,11 @@ fn main() -> anyhow::Result<()> {
     let layer = tracing_subscriber::fmt::Layer::default()
         .with_writer(non_blocking)
         .with_ansi(false);
-
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::fmt::Subscriber::builder()
-            .with_max_level(LevelFilter::TRACE)
-            .finish()
-            .with(layer),
-    )?;
+    let subscriber = tracing_subscriber::fmt::Subscriber::builder()
+        .with_max_level(LevelFilter::TRACE)
+        .finish()
+        .with(layer);
+    tracing::subscriber::set_global_default(subscriber)?;
 
     run(data_dir).inspect_err(|e| tracing::error!("{e}"))
 }

@@ -1,7 +1,7 @@
 use crate::{
     common::{icon::Icon, IntoSearchResultItem, SearchResultItem},
     config::Config,
-    utils::{self, thread, ResolveEnvVars},
+    utils::{self, thread, IteratorExt, ResolveEnvVars},
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
@@ -10,8 +10,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-
-const PLUGIN_NAME: &str = "AppLauncher";
 
 #[derive(Debug)]
 struct App {
@@ -25,7 +23,7 @@ impl App {
     fn new(path: PathBuf, icons_dir: &Path) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
         let icon = icons_dir.join(&name).with_extension("png");
-        let identifier = format!("{PLUGIN_NAME}:{}", name.to_string_lossy());
+        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         Self {
             name,
             path,
@@ -90,12 +88,10 @@ impl Default for PluginConfig {
 }
 
 impl Plugin {
-    fn name(&self) -> &str {
-        PLUGIN_NAME
-    }
+    const NAME: &'static str = "AppLauncher";
 
     fn update_config(&mut self, config: &Config) {
-        let config = config.plugin_config::<PluginConfig>(self.name());
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.paths = config.paths;
         self.extensions = config.extensions;
     }
@@ -114,7 +110,7 @@ impl Plugin {
 
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
-        let config = config.plugin_config::<PluginConfig>(PLUGIN_NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         Ok(Self {
             paths: config.paths,
             extensions: config.extensions,
@@ -123,8 +119,8 @@ impl crate::plugin::Plugin for Plugin {
         })
     }
 
-    fn name(&self) -> &str {
-        self.name()
+    fn name(&self) -> &'static str {
+        Self::NAME
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
@@ -147,18 +143,18 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn results(
-        &self,
+        &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
         Ok(self
             .apps
             .iter()
             .filter_map(|app| app.fuzzy_match(query, matcher))
-            .collect::<Vec<_>>())
+            .collect_non_empty())
     }
 
-    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
         if let Some(app) = self.apps.iter().find(|app| app.identifier == identifier) {
             app.execute(elevated)?;
         }

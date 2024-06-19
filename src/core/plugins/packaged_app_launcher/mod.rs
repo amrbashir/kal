@@ -22,10 +22,9 @@ use crate::{
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
-    utils,
+    utils::{self, IteratorExt},
 };
 
-const PLUGIN_NAME: &str = "PackagedAppLauncher";
 const MS_RESOURCE: &str = "ms-resource:";
 const PACKAGED_APP: &str = "Packaged App";
 
@@ -39,7 +38,7 @@ struct PackagedApp {
 
 impl PackagedApp {
     fn new(name: OsString, icon: Option<OsString>, id: String) -> Self {
-        let identifier = format!("{PLUGIN_NAME}:{}", name.to_string_lossy());
+        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         Self {
             name,
             id,
@@ -89,9 +88,7 @@ impl Default for PluginConfig {
 }
 
 impl Plugin {
-    fn name(&self) -> &str {
-        PLUGIN_NAME
-    }
+    const NAME: &'static str = "PackagedAppLauncher";
 
     fn find_packaged_apps(&mut self) -> anyhow::Result<()> {
         let pm = PackageManager::new()?;
@@ -115,8 +112,8 @@ impl crate::plugin::Plugin for Plugin {
         Ok(Self { apps: Vec::new() })
     }
 
-    fn name(&self) -> &str {
-        self.name()
+    fn name(&self) -> &'static str {
+        Self::NAME
     }
 
     fn refresh(&mut self, _config: &Config) -> anyhow::Result<()> {
@@ -124,18 +121,18 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn results(
-        &self,
+        &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
         Ok(self
             .apps
             .iter()
             .filter_map(|app| app.fuzzy_match(query, matcher))
-            .collect::<Vec<_>>())
+            .collect_non_empty())
     }
 
-    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
         if let Some(app) = self.apps.iter().find(|app| app.identifier == identifier) {
             app.execute(elevated)?;
         }

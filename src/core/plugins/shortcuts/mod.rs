@@ -4,14 +4,12 @@ use crate::{
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
-    utils,
+    utils::{self, IteratorExt},
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use url::Url;
-
-const PLUGIN_NAME: &str = "Shortcuts";
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", tag = "type")]
@@ -123,19 +121,15 @@ impl Default for PluginConfig {
 impl Plugin {
     const NAME: &'static str = "Shortcuts";
 
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
     fn update_ids(&mut self) {
         self.shortcuts
             .iter_mut()
             .enumerate()
             .for_each(|(idx, shortcut)| {
                 shortcut.identifier = if shortcut.identifier.is_empty() {
-                    format!("{PLUGIN_NAME}:{idx}")
+                    format!("{}:{idx}", Self::NAME)
                 } else {
-                    format!("{PLUGIN_NAME}:{}", shortcut.identifier)
+                    format!("{}:{}", Self::NAME, shortcut.identifier)
                 };
             });
     }
@@ -150,8 +144,8 @@ impl crate::plugin::Plugin for Plugin {
         })
     }
 
-    fn name(&self) -> &str {
-        PLUGIN_NAME
+    fn name(&self) -> &'static str {
+        Self::NAME
     }
 
     fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
@@ -164,18 +158,18 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn results(
-        &self,
+        &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Vec<SearchResultItem<'_>>> {
+    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
         Ok(self
             .shortcuts
             .iter()
             .filter_map(|shortcut| shortcut.fuzzy_match(query, matcher))
-            .collect::<Vec<_>>())
+            .collect_non_empty())
     }
 
-    fn execute(&self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
         if let Some(shortcut) = self.shortcuts.iter().find(|s| s.identifier == identifier) {
             shortcut.execute(elevated)?;
         }
