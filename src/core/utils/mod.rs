@@ -25,7 +25,7 @@ mod tests {
     #[test]
     fn it_collects_non_empty() {
         let empty = Vec::<u32>::new();
-        let non_empty = vec![1];
+        let non_empty = [1];
 
         assert!(empty.iter().collect_non_empty::<Vec<_>>().is_none());
         assert!(non_empty.iter().collect_non_empty::<Vec<_>>().is_some());
