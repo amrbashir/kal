@@ -275,14 +275,8 @@ fn process_ipc_events(
 
             let mut store = app_state.plugin_store.lock();
             for plugin in store.plugins() {
-                let plugin_name = plugin.name();
-                let res = match plugin.results(query, &app_state.fuzzy_matcher) {
-                    Ok(Some(res)) => res,
-                    Err(err) => {
-                        tracing::error!("[{plugin_name}] {err}");
-                        continue;
-                    }
-                    _ => continue,
+                let Ok(Some(res)) = plugin.results(query, &app_state.fuzzy_matcher) else {
+                    continue;
                 };
                 results.extend(res);
             }
