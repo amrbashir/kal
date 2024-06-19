@@ -165,8 +165,8 @@ const bgPrimaryColor = window.KAL.config?.appearance.transparent
   : "bg-[rgba(21,_20,_20,_0.75)]";
 
 const inputHeight = window.KAL.config?.appearance.input_height;
-const resultsItemHeight = window.KAL.config?.appearance.results_item_height;
-const resultsItemHeightPx = `${resultsItemHeight}px`;
+const resultsRowHeight = window.KAL.config?.appearance.results_row_height;
+const resultsRowHeightPx = `${resultsRowHeight}px`;
 </script>
 
 <template>
@@ -216,13 +216,13 @@ const resultsItemHeightPx = `${resultsItemHeight}px`;
         v-for="(item, index) in results"
         @click="(e: MouseEvent) => executeItem(e, index)"
         ref="resultItemRefs"
-        :style="{ height: `${resultsItemHeight}px` }"
+        :style="{ height: `${resultsRowHeight}px` }"
         class="overflow-hidden flex w-full part:content:overflow-hidden mb-1 last:mb-0 part:content:flex part:content:w-full"
         :class="{ selected: index === currentSelection }"
         :aria-selected="index === currentSelection"
       >
         <div
-          :style="{ width: `${resultsItemHeight}px` }"
+          :style="{ width: `${resultsRowHeight}px` }"
           class="flex-shrink-0 h-full grid place-items-center children:w-50% children:h-50%"
           v-html="getIconHtml(item.icon)"
         ></div>
@@ -285,7 +285,7 @@ ul fluent-option[aria-selected="false"]:hover::before {
 }
 
 ul fluent-option::part(content) {
-  height: v-bind(resultsItemHeightPx);
+  height: v-bind(resultsRowHeightPx);
 }
 
 .fade-leave-active,

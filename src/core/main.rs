@@ -174,7 +174,10 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
         0
     } else {
         std::cmp::min(
-            count * config.appearance.results_row_height + 16  /* padding */ + gaps * 4 /* gap */ + 1, /* divider */
+            count * config.appearance.results_row_height
+                + config.appearance.results_padding
+                + gaps * config.appearance.results_row_gap
+                + config.appearance.results_divier,
             config.appearance.results_height,
         )
     };

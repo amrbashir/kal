@@ -15,8 +15,14 @@ pub struct AppearanceConfig {
     pub input_height: u32,
     #[serde(default = "default_results_height")]
     pub results_height: u32,
+    #[serde(default = "default_results_divier")]
+    pub results_divier: u32,
+    #[serde(default = "default_results_padding")]
+    pub results_padding: u32,
     #[serde(default = "default_results_row_height")]
     pub results_row_height: u32,
+    #[serde(default = "default_results_row_gap")]
+    pub results_row_gap: u32,
     #[serde(default)]
     pub transparent: bool,
     #[serde(default = "default_true")]
@@ -34,8 +40,17 @@ fn default_input_height() -> u32 {
 fn default_results_height() -> u32 {
     480
 }
+fn default_results_divier() -> u32 {
+    1
+}
+fn default_results_padding() -> u32 {
+    16
+}
 fn default_results_row_height() -> u32 {
     60
+}
+fn default_results_row_gap() -> u32 {
+    4
 }
 fn default_true() -> bool {
     true
@@ -47,10 +62,13 @@ impl Default for AppearanceConfig {
             window_width: default_window_width(),
             input_height: default_input_height(),
             results_height: default_results_height(),
+            results_divier: default_results_divier(),
+            results_padding: default_results_padding(),
             results_row_height: default_results_row_height(),
+            results_row_gap: default_results_row_gap(),
             transparent: true,
             shadows: true,
-            vibrancy: None,
+            vibrancy: Some(Vibrancy::Mica),
             custom_css_file: None,
         }
     }
@@ -89,6 +107,7 @@ pub struct Config {
 }
 
 impl Config {
+    /// Loads config from a toml string
     fn from_toml(toml: &str) -> Self {
         toml::from_str(toml)
             .inspect_err(|e| {
@@ -97,7 +116,7 @@ impl Config {
             .unwrap_or_default()
     }
 
-    /// Loads the config from a path
+    /// Loads config from a path
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {
         let path = path.as_ref();
         let config = match path.exists() {

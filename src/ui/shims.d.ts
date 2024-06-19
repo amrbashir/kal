@@ -8,7 +8,7 @@ declare interface Window {
       appearance: {
         transparent?: boolean;
         input_height: number;
-        results_item_height: number;
+        results_row_height: number;
       };
     };
 
