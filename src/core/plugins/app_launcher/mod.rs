@@ -2,7 +2,6 @@ use crate::{
     common::{icon::Icon, IntoSearchResultItem, SearchResultItem},
     config::Config,
     utils::{self, thread, ResolveEnvVars},
-    KAL_DATA_DIR,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
@@ -91,16 +90,6 @@ impl Default for PluginConfig {
 }
 
 impl Plugin {
-    fn new(paths: Vec<String>, extensions: Vec<String>) -> Self {
-        Self {
-            paths,
-            extensions,
-
-            icons_dir: KAL_DATA_DIR.join("icons"),
-            apps: Vec::new(),
-        }
-    }
-
     fn name(&self) -> &str {
         PLUGIN_NAME
     }
@@ -124,9 +113,14 @@ impl Plugin {
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(PLUGIN_NAME);
-        Ok(Self::new(config.paths, config.extensions))
+        Ok(Self {
+            paths: config.paths,
+            extensions: config.extensions,
+            icons_dir: data_dir.join("icons"),
+            apps: Vec::new(),
+        })
     }
 
     fn name(&self) -> &str {

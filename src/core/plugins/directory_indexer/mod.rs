@@ -5,7 +5,6 @@ use crate::{
     },
     config::Config,
     utils::{self, thread, ResolveEnvVars},
-    KAL_DATA_DIR,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
@@ -115,12 +114,12 @@ impl Plugin {
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Ok(Self {
             paths: config.paths,
-            icons_dir: KAL_DATA_DIR.join("icons"),
+            icons_dir: data_dir.join("icons"),
             entries: Vec::new(),
         })
     }

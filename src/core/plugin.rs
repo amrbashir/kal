@@ -1,6 +1,7 @@
 use std::{
     fmt::Debug,
     ops::{Deref, DerefMut},
+    path::Path,
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -11,7 +12,7 @@ use serde::Deserialize;
 use crate::{common::SearchResultItem, config::Config};
 
 pub trait Plugin: Debug {
-    fn new(config: &Config) -> anyhow::Result<Self>
+    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self>
     where
         Self: Sized;
     /// Gets the name of the plugin.

@@ -1,4 +1,4 @@
-use std::ffi::OsString;
+use std::{ffi::OsString, path::Path};
 
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
@@ -89,10 +89,6 @@ impl Default for PluginConfig {
 }
 
 impl Plugin {
-    fn new() -> Self {
-        Self { apps: Vec::new() }
-    }
-
     fn name(&self) -> &str {
         PLUGIN_NAME
     }
@@ -115,8 +111,8 @@ impl Plugin {
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &Config) -> anyhow::Result<Self> {
-        Ok(Self::new())
+    fn new(_config: &Config, _: &Path) -> anyhow::Result<Self> {
+        Ok(Self { apps: Vec::new() })
     }
 
     fn name(&self) -> &str {

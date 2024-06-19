@@ -1,14 +1,14 @@
 # "pnpm dev" (vite dev server) process info
-$pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "pnpm"
-$pnpmDevInfo.Arguments = "dev"
-$pnpmDevInfo.WorkingDirectory = "$PSScriptRoot/.."
+$pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
+$pnpmDevInfo.Arguments = "-Command pnpm dev"
+$pnpmDevInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
 $pnpmDev = New-Object System.Diagnostics.Process
 $pnpmDev.StartInfo = $pnpmDevInfo
 
 # "cargo run" process info
 $cargoRunInfo = New-Object System.Diagnostics.ProcessStartInfo "cargo"
 $cargoRunInfo.Arguments = "run"
-$cargoRunInfo.WorkingDirectory = "$PSScriptRoot/.."
+$cargoRunInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
 $cargoRun = New-Object System.Diagnostics.Process
 $cargoRun.StartInfo = $cargoRunInfo
 

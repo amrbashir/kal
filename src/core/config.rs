@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{vibrancy::Vibrancy, CONFIG_FILE};
+use crate::vibrancy::Vibrancy;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppearanceConfig {
@@ -15,8 +15,8 @@ pub struct AppearanceConfig {
     pub input_height: u32,
     #[serde(default = "default_results_height")]
     pub results_height: u32,
-    #[serde(default = "default_results_item_height")]
-    pub results_item_height: u32,
+    #[serde(default = "default_results_row_height")]
+    pub results_row_height: u32,
     #[serde(default)]
     pub transparent: bool,
     #[serde(default = "default_true")]
@@ -34,7 +34,7 @@ fn default_input_height() -> u32 {
 fn default_results_height() -> u32 {
     480
 }
-fn default_results_item_height() -> u32 {
+fn default_results_row_height() -> u32 {
     60
 }
 fn default_true() -> bool {
@@ -47,7 +47,7 @@ impl Default for AppearanceConfig {
             window_width: default_window_width(),
             input_height: default_input_height(),
             results_height: default_results_height(),
-            results_item_height: default_results_item_height(),
+            results_row_height: default_results_row_height(),
             transparent: true,
             shadows: true,
             vibrancy: None,
@@ -89,11 +89,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Loads the config from the conventional location `$HOME/.config/kal.conf.json`
-    pub fn load() -> anyhow::Result<Config> {
-        Self::load_from_path(&*CONFIG_FILE)
-    }
-
     fn from_toml(toml: &str) -> Self {
         toml::from_str(toml)
             .inspect_err(|e| {

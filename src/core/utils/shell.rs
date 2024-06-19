@@ -10,8 +10,6 @@ use windows::{
     },
 };
 
-use crate::TEMP_DIR;
-
 pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) -> anyhow::Result<()> {
     let app = HSTRING::from(app.as_ref());
     unsafe {
@@ -106,7 +104,7 @@ where
         s.split_once(' ').unwrap_or((s, ""))
     };
 
-    let script_path = TEMP_DIR.join("kal_temp_script.ps1");
+    let script_path = std::env::temp_dir().join("kal_temp_script.ps1");
     std::fs::write(&script_path, script.as_ref())?;
 
     let args = format!("{args} {}", script_path.display());

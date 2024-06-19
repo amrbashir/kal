@@ -8,7 +8,7 @@ use crate::{
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 const PLUGIN_NAME: &str = "Shortcuts";
@@ -142,7 +142,7 @@ impl Plugin {
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config) -> anyhow::Result<Self> {
+    fn new(config: &Config, _: &Path) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Ok(Self {

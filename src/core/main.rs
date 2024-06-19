@@ -3,7 +3,6 @@ use std::{cell::RefCell, path::PathBuf};
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
-use once_cell::sync::Lazy;
 use plugin::PluginStore;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
 
@@ -45,24 +44,6 @@ mod utils;
 mod vibrancy;
 mod webview_window;
 
-static KAL_DATA_DIR: Lazy<PathBuf> = Lazy::new(|| {
-    dirs::data_local_dir()
-        .expect("Failed to get $data_local_dir path")
-        .join("kal")
-});
-static CONFIG_FILE: Lazy<PathBuf> = Lazy::new(|| {
-    #[cfg(debug_assertions)]
-    return std::env::current_dir()
-        .expect("Failed to get current directory path")
-        .join("kal.toml");
-    #[cfg(not(debug_assertions))]
-    dirs::home_dir()
-        .expect("Failed to get $home_dir path")
-        .join(".config")
-        .join("kal.toml")
-});
-static TEMP_DIR: Lazy<PathBuf> = Lazy::new(std::env::temp_dir);
-
 #[cfg(not(debug_assertions))]
 #[derive(rust_embed::RustEmbed)]
 #[folder = "dist"]
@@ -101,10 +82,9 @@ fn create_main_window(
     ];
 
     if let Some(file) = &config.appearance.custom_css_file {
-        if let Some(file) = CONFIG_FILE.parent().map(|p| p.join(file)) {
-            let contents = std::fs::read_to_string(file)?;
-            initialization_scripts.push(format!(
-                r#"(function () {{
+        let contents = std::fs::read_to_string(file)?;
+        initialization_scripts.push(format!(
+            r#"(function () {{
                   window.addEventListener("DOMContentLoaded", () => {{
                     const style = document.createElement("style");
                     style.textContent = {};
@@ -112,13 +92,13 @@ fn create_main_window(
                     head.appendChild(style)
                   }})
                 }})()"#,
-                serialize_to_javascript::Serialized::new(
-                    &serde_json::value::to_raw_value(&contents).unwrap_or_default(),
-                    &serialize_options,
-                ),
-            ));
-        }
+            serialize_to_javascript::Serialized::new(
+                &serde_json::value::to_raw_value(&contents).unwrap_or_default(),
+                &serialize_options,
+            ),
+        ));
     }
+
     let main_window = WebviewWindow::new(
         WindowAttributes {
             inner_size: Some(
@@ -194,7 +174,7 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
         0
     } else {
         std::cmp::min(
-            count * config.appearance.results_item_height + 16  /* padding */ + gaps * 4 /* gap */ + 1, /* divider */
+            count * config.appearance.results_row_height + 16  /* padding */ + gaps * 4 /* gap */ + 1, /* divider */
             config.appearance.results_height,
         )
     };
@@ -208,13 +188,18 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
 
 struct AppState<T: 'static> {
     config: Config,
+
     main_window: WebviewWindow,
     #[cfg(windows)]
     previously_foreground_hwnd: HWND,
+
     plugin_store: PluginStore,
-    modifier_pressed: bool,
-    proxy: EventLoopProxy<T>,
     fuzzy_matcher: SkimMatcherV2,
+
+    proxy: EventLoopProxy<T>,
+
+    data_dir: PathBuf,
+    config_file: PathBuf,
 }
 
 impl<T: 'static> std::fmt::Debug for AppState<T> {
@@ -226,9 +211,10 @@ impl<T: 'static> std::fmt::Debug for AppState<T> {
                 "previously_foreground_hwnd",
                 &self.previously_foreground_hwnd,
             )
-            .field("plugins", &self.plugin_store)
-            .field("modifier_pressed", &self.modifier_pressed)
+            .field("plugin_store", &self.plugin_store)
             .field("proxy", &self.proxy)
+            .field("data_dir", &self.data_dir)
+            .field("config_file", &self.config_file)
             .finish()
     }
 }
@@ -239,17 +225,20 @@ impl<T: 'static> AppState<T> {
         main_window: WebviewWindow,
         plugin_store: PluginStore,
         proxy: EventLoopProxy<T>,
-    ) -> Self {
-        Self {
+        data_dir: PathBuf,
+        config_file: PathBuf,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             config,
             main_window,
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
             plugin_store,
-            modifier_pressed: false,
             proxy,
             fuzzy_matcher: SkimMatcherV2::default(),
-        }
+            data_dir,
+            config_file,
+        })
     }
 
     #[cfg(windows)]
@@ -323,8 +312,9 @@ fn process_ipc_events(
             let app_state = app_state.borrow();
             let proxy = app_state.proxy.clone();
             let mut plugin_store = app_state.plugin_store.clone();
+            let config_file = app_state.config_file.clone();
             thread::spawn(move || {
-                let config = Config::load()?;
+                let config = Config::load_from_path(config_file)?;
                 plugin_store.refresh(&config)?;
                 proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::RefreshingIndexFinished))?;
                 proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::UpdateConfig(config)))?;
@@ -420,9 +410,18 @@ fn process_events(
 }
 
 #[tracing::instrument]
-fn run() -> anyhow::Result<()> {
-    let config = Config::load()?;
-    let plugin_store = plugins::all(&config)?;
+fn run(data_dir: PathBuf) -> anyhow::Result<()> {
+    #[cfg(debug_assertions)]
+    let config_file = std::env::current_dir()
+        .context("Failed to get current directory path")?
+        .join("kal.toml");
+    #[cfg(not(debug_assertions))]
+    let config_file = dirs::home_dir()
+        .context("Failed to get $home_dir path")?
+        .join(".config")
+        .join("kal.toml");
+    let config = Config::load_from_path(&config_file)?;
+    let plugin_store = plugins::all(&config, &data_dir)?;
 
     let config_c = config.clone();
     let mut plugin_store_c = plugin_store.clone();
@@ -443,7 +442,14 @@ fn run() -> anyhow::Result<()> {
     let main_window = create_main_window(&config, &event_loop)?;
     let main_window_id = main_window.window().id();
 
-    let app_state = AppState::new(config, main_window, plugin_store, event_loop.create_proxy());
+    let app_state = AppState::new(
+        config,
+        main_window,
+        plugin_store,
+        event_loop.create_proxy(),
+        data_dir,
+        config_file,
+    )?;
     let app_state = RefCell::new(app_state);
 
     event_loop.run(move |event, _event_loop, control_flow| {
@@ -466,7 +472,11 @@ fn run() -> anyhow::Result<()> {
 
 #[tracing::instrument]
 fn main() -> anyhow::Result<()> {
-    let appender = tracing_appender::rolling::never(&*KAL_DATA_DIR, "kal.log");
+    let data_dir = dirs::data_local_dir()
+        .context("Failed to get $data_local_dir path")?
+        .join("kal");
+
+    let appender = tracing_appender::rolling::never(&data_dir, "kal.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
     let layer = tracing_subscriber::fmt::Layer::default()
@@ -480,5 +490,5 @@ fn main() -> anyhow::Result<()> {
             .with(layer),
     )?;
 
-    run().inspect_err(|e| tracing::error!("{e}"))
+    run(data_dir).inspect_err(|e| tracing::error!("{e}"))
 }

@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{path::Path, process::Command};
 
 use crate::{
     common::{
@@ -152,7 +152,7 @@ impl Default for PluginConfig {
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &Config) -> anyhow::Result<Self> {
+    fn new(_config: &Config, _: &Path) -> anyhow::Result<Self> {
         Ok(Self {
             commands: SystemCommand::all(),
         })

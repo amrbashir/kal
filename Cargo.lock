@@ -1133,7 +1133,6 @@ dependencies = [
  "embed-manifest",
  "fuzzy-matcher",
  "global-hotkey",
- "once_cell",
  "percent-encoding",
  "rust-embed",
  "serde",

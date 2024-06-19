@@ -11,6 +11,7 @@ pub enum WebviewEvent {
     ///
     /// Currently, it is only used on Windows
     #[cfg(windows)]
+    #[allow(dead_code)]
     Focus(bool),
 }
 
@@ -29,6 +30,7 @@ pub enum AppEvent {
     /// An Ipc event from the webview
     Ipc(WindowId, String),
     /// Describes an event from a [`WebView`]
+    #[allow(dead_code)]
     WebviewEvent {
         event: WebviewEvent,
         window_id: WindowId,
