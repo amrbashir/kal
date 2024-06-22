@@ -3,6 +3,7 @@ import { watch, onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent } from "../../common";
 import { getIconHtml, isVScrollable } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
+import { watchDebounced } from "@vueuse/core";
 
 const inputRef = ref<Element | null>(null);
 onMounted(() =>
@@ -72,7 +73,10 @@ onMounted(() =>
 );
 
 const currentQuery = ref("");
-watch(currentQuery, (query) => search(query));
+watchDebounced(currentQuery, (query) => search(query), {
+  debounce: 300,
+  maxWait: 3000,
+});
 
 function search(query: string) {
   if (query) {

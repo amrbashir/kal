@@ -43,6 +43,21 @@ pub fn open_url(url: &Url) -> anyhow::Result<()> {
     }
 }
 
+pub fn open_dir(path: impl AsRef<Path>) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    let path = HSTRING::from(path);
+
+    let mut info = SHELLEXECUTEINFOW {
+        cbSize: std::mem::size_of::<SHELLEXECUTEINFOW>() as _,
+        nShow: SW_SHOWNORMAL.0,
+        lpVerb: w!("explore"),
+        lpClass: w!("folder"),
+        lpFile: PCWSTR::from_raw(path.as_ptr()),
+        ..unsafe { std::mem::zeroed() }
+    };
+    unsafe { ShellExecuteExW(&mut info).map_err(Into::into) }
+}
+
 struct ITEMIDLISTPtr(*const windows::Win32::UI::Shell::Common::ITEMIDLIST);
 impl Drop for ITEMIDLISTPtr {
     fn drop(&mut self) {

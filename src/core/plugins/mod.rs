@@ -8,6 +8,7 @@ use crate::{
 mod app_launcher;
 mod calculator;
 mod directory_indexer;
+mod everything;
 mod packaged_app_launcher;
 mod shortcuts;
 mod system_commands;
@@ -22,6 +23,7 @@ pub fn all(config: &Config, data_dir: &Path) -> anyhow::Result<PluginStore> {
         inner.add(shortcuts::Plugin::new(config, data_dir)?);
         inner.add(system_commands::Plugin::new(config, data_dir)?);
         inner.add(calculator::Plugin::new(config, data_dir)?);
+        inner.add(everything::Plugin::new(config, data_dir)?);
     }
     Ok(store)
 }

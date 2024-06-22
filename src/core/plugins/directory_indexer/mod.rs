@@ -74,6 +74,7 @@ pub struct Plugin {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct PluginConfig {
+    #[serde(default)]
     paths: Vec<String>,
 }
 

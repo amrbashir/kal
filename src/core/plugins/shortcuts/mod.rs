@@ -105,6 +105,7 @@ pub struct Plugin {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct PluginConfig {
+    #[serde(default)]
     shortcuts: Vec<Shortcut>,
 }
 

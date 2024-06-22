@@ -68,19 +68,29 @@ pub struct Plugin {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PluginConfig {
+    #[serde(default = "default_paths")]
     paths: Vec<String>,
+    #[serde(default = "default_extensions")]
     extensions: Vec<String>,
+}
+
+fn default_paths() -> Vec<String> {
+    vec![
+        "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
+        "%APPDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
+        "%USERPROFILE%\\Desktop".to_string(),
+    ]
+}
+
+fn default_extensions() -> Vec<String> {
+    vec!["exe".to_string(), "lnk".to_string()]
 }
 
 impl Default for PluginConfig {
     fn default() -> Self {
         Self {
-            paths: vec![
-                "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
-                "%APPDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
-                "%USERPROFILE%\\Desktop".to_string(),
-            ],
-            extensions: vec!["exe".to_string(), "lnk".to_string()],
+            paths: default_paths(),
+            extensions: default_extensions(),
         }
     }
 }

@@ -274,12 +274,7 @@ fn process_ipc_events(
             let mut results = Vec::new();
 
             let mut store = app_state.plugin_store.lock();
-            for plugin in store.plugins() {
-                let Ok(Some(res)) = plugin.results(query, &app_state.fuzzy_matcher) else {
-                    continue;
-                };
-                results.extend(res);
-            }
+            store.results(query, &app_state.fuzzy_matcher, &mut results)?;
 
             // sort results in reverse so higher scores are first
             results.sort_by(|a, b| b.score.cmp(&a.score));
