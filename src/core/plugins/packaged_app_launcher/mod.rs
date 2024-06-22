@@ -1,7 +1,6 @@
 use std::{ffi::OsString, path::Path};
 
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use serde::{Deserialize, Serialize};
 use windows::{
     core::{w, HSTRING, PCWSTR},
     ApplicationModel::Package,
@@ -74,17 +73,6 @@ impl IntoSearchResultItem for PackagedApp {
 #[derive(Debug)]
 pub struct Plugin {
     apps: Vec<PackagedApp>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PluginConfig {
-    enabled: bool,
-}
-
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self { enabled: true }
-    }
 }
 
 impl Plugin {

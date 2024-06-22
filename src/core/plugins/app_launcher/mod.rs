@@ -68,7 +68,6 @@ pub struct Plugin {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PluginConfig {
-    enabled: bool,
     paths: Vec<String>,
     extensions: Vec<String>,
 }
@@ -76,7 +75,6 @@ struct PluginConfig {
 impl Default for PluginConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
             paths: vec![
                 "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
                 "%APPDATA%\\Microsoft\\Windows\\Start Menu".to_string(),

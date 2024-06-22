@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use calculator_rs::Calculate;
-use serde::{Deserialize, Serialize};
 
 use crate::{
     common::{icon::Defaults, SearchResultItem},
@@ -19,17 +18,6 @@ impl std::fmt::Debug for Plugin {
             .field("clipboard", &"arboard::Clipboard")
             .field("last_calculation", &self.last_calculation)
             .finish()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PluginConfig {
-    enabled: bool,
-}
-
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self { enabled: true }
     }
 }
 

@@ -96,6 +96,23 @@ impl Default for GeneralConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GenericPluginConfig {
+    enabled: bool,
+
+    #[serde(flatten)]
+    inner: toml::Table,
+}
+
+impl Default for GenericPluginConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            inner: toml::Table::default(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Config {
     #[serde(default)]
@@ -103,7 +120,7 @@ pub struct Config {
     #[serde(default)]
     pub appearance: AppearanceConfig,
     #[serde(default)]
-    pub plugins: HashMap<String, toml::Table>,
+    pub plugins: HashMap<String, GenericPluginConfig>,
 }
 
 impl Config {
@@ -141,8 +158,8 @@ impl Config {
     {
         self.plugins
             .get(name)
-            .and_then(|toml_value| {
-                toml::from_str(&toml_value.to_string())
+            .and_then(|c| {
+                toml::from_str(&c.inner.to_string())
                     .inspect_err(|e| {
                         tracing::error!(
                             "Failed to deserialize {name} config, failling back to default: {e}"
@@ -151,5 +168,14 @@ impl Config {
                     .ok()
             })
             .unwrap_or_default()
+    }
+
+    /// Gets whether the specified plugin is enabled or not
+    pub fn is_plugin_enabled(&self, name: &str) -> bool {
+        self.plugins
+            .get(name)
+            .map(|c| c.enabled)
+            // plugins are enabled by defaults, and disabled explicitly
+            .unwrap_or(true)
     }
 }

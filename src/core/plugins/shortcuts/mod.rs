@@ -103,19 +103,9 @@ pub struct Plugin {
     shortcuts: Vec<Shortcut>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct PluginConfig {
-    enabled: bool,
     shortcuts: Vec<Shortcut>,
-}
-
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            shortcuts: Default::default(),
-        }
-    }
 }
 
 impl Plugin {

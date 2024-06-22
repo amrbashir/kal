@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use serde::Deserialize;
 
 use crate::{common::SearchResultItem, config::Config};
 
@@ -38,17 +37,6 @@ pub trait Plugin: Debug {
     /// Called when `CtrlLeft + O` are pressed
     fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
         Ok(())
-    }
-}
-
-#[derive(Deserialize)]
-struct BasePluginConfig {
-    enabled: bool,
-}
-
-impl Default for BasePluginConfig {
-    fn default() -> Self {
-        Self { enabled: true }
     }
 }
 
@@ -113,8 +101,7 @@ impl PluginStoreInner {
     pub fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
         for plugin in self.plugins.iter_mut() {
             // update plugin enabled status
-            let c = config.plugin_config::<BasePluginConfig>(plugin.name());
-            plugin.enabled = c.enabled;
+            plugin.enabled = config.is_plugin_enabled(plugin.name());
 
             // run plugin refresh if enabled
             if plugin.enabled {

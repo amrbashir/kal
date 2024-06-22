@@ -9,7 +9,6 @@ use crate::{
     utils::IteratorExt,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use serde::{Deserialize, Serialize};
 use windows::Win32::System::{Power::SetSuspendState, Shutdown::LockWorkStation};
 
 #[derive(Clone, Copy, Debug)]
@@ -141,17 +140,6 @@ pub struct Plugin {
 
 impl Plugin {
     const NAME: &'static str = "SystemCommands";
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PluginConfig {
-    enabled: bool,
-}
-
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self { enabled: true }
-    }
 }
 
 impl crate::plugin::Plugin for Plugin {

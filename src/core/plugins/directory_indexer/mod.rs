@@ -74,14 +74,12 @@ pub struct Plugin {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PluginConfig {
-    enabled: bool,
     paths: Vec<String>,
 }
 
 impl Default for PluginConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
             paths: Default::default(),
         }
     }
