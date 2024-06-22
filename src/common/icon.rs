@@ -71,7 +71,7 @@ impl Defaults {
             Defaults::Directory => Icon::svg(include_str!("./icons/folder.svg").into()),
             Defaults::File => Icon::svg(include_str!("./icons/file.svg").into()),
             Defaults::Lock => Icon::svg(include_str!("./icons/lock.svg").into()),
-            Defaults::Calculator => Icon::svg(include_str!("./icons/lock.svg").into()),
+            Defaults::Calculator => Icon::svg(include_str!("./icons/calculator.svg").into()),
             _ => Icon::default(self.path().into()),
         }
     }
