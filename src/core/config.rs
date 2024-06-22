@@ -107,7 +107,7 @@ pub struct GenericPluginConfig {
 impl Default for GenericPluginConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             inner: toml::Table::default(),
         }
     }

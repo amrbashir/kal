@@ -72,17 +72,9 @@ pub struct Plugin {
     entries: Vec<DirEntry>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct PluginConfig {
     paths: Vec<String>,
-}
-
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self {
-            paths: Default::default(),
-        }
-    }
 }
 
 impl Plugin {
