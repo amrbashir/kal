@@ -12,8 +12,8 @@ name = "kal"
 path = "src/core/main.rs"
 
 [dependencies]
-wry = "0.37"
-tao = { version = "0.26" }
+wry = "0.42"
+tao = "0.29"
 serde = "1"
 serde_json = "1"
 toml = "0.8"
@@ -35,10 +35,10 @@ arboard = "3.4"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"
-webview2-com = "0.28"
+webview2-com = "0.33"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.52"
+version = "0.58"
 features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",

@@ -163,11 +163,11 @@ mod ffi {
         nshowcmd: SHOW_WINDOW_CMD,
     ) -> anyhow::Result<()>
     where
-        P0: IntoParam<HWND>,
-        P1: IntoParam<PCWSTR>,
-        P2: IntoParam<PCWSTR>,
-        P3: IntoParam<PCWSTR>,
-        P4: IntoParam<PCWSTR>,
+        P0: Param<HWND>,
+        P1: Param<PCWSTR>,
+        P2: Param<PCWSTR>,
+        P3: Param<PCWSTR>,
+        P4: Param<PCWSTR>,
     {
         let hr = windows::Win32::UI::Shell::ShellExecuteW(
             hwnd,
@@ -178,7 +178,7 @@ mod ffi {
             nshowcmd,
         );
 
-        if hr.0 > 32 {
+        if hr.0 as isize > 32 {
             Ok(())
         } else {
             Err(windows::core::Error::from_win32().into())

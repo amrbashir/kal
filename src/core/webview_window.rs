@@ -117,7 +117,7 @@ impl WebviewWindow {
     ) -> WebViewBuilder<'a> {
         let proxy = event_loop.create_proxy();
         builder = builder.with_ipc_handler(move |r| {
-            if let Err(e) = proxy.send_event(AppEvent::Ipc(window_id, r)) {
+            if let Err(e) = proxy.send_event(AppEvent::Ipc(window_id, r.body().clone())) {
                 tracing::error!("{e}");
             }
         });

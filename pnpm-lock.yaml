@@ -12,7 +12,7 @@ importers:
         specifier: ^2.6
         version: 2.6.1
       '@vueuse/core':
-        specifier: ^10.11.0
+        specifier: ^10.11
         version: 10.11.0(vue@3.4.29(typescript@5.4.5))
       vue:
         specifier: ^3.4

@@ -251,7 +251,7 @@ impl<T: 'static> AppState<T> {
 
     #[cfg(windows)]
     fn restore_prev_foreground_hwnd(&self) {
-        unsafe { SetForegroundWindow(self.previously_foreground_hwnd) };
+        let _ = unsafe { SetForegroundWindow(self.previously_foreground_hwnd) };
     }
 }
 
