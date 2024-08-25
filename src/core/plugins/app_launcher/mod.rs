@@ -186,7 +186,6 @@ where
 {
     let mut filtered = Vec::new();
 
-    dbg!(path.as_ref());
     let entries = fs::read_dir(path)?;
     for entry in entries.flatten() {
         if let Ok(metadata) = entry.metadata() {
