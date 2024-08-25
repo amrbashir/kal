@@ -32,6 +32,7 @@ window-vibrancy = "0.5"
 global-hotkey = "0.4.2"
 calculator-rs = "0.1"
 arboard = "3.4"
+png = "0.17"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"
@@ -50,6 +51,9 @@ features = [
   "Win32_System_Power",
   "Win32_Storage_Packaging_Appx",
   "Win32_System_Registry",
+  "Win32_Security",
+  "Win32_System_IO",
+  "Win32_Graphics_Gdi",
   "Management_Deployment",
   "ApplicationModel",
   "Foundation_Collections",

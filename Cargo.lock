@@ -1292,6 +1292,7 @@ dependencies = [
  "fuzzy-matcher",
  "global-hotkey",
  "percent-encoding",
+ "png",
  "rust-embed",
  "serde",
  "serde_json",

@@ -76,9 +76,9 @@ struct PluginConfig {
 
 fn default_paths() -> Vec<String> {
     vec![
-        "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
-        "%APPDATA%\\Microsoft\\Windows\\Start Menu".to_string(),
         "%USERPROFILE%\\Desktop".to_string(),
+        "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+        "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
     ]
 }
 
