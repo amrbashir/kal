@@ -186,10 +186,14 @@ where
 {
     let mut filtered = Vec::new();
 
+    dbg!(path.as_ref());
     let entries = fs::read_dir(path)?;
     for entry in entries.flatten() {
         if let Ok(metadata) = entry.metadata() {
-            if metadata.is_file() {
+            if metadata.is_dir() {
+                let filtered_entries = filter_path_entries_by_extensions(entry.path(), extensions)?;
+                filtered.extend(filtered_entries);
+            } else {
                 let path = entry.path();
                 let extension = path
                     .extension()
@@ -199,9 +203,6 @@ where
                 if extensions.contains(&extension) {
                     filtered.push(entry);
                 }
-            } else {
-                let filtered_entries = filter_path_entries_by_extensions(entry.path(), extensions)?;
-                filtered.extend(filtered_entries);
             }
         }
     }
