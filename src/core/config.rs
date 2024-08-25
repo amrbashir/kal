@@ -23,10 +23,11 @@ pub struct AppearanceConfig {
     pub results_row_height: u32,
     #[serde(default = "default_results_row_gap")]
     pub results_row_gap: u32,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub transparent: bool,
     #[serde(default = "default_true")]
     pub shadows: bool,
+    #[serde(default = "default_vibrancy")]
     pub vibrancy: Option<Vibrancy>,
     pub custom_css_file: Option<PathBuf>,
 }
@@ -52,6 +53,9 @@ fn default_results_row_height() -> u32 {
 fn default_results_row_gap() -> u32 {
     4
 }
+fn default_vibrancy() -> Option<Vibrancy> {
+    Some(Vibrancy::Mica)
+}
 fn default_true() -> bool {
     true
 }
@@ -68,7 +72,7 @@ impl Default for AppearanceConfig {
             results_row_gap: default_results_row_gap(),
             transparent: true,
             shadows: true,
-            vibrancy: Some(Vibrancy::Mica),
+            vibrancy: default_vibrancy(),
             custom_css_file: None,
         }
     }
@@ -77,21 +81,29 @@ impl Default for AppearanceConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeneralConfig {
     /// A string of hotkey
-    #[serde(default)]
+    #[serde(default = "default_hotkey")]
     pub hotkey: String,
     /// A vector of glob patterns
     #[serde(default)]
     pub blacklist: Vec<String>,
-    #[serde(default)]
+    #[serde(default = "default_max_search_results")]
     pub max_search_results: usize,
+}
+
+fn default_hotkey() -> String {
+    "Alt+Space".to_string()
+}
+
+fn default_max_search_results() -> usize {
+    24
 }
 
 impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
-            hotkey: "Alt+Space".into(),
+            hotkey: default_hotkey(),
             blacklist: Vec::new(),
-            max_search_results: 24,
+            max_search_results: default_max_search_results(),
         }
     }
 }
