@@ -18,7 +18,7 @@ use windows::{
 };
 
 /// Extract icons as png from paths.
-pub fn extract_icons<'a, I, P, P2>(files: I) -> anyhow::Result<()>
+pub fn extract_icons<I, P, P2>(files: I) -> anyhow::Result<()>
 where
     I: IntoIterator<Item = (P, P2)>,
     P: AsRef<Path>,
@@ -65,11 +65,9 @@ where
     let file = HSTRING::from(file);
     let file = file.as_wide();
 
-    let mut path = [0_u16; 128];
     let len = file.len().min(128);
-    for i in 0..len {
-        path[i] = file[i];
-    }
+    let mut path = [0_u16; 128];
+    path[..len].copy_from_slice(&file[..len]);
 
     let mut index = 0;
 
