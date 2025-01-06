@@ -10,7 +10,7 @@ pub struct SearchResultItem<'a> {
     pub secondary_text: Cow<'a, str>,
     pub icon: Icon<'a>,
     pub needs_confirmation: bool,
-    pub identifier: Cow<'a, str>,
+    pub id: Cow<'a, str>,
     pub score: i64,
 }
 

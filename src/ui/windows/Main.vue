@@ -111,13 +111,13 @@ function executeItem(e: { shiftKey: boolean }, index: number) {
   } else {
     resetConfirm();
     console.log(item);
-    window.KAL.ipc.send(IPCEvent.Execute, item.identifier, e.shiftKey);
+    window.KAL.ipc.send(IPCEvent.Execute, item.id, e.shiftKey);
   }
 }
 
 function showItemInDir(index: number) {
   let item = results.value[index];
-  window.KAL.ipc.send(IPCEvent.OpenLocation, item.identifier);
+  window.KAL.ipc.send(IPCEvent.OpenLocation, item.id);
 }
 
 function onChange(e: InputEvent) {

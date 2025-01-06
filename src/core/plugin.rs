@@ -38,12 +38,12 @@ pub trait Plugin: Debug {
     ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>>;
 
     /// Called when `Enter` or `Shift + Enter` are pressed
-    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
+    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
         Ok(())
     }
 
     /// Called when `CtrlLeft + O` are pressed
-    fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
+    fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
         Ok(())
     }
 

@@ -31,23 +31,23 @@ const PACKAGED_APP: &str = "Packaged App";
 struct PackagedApp {
     name: OsString,
     icon: Option<OsString>,
+    appid: String,
     id: String,
-    identifier: String,
 }
 
 impl PackagedApp {
-    fn new(name: OsString, icon: Option<OsString>, id: String) -> Self {
-        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
+    fn new(name: OsString, icon: Option<OsString>, appid: String) -> Self {
+        let id = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         Self {
             name,
             id,
             icon,
-            identifier,
+            appid,
         }
     }
 
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
-        utils::execute(format!("shell:AppsFolder\\{}", self.id), elevated)
+        utils::execute(format!("shell:AppsFolder\\{}", self.appid), elevated)
     }
 }
 
@@ -64,7 +64,7 @@ impl IntoSearchResultItem for PackagedApp {
                     .map(|i| Icon::path(i.to_string_lossy()))
                     .unwrap_or_else(|| Defaults::Directory.icon()),
                 needs_confirmation: false,
-                identifier: self.identifier.as_str().into(),
+                id: self.id.as_str().into(),
                 score,
             })
     }
@@ -120,8 +120,8 @@ impl crate::plugin::Plugin for Plugin {
             .collect_non_empty())
     }
 
-    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(app) = self.apps.iter().find(|app| app.identifier == identifier) {
+    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
+        if let Some(app) = self.apps.iter().find(|app| app.id == id) {
             app.execute(elevated)?;
         }
         Ok(())
@@ -179,7 +179,7 @@ fn app_from_manifest(
         }
     }
 
-    let id = unsafe { manifest.GetAppUserModelId()?.to_hstring()? };
+    let appid = unsafe { manifest.GetAppUserModelId()?.to_hstring()? };
     let mut display_name = unsafe { manifest.GetStringValue(w!("DisplayName"))?.to_hstring()? };
 
     let full_name = package
@@ -202,7 +202,7 @@ fn app_from_manifest(
     Ok(Some(PackagedApp::new(
         display_name.to_os_string(),
         logo.ok(),
-        id.to_string(),
+        appid.to_string(),
     )))
 }
 

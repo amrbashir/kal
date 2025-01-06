@@ -72,7 +72,7 @@ impl SystemCommand {
         }
     }
 
-    const fn identifier(&self) -> &str {
+    const fn id(&self) -> &str {
         match self {
             Self::Shutdown => "SystemCommands:Shutdown",
             Self::Restart => "SystemCommands:Restart",
@@ -119,14 +119,14 @@ impl IntoSearchResultItem for SystemCommand {
         matcher.fuzzy_match(self.as_ref(), query).map(|score| {
             let primary_text = self.as_ref().into();
             let icon = self.icon();
-            let identifier = self.identifier().into();
+            let id = self.id().into();
             let secondary_text = self.description().into();
             SearchResultItem {
                 primary_text,
                 secondary_text,
                 icon,
                 needs_confirmation: true,
-                identifier,
+                id,
                 score,
             }
         })
@@ -169,12 +169,8 @@ impl crate::plugin::Plugin for Plugin {
             .collect_non_empty())
     }
 
-    fn execute(&mut self, identifier: &str, _elevated: bool) -> anyhow::Result<()> {
-        if let Some(command) = self
-            .commands
-            .iter()
-            .find(|command| command.identifier() == identifier)
-        {
+    fn execute(&mut self, id: &str, _elevated: bool) -> anyhow::Result<()> {
+        if let Some(command) = self.commands.iter().find(|command| command.id() == id) {
             command.execute()?;
         }
         Ok(())

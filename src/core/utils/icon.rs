@@ -71,6 +71,7 @@ where
 
     let mut index = 0;
 
+    // TODO: fix icons failing to be extracted
     let hicon = unsafe { ExtractAssociatedIconW(GetModuleHandleW(None)?, &mut path, &mut index) };
     let hicon = unsafe { Owned::new(hicon) };
 

@@ -5,5 +5,5 @@ export interface SearchResultItem {
   secondary_text: string;
   icon: Icon;
   needs_confirmation: boolean;
-  identifier: string;
+  id: string;
 }

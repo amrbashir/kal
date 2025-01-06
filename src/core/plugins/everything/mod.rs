@@ -16,7 +16,7 @@ struct EverythingEntry {
     path: PathBuf,
     icon: PathBuf,
     is_dir: bool,
-    identifier: String,
+    id: String,
 }
 
 impl EverythingEntry {
@@ -24,14 +24,14 @@ impl EverythingEntry {
         let path = PathBuf::from(path);
         let name = path.file_name().unwrap_or_default().to_os_string();
         let is_dir = path.metadata().map(|m| m.is_dir()).unwrap_or_default();
-        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
+        let id = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         let icon = icons_dir.join(&name).with_extra_extension("png");
         let _ = utils::extract_icon_cached(&path, &icon);
         Self {
             name,
             path,
             icon,
-            identifier,
+            id,
             is_dir,
         }
     }
@@ -56,7 +56,7 @@ impl IntoSearchResultItem for EverythingEntry {
             secondary_text: self.path.to_string_lossy(),
             icon: Icon::path(self.icon.to_string_lossy()),
             needs_confirmation: false,
-            identifier: self.identifier.as_str().into(),
+            id: self.id.as_str().into(),
             score: 200,
         })
     }
@@ -135,15 +135,15 @@ impl crate::plugin::Plugin for Plugin {
             .collect())
     }
 
-    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| e.identifier == identifier) {
+    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
+        if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
             entry.execute(elevated)?;
         }
         Ok(())
     }
 
-    fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| e.identifier == identifier) {
+    fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
+        if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
             entry.reveal_in_dir()?;
         }
         Ok(())

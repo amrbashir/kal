@@ -19,7 +19,7 @@ struct DirEntry {
     name: OsString,
     path: PathBuf,
     icon: Option<PathBuf>,
-    identifier: String,
+    id: String,
 }
 
 impl DirEntry {
@@ -28,12 +28,12 @@ impl DirEntry {
         let filename = path.file_name().unwrap_or_default().to_os_string();
         let is_file = path.is_file();
         let icon = is_file.then(|| icons_dir.join(&filename).with_extra_extension("png"));
-        let identifier = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
+        let id = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
         Self {
             name,
             path,
             icon,
-            identifier,
+            id,
         }
     }
 
@@ -59,7 +59,7 @@ impl IntoSearchResultItem for DirEntry {
                     None => Defaults::Directory.icon(),
                 },
                 needs_confirmation: false,
-                identifier: self.identifier.as_str().into(),
+                id: self.id.as_str().into(),
                 score,
             })
     }
@@ -145,15 +145,15 @@ impl crate::plugin::Plugin for Plugin {
             .collect_non_empty())
     }
 
-    fn execute(&mut self, identifier: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| e.identifier == identifier) {
+    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
+        if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
             entry.execute(elevated)?;
         }
         Ok(())
     }
 
-    fn reveal_in_dir(&self, identifier: &str) -> anyhow::Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| e.identifier == identifier) {
+    fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
+        if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
             entry.reveal_in_dir()?;
         }
         Ok(())

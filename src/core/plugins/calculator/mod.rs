@@ -23,7 +23,7 @@ impl std::fmt::Debug for Plugin {
 
 impl Plugin {
     const NAME: &'static str = "Calculator";
-    const IDENITIFER: &'static str = "Calculator-99999-item";
+    const ID: &'static str = "Calculator-99999-item";
 
     #[inline]
     fn item(&self) -> SearchResultItem<'_> {
@@ -31,7 +31,7 @@ impl Plugin {
             primary_text: self.last_calculation.as_str().into(),
             secondary_text: "Press Enter to copy to clipboard".into(),
             needs_confirmation: false,
-            identifier: Self::IDENITIFER.into(),
+            id: Self::ID.into(),
             icon: Defaults::Calculator.icon(),
             score: 99999, // should always be the first one
         }
@@ -88,8 +88,8 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn execute(&mut self, identifier: &str, _: bool) -> anyhow::Result<()> {
-        if identifier == Self::IDENITIFER {
+    fn execute(&mut self, id: &str, _: bool) -> anyhow::Result<()> {
+        if id == Self::ID {
             self.copy_last_calculation()
         }
 
