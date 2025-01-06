@@ -1,8 +1,4 @@
-use std::{
-    fs::File,
-    io::BufWriter,
-    path::{Path, PathBuf},
-};
+use std::{fs::File, io::BufWriter, path::Path};
 
 use anyhow::Context;
 use windows::{
@@ -21,23 +17,51 @@ use windows::{
     },
 };
 
-/// Extract pngs from paths, using powershell
-///
-/// Possiple failures:
-/// - When a path is a directory
-pub fn extract_pngs<I>(files: I) -> anyhow::Result<()>
+/// Extract icons as png from paths.
+pub fn extract_icons<'a, I, P, P2>(files: I) -> anyhow::Result<()>
 where
-    I: IntoIterator<Item = (PathBuf, PathBuf)>,
+    I: IntoIterator<Item = (P, P2)>,
+    P: AsRef<Path>,
+    P2: AsRef<Path>,
 {
     for (src, out) in files {
-        extract_png(src, out)?;
+        extract_icon(src, out)?;
     }
 
     Ok(())
 }
 
-pub fn extract_png<P: AsRef<Path>>(file: P, out: P) -> anyhow::Result<()> {
+/// Extract icon as png from path and cache it.
+pub fn extract_icon_cached<P, P2>(file: P, out: P2) -> anyhow::Result<()>
+where
+    P: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    use std::time::{Duration, SystemTime};
+
+    const DAY: Duration = Duration::from_secs(60 * 60 * 24);
+
+    let out = out.as_ref().to_path_buf();
+
+    if out.exists() && out.metadata()?.modified()? + DAY > SystemTime::now() {
+        return Ok(());
+    }
+
+    let file = file.as_ref().to_path_buf();
+
+    super::thread::spawn(move || extract_icon(file, out)); // TODO: use async
+
+    Ok(())
+}
+
+/// Extract icon as png from path.
+pub fn extract_icon<P, P2>(file: P, out: P2) -> anyhow::Result<()>
+where
+    P: AsRef<Path>,
+    P2: AsRef<Path>,
+{
     let file = file.as_ref();
+
     let file = HSTRING::from(file);
     let file = file.as_wide();
 
@@ -52,12 +76,24 @@ pub fn extract_png<P: AsRef<Path>>(file: P, out: P) -> anyhow::Result<()> {
     let hicon = unsafe { ExtractAssociatedIconW(GetModuleHandleW(None)?, &mut path, &mut index) };
     let hicon = unsafe { Owned::new(hicon) };
 
-    unsafe { save_hicon(*hicon, out)? };
+    let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
 
-    Ok(())
+    let file = File::options()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(out)?;
+    let file = BufWriter::new(file);
+
+    let mut encoder = png::Encoder::new(file, width, height);
+    encoder.set_color(png::ColorType::Rgba);
+    encoder.set_depth(png::BitDepth::Eight);
+
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(&rgba).map_err(Into::into)
 }
 
-unsafe fn save_hicon<P: AsRef<Path>>(hicon: HICON, out: P) -> anyhow::Result<()> {
+unsafe fn hicon_to_rgba8(hicon: HICON) -> anyhow::Result<(Vec<u8>, u32, u32)> {
     let bitmap_size_i32 = i32::try_from(std::mem::size_of::<BITMAP>())?;
     let biheader_size_u32 = u32::try_from(std::mem::size_of::<BITMAPINFOHEADER>())?;
 
@@ -122,16 +158,5 @@ unsafe fn save_hicon<P: AsRef<Path>>(hicon: HICON, out: P) -> anyhow::Result<()>
         std::mem::swap(b, r);
     }
 
-    let file = File::options()
-        .create(true)
-        .truncate(true)
-        .write(true)
-        .open(out)?;
-    let file = BufWriter::new(file);
-    let mut encoder = png::Encoder::new(file, width_u32, height_u32);
-    encoder.set_color(png::ColorType::Rgba);
-    encoder.set_depth(png::BitDepth::Eight);
-
-    let mut writer = encoder.write_header()?;
-    writer.write_image_data(&buf).map_err(Into::into)
+    Ok((buf, width_u32, height_u32))
 }

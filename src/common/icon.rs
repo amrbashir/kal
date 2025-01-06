@@ -41,7 +41,6 @@ pub enum IconKind {
 pub enum Defaults {
     Directory,
     Url,
-    File,
     Shell,
     Shutdown,
     Restart,
@@ -69,7 +68,6 @@ impl Defaults {
             Defaults::Hibernate => Icon::svg(include_str!("./icons/hibernate.svg").into()),
             Defaults::Sleep => Icon::svg(include_str!("./icons/sleep.svg").into()),
             Defaults::Directory => Icon::svg(include_str!("./icons/folder.svg").into()),
-            Defaults::File => Icon::svg(include_str!("./icons/file.svg").into()),
             Defaults::Lock => Icon::svg(include_str!("./icons/lock.svg").into()),
             Defaults::Calculator => Icon::svg(include_str!("./icons/calculator.svg").into()),
             _ => Icon::default(self.path().into()),

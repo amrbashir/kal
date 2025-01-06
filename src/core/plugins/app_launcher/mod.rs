@@ -1,7 +1,7 @@
 use crate::{
     common::{icon::Icon, IntoSearchResultItem, SearchResultItem},
     config::Config,
-    utils::{self, thread, IteratorExt, ResolveEnvVars},
+    utils::{self, thread, IteratorExt, PathExt, ResolveEnvVars},
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
@@ -22,8 +22,9 @@ struct App {
 impl App {
     fn new(path: PathBuf, icons_dir: &Path) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
-        let icon = icons_dir.join(&name).with_extension("png");
-        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
+        let filename = path.file_name().unwrap_or_default().to_os_string();
+        let icon = icons_dir.join(&filename).with_extra_extension("png");
+        let identifier = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
         Self {
             name,
             path,
@@ -144,7 +145,7 @@ impl crate::plugin::Plugin for Plugin {
 
         thread::spawn(move || {
             std::fs::create_dir_all(icons_dir)?;
-            utils::extract_pngs(paths)
+            utils::extract_icons(paths)
         });
 
         Ok(())

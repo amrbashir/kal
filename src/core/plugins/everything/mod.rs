@@ -1,7 +1,7 @@
 use crate::{
-    common::{icon::Defaults, IntoSearchResultItem, SearchResultItem},
+    common::{icon::Icon, IntoSearchResultItem, SearchResultItem},
     config::{Config, GenericPluginConfig},
-    utils,
+    utils::{self, PathExt},
 };
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
@@ -14,19 +14,23 @@ use std::{
 struct EverythingEntry {
     name: OsString,
     path: PathBuf,
-    identifier: String,
+    icon: PathBuf,
     is_dir: bool,
+    identifier: String,
 }
 
 impl EverythingEntry {
-    fn new(path: &str) -> Self {
+    fn new(path: &str, icons_dir: &Path) -> Self {
         let path = PathBuf::from(path);
         let name = path.file_name().unwrap_or_default().to_os_string();
-        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         let is_dir = path.metadata().map(|m| m.is_dir()).unwrap_or_default();
+        let identifier = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
+        let icon = icons_dir.join(&name).with_extra_extension("png");
+        let _ = utils::extract_icon_cached(&path, &icon);
         Self {
             name,
             path,
+            icon,
             identifier,
             is_dir,
         }
@@ -50,11 +54,7 @@ impl IntoSearchResultItem for EverythingEntry {
         Some(SearchResultItem {
             primary_text: self.name.to_string_lossy(),
             secondary_text: self.path.to_string_lossy(),
-            icon: if self.is_dir {
-                Defaults::Directory.icon()
-            } else {
-                Defaults::File.icon() // TODO: load from path
-            },
+            icon: Icon::path(self.icon.to_string_lossy()),
             needs_confirmation: false,
             identifier: self.identifier.as_str().into(),
             score: 200,
@@ -65,7 +65,9 @@ impl IntoSearchResultItem for EverythingEntry {
 #[derive(Debug)]
 pub struct Plugin {
     es: PathBuf,
+
     entries: Vec<EverythingEntry>,
+    icons_dir: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -78,11 +80,12 @@ impl Plugin {
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, _: &Path) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         Ok(Self {
             es: config.es.unwrap_or_else(|| PathBuf::from("es")),
             entries: Vec::new(),
+            icons_dir: data_dir.join("icons"),
         })
     }
 
@@ -109,7 +112,10 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &SkimMatcherV2,
     ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
-        let output = std::process::Command::new(&self.es).arg(query).output()?;
+        let output = std::process::Command::new(&self.es)
+            .arg(query)
+            .args(["-n", "24"]) // TODO: pull from config
+            .output()?;
 
         if !output.status.success() {
             return Ok(None);
@@ -117,7 +123,10 @@ impl crate::plugin::Plugin for Plugin {
 
         let output = String::from_utf8_lossy(output.stdout.as_slice());
 
-        self.entries = output.lines().map(EverythingEntry::new).collect::<Vec<_>>();
+        self.entries = output
+            .lines()
+            .map(|e| EverythingEntry::new(e, &self.icons_dir))
+            .collect::<Vec<_>>();
 
         Ok(self
             .entries

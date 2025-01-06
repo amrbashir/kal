@@ -4,7 +4,7 @@ use crate::{
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
-    utils::{self, IteratorExt},
+    utils::{self, thread, IteratorExt, PathExt},
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,9 @@ use url::Url;
 enum ShortcutKind {
     Path {
         path: PathBuf,
+
+        #[serde(skip)]
+        icon: PathBuf,
     },
     Url {
         url: Url,
@@ -43,14 +46,7 @@ struct Shortcut {
 impl Shortcut {
     fn icon(&self) -> Icon {
         match &self.kind {
-            ShortcutKind::Path { path } => {
-                if path.is_file() {
-                    // TODO: generate from file
-                    Defaults::File.icon()
-                } else {
-                    Defaults::Directory.icon()
-                }
-            }
+            ShortcutKind::Path { icon, .. } => Icon::path(icon.to_string_lossy()),
             ShortcutKind::Url { .. } => Defaults::Url.icon(),
             ShortcutKind::Shell { .. } => Defaults::Shell.icon(),
         }
@@ -58,7 +54,7 @@ impl Shortcut {
 
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         match &self.kind {
-            ShortcutKind::Path { path } => utils::execute(path, elevated),
+            ShortcutKind::Path { path, .. } => utils::execute(path, elevated),
             ShortcutKind::Url { url } => utils::open_url(url),
             ShortcutKind::Shell {
                 shell,
@@ -70,7 +66,7 @@ impl Shortcut {
     }
 
     fn reveal_in_dir(&self) -> anyhow::Result<()> {
-        if let ShortcutKind::Path { path } = &self.kind {
+        if let ShortcutKind::Path { path, .. } = &self.kind {
             utils::reveal_in_dir(path)?;
         }
 
@@ -101,6 +97,8 @@ impl IntoSearchResultItem for Shortcut {
 #[derive(Debug)]
 pub struct Plugin {
     shortcuts: Vec<Shortcut>,
+
+    icons_dir: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -113,25 +111,53 @@ impl Plugin {
     const NAME: &'static str = "Shortcuts";
 
     fn update_ids(&mut self) {
-        self.shortcuts
+        for (idx, shortcut) in self.shortcuts.iter_mut().enumerate() {
+            shortcut.identifier = if shortcut.identifier.is_empty() {
+                format!("{}:{idx}", Self::NAME)
+            } else {
+                format!("{}:{}", Self::NAME, shortcut.identifier)
+            };
+        }
+    }
+
+    fn extract_icons(&mut self) {
+        let paths = self
+            .shortcuts
             .iter_mut()
-            .enumerate()
-            .for_each(|(idx, shortcut)| {
-                shortcut.identifier = if shortcut.identifier.is_empty() {
-                    format!("{}:{idx}", Self::NAME)
-                } else {
-                    format!("{}:{}", Self::NAME, shortcut.identifier)
+            .filter(|s| matches!(s.kind, ShortcutKind::Path { .. }))
+            .filter_map(|shortcut| {
+                let ShortcutKind::Path { path, ref mut icon } = &mut shortcut.kind else {
+                    unreachable!("can't be reached as we filtered");
                 };
-            });
+
+                let name = path.file_name().unwrap_or_default().to_os_string();
+                let is_dir = path.metadata().map(|m| m.is_dir()).unwrap_or_default();
+                if !is_dir {
+                    let icon_path = self.icons_dir.join(&name).with_extra_extension("png");
+                    *icon = icon_path.clone();
+                    Some((path.clone(), icon_path))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let icons_dir = self.icons_dir.clone();
+
+        thread::spawn(move || {
+            std::fs::create_dir_all(icons_dir)?;
+            utils::extract_icons(paths)
+        });
     }
 }
 
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, _: &Path) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Ok(Self {
             shortcuts: config.shortcuts,
+            icons_dir: data_dir.join("icons"),
         })
     }
 
@@ -144,6 +170,7 @@ impl crate::plugin::Plugin for Plugin {
 
         self.shortcuts = config.shortcuts;
         self.update_ids();
+        self.extract_icons();
 
         Ok(())
     }

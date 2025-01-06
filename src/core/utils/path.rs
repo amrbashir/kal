@@ -3,6 +3,24 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub trait PathExt {
+    fn with_extra_extension<S: AsRef<OsStr>>(&self, extension: S) -> PathBuf;
+}
+
+impl<T: AsRef<Path>> PathExt for T {
+    fn with_extra_extension<S: AsRef<OsStr>>(&self, extension: S) -> PathBuf {
+        let path = self.as_ref();
+        let extension = extension.as_ref();
+
+        let ext = path.extension().map(|e| e.to_string_lossy());
+
+        match ext {
+            Some(ext) => path.with_extension(format!("{ext}.{}", extension.to_string_lossy())),
+            None => path.with_extension(extension),
+        }
+    }
+}
+
 /// Resolve environment variables components in a path.
 ///
 /// Resolves the follwing formats:
