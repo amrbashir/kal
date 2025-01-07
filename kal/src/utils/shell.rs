@@ -1,14 +1,11 @@
 use std::path::Path;
 
 use url::Url;
-use windows::{
-    core::*,
-    Win32::{
-        Foundation::*,
-        System::Com::*,
-        UI::{Shell::*, WindowsAndMessaging::*},
-    },
-};
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::System::Com::*;
+use windows::Win32::UI::Shell::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) -> anyhow::Result<()> {
     let app = HSTRING::from(app.as_ref());

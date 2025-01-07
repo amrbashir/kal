@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 
-use crate::icon::Icon;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::Serialize;
+
+use crate::icon::Icon;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct SearchResultItem<'a> {

@@ -1,30 +1,29 @@
-use std::{cell::RefCell, path::PathBuf, str::FromStr};
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use global_hotkey::hotkey::HotKey;
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use plugin::PluginStore;
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
-
+use tao::dpi::{LogicalPosition, LogicalSize};
+use tao::event::{Event, StartCause, WindowEvent};
+use tao::event_loop::{
+    ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy,
+};
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
 use webview_window::WebViewWindowBuilder;
 #[cfg(windows)]
 use windows::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
 
-use tao::{
-    dpi::{LogicalPosition, LogicalSize},
-    event::{Event, StartCause, WindowEvent},
-    event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy},
-};
-
-use crate::{
-    config::Config,
-    event::{emit_event, AppEvent, IPCEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
-    utils::thread,
-    webview_window::WebViewWindow,
-};
-
+use crate::config::Config;
 #[cfg(not(debug_assertions))]
 use crate::event::WebviewEvent;
+use crate::event::{emit_event, AppEvent, IPCEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT};
+use crate::utils::thread;
+use crate::webview_window::WebViewWindow;
 
 mod config;
 mod event;

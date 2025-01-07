@@ -1,13 +1,15 @@
-use std::{path::Path, process::Command};
+use std::path::Path;
+use std::process::Command;
 
-use crate::{
-    config::Config,
-    icon::{BuiltinIcon, Icon},
-    search_result_item::{IntoSearchResultItem, SearchResultItem},
-    utils::IteratorExt,
-};
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use windows::Win32::System::{Power::SetSuspendState, Shutdown::LockWorkStation};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use windows::Win32::System::Power::SetSuspendState;
+use windows::Win32::System::Shutdown::LockWorkStation;
+
+use crate::config::Config;
+use crate::icon::{BuiltinIcon, Icon};
+use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::utils::IteratorExt;
 
 #[derive(Clone, Copy, Debug)]
 enum SystemCommand {

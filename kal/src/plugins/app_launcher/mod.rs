@@ -1,16 +1,15 @@
-use crate::{
-    config::Config,
-    icon::Icon,
-    search_result_item::{IntoSearchResultItem, SearchResultItem},
-    utils::{self, thread, IteratorExt, PathExt, ResolveEnvVars},
-};
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use std::ffi::OsString;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
-use std::{
-    ffi::OsString,
-    fs,
-    path::{Path, PathBuf},
-};
+
+use crate::config::Config;
+use crate::icon::Icon;
+use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::utils::{self, thread, IteratorExt, PathExt, ResolveEnvVars};
 
 #[derive(Debug)]
 struct App {

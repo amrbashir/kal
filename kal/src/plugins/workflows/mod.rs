@@ -1,13 +1,14 @@
-use crate::{
-    config::Config,
-    icon::{BuiltinIcon, Icon},
-    search_result_item::{IntoSearchResultItem, SearchResultItem},
-    utils::{self, IteratorExt},
-};
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use serde::{Deserialize, Serialize};
 use url::Url;
+
+use crate::config::Config;
+use crate::icon::{BuiltinIcon, Icon};
+use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::utils::{self, IteratorExt};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", untagged)]

@@ -2,7 +2,9 @@ use std::path::Path;
 
 use calculator_rs::Calculate;
 
-use crate::{config::Config, icon::BuiltinIcon, search_result_item::SearchResultItem};
+use crate::config::Config;
+use crate::icon::BuiltinIcon;
+use crate::search_result_item::SearchResultItem;
 
 pub struct Plugin {
     clipboard: Option<arboard::Clipboard>,

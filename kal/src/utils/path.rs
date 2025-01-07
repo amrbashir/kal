@@ -1,7 +1,5 @@
-use std::{
-    ffi::OsStr,
-    path::{Path, PathBuf},
-};
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 
 pub trait PathExt {
     fn with_extra_extension<S: AsRef<OsStr>>(&self, extension: S) -> PathBuf;

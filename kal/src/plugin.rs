@@ -1,17 +1,13 @@
-use std::{
-    fmt::Debug,
-    ops::{Deref, DerefMut},
-    path::Path,
-    sync::{Arc, Mutex, MutexGuard},
-};
+use std::fmt::Debug;
+use std::ops::{Deref, DerefMut};
+use std::path::Path;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
-use crate::{
-    config::{Config, GenericPluginConfig},
-    search_result_item::SearchResultItem,
-};
+use crate::config::{Config, GenericPluginConfig};
+use crate::search_result_item::SearchResultItem;
 
 #[allow(unused_variables)]
 pub trait Plugin: Debug {

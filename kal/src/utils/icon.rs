@@ -1,21 +1,14 @@
-use std::{fs::File, io::BufWriter, path::Path};
+use std::fs::File;
+use std::io::BufWriter;
+use std::path::Path;
 
 use anyhow::Context;
-use windows::{
-    core::{Owned, HSTRING},
-    Win32::{
-        Foundation::HWND,
-        Graphics::Gdi::{
-            DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFOHEADER,
-            BI_RGB, DIB_RGB_COLORS,
-        },
-        System::LibraryLoader::GetModuleHandleW,
-        UI::{
-            Shell::ExtractAssociatedIconW,
-            WindowsAndMessaging::{GetIconInfo, HICON, ICONINFO},
-        },
-    },
-};
+use windows::core::*;
+use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::System::LibraryLoader::*;
+use windows::Win32::UI::Shell::*;
+use windows::Win32::UI::WindowsAndMessaging::*;
 
 /// Extract icons as png from paths.
 pub fn extract_icons<I, P, P2>(files: I) -> anyhow::Result<()>

@@ -1,9 +1,7 @@
 use std::path::Path;
 
-use crate::{
-    config::Config,
-    plugin::{Plugin, PluginStore},
-};
+use crate::config::Config;
+use crate::plugin::{Plugin, PluginStore};
 
 mod app_launcher;
 mod calculator;

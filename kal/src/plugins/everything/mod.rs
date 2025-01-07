@@ -1,15 +1,13 @@
-use crate::{
-    config::{Config, GenericPluginConfig},
-    icon::Icon,
-    search_result_item::{IntoSearchResultItem, SearchResultItem},
-    utils::{self, PathExt},
-};
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
+
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
-use std::{
-    ffi::OsString,
-    path::{Path, PathBuf},
-};
+
+use crate::config::{Config, GenericPluginConfig};
+use crate::icon::Icon;
+use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::utils::{self, PathExt};
 
 #[derive(Debug)]
 struct EverythingEntry {

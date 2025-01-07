@@ -1,18 +1,15 @@
-use std::{fmt::Debug, rc::Rc};
+use std::fmt::Debug;
+use std::rc::Rc;
 
-use crate::{
-    event::{AppEvent, WebviewEvent},
-    protocol,
-};
-
+use tao::dpi::{Position, Size};
+use tao::event_loop::EventLoop;
 #[cfg(windows)]
 use tao::platform::windows::*;
-use tao::{
-    dpi::{Position, Size},
-    event_loop::EventLoop,
-    window::{Window, WindowId},
-};
+use tao::window::{Window, WindowId};
 use wry::WebView;
+
+use crate::event::{AppEvent, WebviewEvent};
+use crate::protocol;
 
 pub struct WebViewWindowBuilder<'a> {
     window_builder: tao::window::WindowBuilder,

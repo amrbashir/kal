@@ -1,26 +1,22 @@
-use std::{ffi::OsString, path::Path};
+use std::ffi::OsString;
+use std::path::Path;
 
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use windows::{
-    core::{w, HSTRING, PCWSTR},
-    ApplicationModel::Package,
-    Management::Deployment::PackageManager,
-    Win32::{
-        Storage::{
-            FileSystem::FILE_ATTRIBUTE_NORMAL,
-            Packaging::Appx::{AppxFactory, IAppxFactory, IAppxManifestApplication},
-        },
-        System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ},
-        UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString},
-    },
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use windows::core::{w, HSTRING, PCWSTR};
+use windows::ApplicationModel::Package;
+use windows::Management::Deployment::PackageManager;
+use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
+use windows::Win32::Storage::Packaging::Appx::{
+    AppxFactory, IAppxFactory, IAppxManifestApplication,
 };
+use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
+use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
-use crate::{
-    config::Config,
-    icon::{BuiltinIcon, Icon},
-    search_result_item::{IntoSearchResultItem, SearchResultItem},
-    utils::{self, IteratorExt},
-};
+use crate::config::Config;
+use crate::icon::{BuiltinIcon, Icon};
+use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::utils::{self, IteratorExt};
 
 const MS_RESOURCE: &str = "ms-resource:";
 const PACKAGED_APP: &str = "Packaged App";

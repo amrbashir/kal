@@ -1,11 +1,12 @@
-use std::{borrow::Cow, path::PathBuf, str::FromStr};
+use std::borrow::Cow;
+use std::path::PathBuf;
+use std::str::FromStr;
+
+use wry::http::header::CONTENT_TYPE;
+use wry::http::{Request, Response};
+use wry::WebViewId;
 
 use crate::icon;
-
-use wry::{
-    http::{header::CONTENT_TYPE, Request, Response},
-    WebViewId,
-};
 
 /// `kal://` protocol
 #[cfg(not(debug_assertions))]
