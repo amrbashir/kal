@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::webview_window::WebviewWindow;
+use crate::webview_window::WebViewWindow;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Vibrancy {
@@ -16,7 +16,7 @@ pub enum Vibrancy {
 
 impl Vibrancy {
     #[cfg(windows)]
-    pub fn apply(&self, window: &WebviewWindow) -> anyhow::Result<()> {
+    pub fn apply(&self, window: &WebViewWindow) -> anyhow::Result<()> {
         match self {
             Vibrancy::Mica => window_vibrancy::apply_mica(window, None),
             Vibrancy::MicaLight => window_vibrancy::apply_mica(window, Some(false)),
@@ -31,7 +31,7 @@ impl Vibrancy {
     }
 
     #[cfg(not(windows))]
-    pub fn apply(&self, window: &WebviewWindow) -> anyhow::Result<()> {
+    pub fn apply(&self, window: &WebViewWindow) -> anyhow::Result<()> {
         Ok(())
     }
 }

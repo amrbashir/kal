@@ -11,8 +11,8 @@ edition = "2021"
 embed-manifest = "1.4"
 
 [dependencies]
-wry = "0.42"
-tao = "0.29"
+wry = "0.48"
+tao = "0.31"
 serde = "1"
 serde_json = "1"
 toml = "0.8"
@@ -28,7 +28,7 @@ tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 url = { version = "2.5", features = ["serde"] }
 window-vibrancy = "0.5"
-global-hotkey = "0.4"
+global-hotkey = "0.6"
 calculator-rs = "0.1"
 arboard = "3.4"
 png = "0.17"
@@ -36,7 +36,7 @@ strum = { version = "0.26", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"
-webview2-com = "0.33"
+webview2-com = "0.34"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.58"

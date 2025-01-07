@@ -6,27 +6,21 @@ use global_hotkey::{hotkey::HotKey, GlobalHotKeyEvent, GlobalHotKeyManager, HotK
 use plugin::PluginStore;
 use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt};
 
+use webview_window::WebViewWindowBuilder;
 #[cfg(windows)]
 use windows::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
-
-#[cfg(target_os = "linux")]
-use tao::platform::linux::WindowExtUnix;
-#[cfg(windows)]
-use tao::platform::windows::WindowExtWindows;
 
 use tao::{
     dpi::{LogicalPosition, LogicalSize},
     event::{Event, StartCause, WindowEvent},
     event_loop::{ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy},
-    window::WindowAttributes,
 };
-use wry::WebViewAttributes;
 
 use crate::{
     config::Config,
     event::{emit_event, AppEvent, IPCEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
     utils::thread,
-    webview_window::WebviewWindow,
+    webview_window::WebViewWindow,
 };
 
 #[cfg(not(debug_assertions))]
@@ -52,7 +46,7 @@ pub(crate) struct EmbededAssets;
 fn create_main_window(
     config: &Config,
     event_loop: &EventLoop<AppEvent>,
-) -> anyhow::Result<WebviewWindow> {
+) -> anyhow::Result<WebViewWindow> {
     let (m_size, m_pos) = {
         let monitor = event_loop
             .primary_monitor()
@@ -69,69 +63,55 @@ fn create_main_window(
     let url = "kal://localhost";
 
     let serialize_options = serialize_to_javascript::Options::default();
-    let mut initialization_scripts = vec![
-        KAL_IPC_INIT_SCRIPT.to_string(),
-        format!(
+
+    let css_script = match config.appearance.custom_css_file {
+        Some(ref file) => {
+            let contents = std::fs::read_to_string(file)?;
+            let script = format!(
+                r#"(function () {{
+          window.addEventListener("DOMContentLoaded", () => {{
+            const style = document.createElement("style");
+            style.textContent = {};
+            const head = document.head ?? document.querySelector('head') ?? document.body;
+            head.appendChild(style)
+          }})
+        }})()"#,
+                serialize_to_javascript::Serialized::new(
+                    &serde_json::value::to_raw_value(&contents).unwrap_or_default(),
+                    &serialize_options,
+                ),
+            );
+            Some(script)
+        }
+        None => None,
+    };
+
+    let main_window = WebViewWindowBuilder::new()
+        .url(url)
+        .initialization_script(KAL_IPC_INIT_SCRIPT)
+        .initialization_script(&format!(
             "(function () {{ window.KAL.config = {}; }})()",
             serialize_to_javascript::Serialized::new(
                 &serde_json::value::to_raw_value(&config).unwrap_or_default(),
                 &serialize_options,
             ),
-        ),
-    ];
-
-    if let Some(file) = &config.appearance.custom_css_file {
-        let contents = std::fs::read_to_string(file)?;
-        initialization_scripts.push(format!(
-            r#"(function () {{
-                  window.addEventListener("DOMContentLoaded", () => {{
-                    const style = document.createElement("style");
-                    style.textContent = {};
-                    const head = document.head ?? document.querySelector('head') ?? document.body;
-                    head.appendChild(style)
-                  }})
-                }})()"#,
-            serialize_to_javascript::Serialized::new(
-                &serde_json::value::to_raw_value(&contents).unwrap_or_default(),
-                &serialize_options,
-            ),
-        ));
-    }
-
-    let main_window = WebviewWindow::new(
-        WindowAttributes {
-            inner_size: Some(
-                LogicalSize::new(
-                    config.appearance.window_width,
-                    config.appearance.input_height,
-                )
-                .into(),
-            ),
-            position: Some(
-                LogicalPosition::new(
-                    m_pos.x + (m_size.width / 2 - config.appearance.window_width / 2),
-                    m_pos.y + (m_size.height / 4),
-                )
-                .into(),
-            ),
-            decorations: false,
-            resizable: false,
-            visible: false,
-            transparent: config.appearance.transparent,
-            ..Default::default()
-        },
-        WebViewAttributes {
-            url: Some(url.parse().unwrap()),
-            transparent: config.appearance.transparent,
-            initialization_scripts,
-            devtools: cfg!(debug_assertions),
-            ..Default::default()
-        },
-        event_loop,
-    )?;
-
-    #[cfg(any(windows, target_os = "linux"))]
-    main_window.window().set_skip_taskbar(true);
+        ))
+        .initialization_script_opt(css_script.as_deref())
+        .inner_size(LogicalSize::new(
+            config.appearance.window_width,
+            config.appearance.input_height,
+        ))
+        .position(LogicalPosition::new(
+            m_pos.x + (m_size.width / 2 - config.appearance.window_width / 2),
+            m_pos.y + (m_size.height / 4),
+        ))
+        .decorations(false)
+        .resizable(false)
+        .visible(false)
+        .transparent(config.appearance.transparent)
+        .skip_taskbar(cfg!(any(windows, target_os = "linux")))
+        .devtools(cfg!(debug_assertions))
+        .build(event_loop)?;
 
     if let Some(vibrancy) = &config.appearance.vibrancy {
         vibrancy.apply(&main_window)?;
@@ -165,7 +145,7 @@ fn hide_main_window(app_state: &AppState<AppEvent>, #[allow(unused)] restore_foc
 
 // Resizes the main window based on the number of current results and user config
 #[tracing::instrument(level = "trace")]
-fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, count: usize) {
+fn resize_main_window_for_results(main_window: &WebViewWindow, config: &Config, count: usize) {
     let count = count as u32;
     let gaps = count.saturating_sub(1);
 
@@ -191,7 +171,7 @@ fn resize_main_window_for_results(main_window: &WebviewWindow, config: &Config, 
 struct AppState<T: 'static> {
     config: Config,
 
-    main_window: WebviewWindow,
+    main_window: WebViewWindow,
     #[cfg(windows)]
     previously_foreground_hwnd: HWND,
 
@@ -224,7 +204,7 @@ impl<T: 'static> std::fmt::Debug for AppState<T> {
 impl<T: 'static> AppState<T> {
     fn new(
         config: Config,
-        main_window: WebviewWindow,
+        main_window: WebViewWindow,
         plugin_store: PluginStore,
         proxy: EventLoopProxy<T>,
         data_dir: PathBuf,

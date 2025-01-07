@@ -2,7 +2,10 @@ use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
 use crate::icon;
 
-use wry::http::{header::CONTENT_TYPE, Request, Response};
+use wry::{
+    http::{header::CONTENT_TYPE, Request, Response},
+    WebViewId,
+};
 
 /// `kal://` protocol
 #[cfg(not(debug_assertions))]
@@ -33,7 +36,7 @@ fn kal_inner<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, a
 /// `kal://` protocol
 #[cfg(not(debug_assertions))]
 #[tracing::instrument]
-pub fn kal<'a>(request: Request<Vec<u8>>) -> Response<Cow<'a, [u8]>> {
+pub fn kal<'a>(_: WebViewId, request: Request<Vec<u8>>) -> Response<Cow<'a, [u8]>> {
     match kal_inner(request) {
         Ok(res) => res,
         Err(e) => Response::builder()
@@ -78,7 +81,7 @@ fn kal_asset_inner<'a>(
 
 /// `kalasset://` protocol
 #[tracing::instrument]
-pub fn kal_asset<'a>(request: Request<Vec<u8>>) -> Response<Cow<'a, [u8]>> {
+pub fn kal_asset<'a>(_: WebViewId, request: Request<Vec<u8>>) -> Response<Cow<'a, [u8]>> {
     match kal_asset_inner(request) {
         Ok(res) => res,
         Err(e) => Response::builder()
