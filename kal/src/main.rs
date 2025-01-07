@@ -24,8 +24,7 @@ use wry::WebViewAttributes;
 
 use crate::{
     config::Config,
-    event::{emit_event, AppEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
-    ipc_event::IPCEvent,
+    event::{emit_event, AppEvent, IPCEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT},
     utils::thread,
     webview_window::WebviewWindow,
 };
@@ -36,7 +35,6 @@ use crate::event::WebviewEvent;
 mod config;
 mod event;
 mod icon;
-mod ipc_event;
 mod plugin;
 mod plugins;
 mod protocol;

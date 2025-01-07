@@ -1,4 +1,5 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use strum::{AsRefStr, EnumString};
 use tao::window::WindowId;
 use wry::WebView;
 
@@ -39,6 +40,19 @@ pub enum AppEvent {
     ThreadEvent(ThreadEvent),
     /// A HotKey event.
     HotKey(global_hotkey::GlobalHotKeyEvent),
+}
+
+#[derive(PartialEq, Eq, Serialize, Deserialize, EnumString, AsRefStr, Clone, Copy)]
+pub enum IPCEvent {
+    Search,
+    Results,
+    Execute,
+    OpenLocation,
+    ClearResults,
+    FocusInput,
+    HideMainWindow,
+    RefreshIndex,
+    RefreshingIndexFinished,
 }
 
 pub const KAL_IPC_INIT_SCRIPT: &str = r#"Object.defineProperty(window, "KAL", {
