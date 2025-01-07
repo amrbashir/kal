@@ -62,7 +62,6 @@ impl IntoSearchResultItem for App {
 pub struct Plugin {
     paths: Vec<String>,
     extensions: Vec<String>,
-
     icons_dir: PathBuf,
     apps: Vec<App>,
 }

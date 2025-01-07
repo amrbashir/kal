@@ -65,7 +65,6 @@ impl IntoSearchResultItem for EverythingEntry {
 #[derive(Debug)]
 pub struct Plugin {
     es: PathBuf,
-
     entries: Vec<EverythingEntry>,
     icons_dir: PathBuf,
 }

@@ -2,7 +2,7 @@ use std::{path::Path, process::Command};
 
 use crate::{
     common::{
-        icon::{Defaults, Icon},
+        icon::{BuiltinIcon, Icon},
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
@@ -63,12 +63,12 @@ impl SystemCommand {
 
     fn icon(&self) -> Icon {
         match self {
-            Self::Shutdown => Defaults::Shutdown.icon(),
-            Self::Restart => Defaults::Restart.icon(),
-            Self::SignOut => Defaults::SignOut.icon(),
-            Self::Lock => Defaults::Lock.icon(),
-            Self::Hibernate => Defaults::Hibernate.icon(),
-            Self::Sleep => Defaults::Sleep.icon(),
+            Self::Shutdown => BuiltinIcon::Shutdown.icon(),
+            Self::Restart => BuiltinIcon::Restart.icon(),
+            Self::SignOut => BuiltinIcon::SignOut.icon(),
+            Self::Lock => BuiltinIcon::Lock.icon(),
+            Self::Hibernate => BuiltinIcon::Hibernate.icon(),
+            Self::Sleep => BuiltinIcon::Sleep.icon(),
         }
     }
 

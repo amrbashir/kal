@@ -1,6 +1,6 @@
 use crate::{
     common::{
-        icon::{Defaults, Icon},
+        icon::{BuiltinIcon, Icon},
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
@@ -56,7 +56,7 @@ impl IntoSearchResultItem for DirEntry {
                 secondary_text: self.path.to_string_lossy(),
                 icon: match &self.icon {
                     Some(path) => Icon::path(path.to_string_lossy()),
-                    None => Defaults::Directory.icon(),
+                    None => BuiltinIcon::Directory.icon(),
                 },
                 needs_confirmation: false,
                 id: self.id.as_str().into(),
@@ -68,7 +68,6 @@ impl IntoSearchResultItem for DirEntry {
 #[derive(Debug)]
 pub struct Plugin {
     paths: Vec<String>,
-
     icons_dir: PathBuf,
     entries: Vec<DirEntry>,
 }

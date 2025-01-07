@@ -10,8 +10,8 @@ mod calculator;
 mod directory_indexer;
 mod everything;
 mod packaged_app_launcher;
-mod shortcuts;
 mod system_commands;
+mod workflows;
 
 pub fn all(config: &Config, data_dir: &Path) -> anyhow::Result<PluginStore> {
     let store = PluginStore::new();
@@ -20,7 +20,7 @@ pub fn all(config: &Config, data_dir: &Path) -> anyhow::Result<PluginStore> {
         inner.add(app_launcher::Plugin::new(config, data_dir)?);
         inner.add(packaged_app_launcher::Plugin::new(config, data_dir)?);
         inner.add(directory_indexer::Plugin::new(config, data_dir)?);
-        inner.add(shortcuts::Plugin::new(config, data_dir)?);
+        inner.add(workflows::Plugin::new(config, data_dir)?);
         inner.add(system_commands::Plugin::new(config, data_dir)?);
         inner.add(calculator::Plugin::new(config, data_dir)?);
         inner.add(everything::Plugin::new(config, data_dir)?);

@@ -1,44 +1,47 @@
 use std::borrow::Cow;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use strum::{EnumString, IntoStaticStr};
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum IconType {
+    Path,
+    Svg,
+    BuiltinIcon,
+    Url,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Icon<'a> {
     pub data: Cow<'a, str>,
-    pub kind: IconKind,
+    pub r#type: IconType,
 }
 
 impl<'a> Icon<'a> {
     pub fn path(data: Cow<'a, str>) -> Self {
         Self {
             data,
-            kind: IconKind::Path,
+            r#type: IconType::Path,
         }
     }
 
-    pub fn default(data: Cow<'a, str>) -> Self {
+    pub fn builtin(data: Cow<'a, str>) -> Self {
         Self {
             data,
-            kind: IconKind::Default,
+            r#type: IconType::BuiltinIcon,
         }
     }
 
     pub fn svg(data: Cow<'a, str>) -> Self {
         Self {
             data,
-            kind: IconKind::Svg,
+            r#type: IconType::Svg,
         }
     }
 }
 
-#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
-pub enum IconKind {
-    Path,
-    Svg,
-    Default,
-}
-
-pub enum Defaults {
+#[derive(EnumString, IntoStaticStr)]
+pub enum BuiltinIcon {
     Directory,
     Url,
     Shell,
@@ -49,38 +52,30 @@ pub enum Defaults {
     Sleep,
     Lock,
     Calculator,
+    Workflow,
 }
 
-impl Defaults {
-    pub fn path(&self) -> &str {
-        match self {
-            Defaults::Url => "icons/defaults/url",
-            Defaults::Shell => "icons/defaults/shell",
-            _ => unreachable!(),
-        }
-    }
-
+impl BuiltinIcon {
     pub fn icon(&self) -> Icon<'_> {
         match self {
-            Defaults::Shutdown => Icon::svg(include_str!("./icons/shutdown.svg").into()),
-            Defaults::Restart => Icon::svg(include_str!("./icons/restart.svg").into()),
-            Defaults::SignOut => Icon::svg(include_str!("./icons/signout.svg").into()),
-            Defaults::Hibernate => Icon::svg(include_str!("./icons/hibernate.svg").into()),
-            Defaults::Sleep => Icon::svg(include_str!("./icons/sleep.svg").into()),
-            Defaults::Directory => Icon::svg(include_str!("./icons/folder.svg").into()),
-            Defaults::Lock => Icon::svg(include_str!("./icons/lock.svg").into()),
-            Defaults::Calculator => Icon::svg(include_str!("./icons/calculator.svg").into()),
-            _ => Icon::default(self.path().into()),
+            Self::Shutdown => Icon::svg(include_str!("./icons/Shutdown.svg").into()),
+            Self::Restart => Icon::svg(include_str!("./icons/Restart.svg").into()),
+            Self::SignOut => Icon::svg(include_str!("./icons/Signout.svg").into()),
+            Self::Hibernate => Icon::svg(include_str!("./icons/Hibernate.svg").into()),
+            Self::Sleep => Icon::svg(include_str!("./icons/Sleep.svg").into()),
+            Self::Directory => Icon::svg(include_str!("./icons/Folder.svg").into()),
+            Self::Lock => Icon::svg(include_str!("./icons/Lock.svg").into()),
+            Self::Calculator => Icon::svg(include_str!("./icons/Calculator.svg").into()),
+            Self::Workflow => Icon::svg(include_str!("./icons/Workflow.svg").into()),
+            _ => Icon::builtin(Cow::Borrowed(self.into())),
         }
     }
 
-    pub fn bytes(path: &str) -> &'static [u8] {
-        let icon = path.split('/').next_back().unwrap();
-        match icon {
-            // TODO: replace with svgs
-            "url" => include_bytes!("./icons/url.png"),
-            "shell" => include_bytes!("./icons/shell.png"),
-            _ => &[],
+    pub fn bytes(&self) -> &'static [u8] {
+        match self {
+            Self::Url => include_bytes!("./icons/url.png"),
+            Self::Shell => include_bytes!("./icons/shell.png"),
+            _ => unreachable!(),
         }
     }
 }

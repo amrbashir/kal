@@ -1,4 +1,4 @@
-import { Icon, IconKind } from "../common";
+import { Icon, IconType } from "../common";
 
 export function convertFileSrc(protocol: string, filePath: string): string {
   const path = encodeURIComponent(filePath);
@@ -8,17 +8,19 @@ export function convertFileSrc(protocol: string, filePath: string): string {
 }
 
 export function getIconHtml(icon: Icon): string {
-  switch (icon.kind) {
-    case IconKind.Svg:
+  switch (icon.type) {
+    case IconType.Svg:
       return icon.data;
-    case IconKind.Default:
-    case IconKind.Path:
+    case IconType.Url:
+      return `<img src="${icon.data}" />`;
+    case IconType.BuiltinIcon:
+      return `<img src="${convertFileSrc("kalasset", icon.data)}?type=builtin" />`;
+    case IconType.Path:
     default:
-      return `<img src="${convertFileSrc("kalasset", icon.data)}" />`;
+      return `<img src="${convertFileSrc("kalasset", icon.data)}?type=path" />`;
   }
 }
 
 export function isVScrollable<T extends Element>(el: T | null): boolean {
-  console.log(el?.scrollHeight, el?.clientHeight);
   return el ? el.scrollHeight > el.clientHeight : false;
 }

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { watch, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import { SearchResultItem, IPCEvent } from "../../common";
 import { getIconHtml, isVScrollable } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";

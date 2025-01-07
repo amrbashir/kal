@@ -3,7 +3,7 @@ use std::path::Path;
 use calculator_rs::Calculate;
 
 use crate::{
-    common::{icon::Defaults, SearchResultItem},
+    common::{icon::BuiltinIcon, SearchResultItem},
     config::Config,
 };
 
@@ -32,7 +32,7 @@ impl Plugin {
             secondary_text: "Press Enter to copy to clipboard".into(),
             needs_confirmation: false,
             id: Self::ID.into(),
-            icon: Defaults::Calculator.icon(),
+            icon: BuiltinIcon::Calculator.icon(),
             score: 99999, // should always be the first one
         }
     }

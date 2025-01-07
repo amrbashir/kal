@@ -11,7 +11,7 @@ use tao::{
     event_loop::EventLoop,
     window::{Window, WindowAttributes, WindowId},
 };
-use wry::{http::Response, WebView, WebViewAttributes, WebViewBuilder};
+use wry::{WebView, WebViewAttributes, WebViewBuilder};
 
 #[cfg(windows)]
 struct SoftBufferContext {
@@ -98,14 +98,10 @@ impl WebviewWindow {
     fn attach_protocols(mut builder: WebViewBuilder) -> WebViewBuilder {
         #[cfg(not(debug_assertions))]
         {
-            builder = builder.with_custom_protocol("kal".into(), move |request| {
-                protocol::bail500!(protocol::kal(request))
-            });
+            builder = builder.with_custom_protocol("kal".into(), protocol::kal);
         }
 
-        builder = builder.with_custom_protocol("kalasset".into(), move |request| {
-            protocol::bail500!(protocol::kal_asset(request))
-        });
+        builder = builder.with_custom_protocol("kalasset".into(), protocol::kal_asset);
 
         builder
     }

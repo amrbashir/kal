@@ -17,7 +17,7 @@ use windows::{
 
 use crate::{
     common::{
-        icon::{Defaults, Icon},
+        icon::{BuiltinIcon, Icon},
         IntoSearchResultItem, SearchResultItem,
     },
     config::Config,
@@ -62,7 +62,7 @@ impl IntoSearchResultItem for PackagedApp {
                     .icon
                     .as_ref()
                     .map(|i| Icon::path(i.to_string_lossy()))
-                    .unwrap_or_else(|| Defaults::Directory.icon()),
+                    .unwrap_or_else(|| BuiltinIcon::Directory.icon()),
                 needs_confirmation: false,
                 id: self.id.as_str().into(),
                 score,

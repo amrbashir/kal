@@ -1,14 +1,12 @@
-use std::{borrow::Cow, path::PathBuf};
+use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
 use crate::common::icon;
 
 use wry::http::{header::CONTENT_TYPE, Request, Response};
 
-#[inline]
-#[cfg(not(debug_assertions))]
 /// `kal://` protocol
-#[tracing::instrument]
-pub fn kal<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
+#[cfg(not(debug_assertions))]
+fn kal_inner<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, anyhow::Error> {
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 
@@ -32,17 +30,34 @@ pub fn kal<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, wry
         .map_err(Into::into)
 }
 
-#[inline]
-/// `kalasset://` protocol
+/// `kal://` protocol
+#[cfg(not(debug_assertions))]
 #[tracing::instrument]
-pub fn kal_asset<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>>, wry::Error> {
+pub fn kal<'a>(request: Request<Vec<u8>>) -> Response<Cow<'a, [u8]>> {
+    match kal_inner(request) {
+        Ok(res) => res,
+        Err(e) => Response::builder()
+            .status(500)
+            .body(e.to_string().as_bytes().to_vec())
+            .unwrap()
+            .map(Into::into),
+    }
+}
+
+/// `kalasset://` protocol
+fn kal_asset_inner<'a>(
+    request: Request<Vec<u8>>,
+) -> Result<Response<Cow<'a, [u8]>>, anyhow::Error> {
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 
-    if path.starts_with("icons/defaults") {
+    let query = request.uri().query();
+    if query.map(|q| q.contains("type=builtin")).unwrap_or(false) {
         return Response::builder()
             .header(CONTENT_TYPE, "image/png")
-            .body(Cow::from(icon::Defaults::bytes(&path)))
+            .body(Cow::Borrowed(
+                icon::BuiltinIcon::from_str(path.as_ref())?.bytes(),
+            ))
             .map_err(Into::into);
     }
 
@@ -61,17 +76,15 @@ pub fn kal_asset<'a>(request: Request<Vec<u8>>) -> Result<Response<Cow<'a, [u8]>
         .map_err(Into::into)
 }
 
-macro_rules! bail500 {
-    ($res:expr) => {
-        match $res {
-            Ok(r) => r,
-            Err(e) => Response::builder()
-                .status(500)
-                .body(e.to_string().as_bytes().to_vec())
-                .unwrap()
-                .map(Into::into),
-        }
-    };
+/// `kalasset://` protocol
+#[tracing::instrument]
+pub fn kal_asset<'a>(request: Request<Vec<u8>>) -> Response<Cow<'a, [u8]>> {
+    match kal_asset_inner(request) {
+        Ok(res) => res,
+        Err(e) => Response::builder()
+            .status(500)
+            .body(e.to_string().as_bytes().to_vec())
+            .unwrap()
+            .map(Into::into),
+    }
 }
-
-pub(crate) use bail500;
