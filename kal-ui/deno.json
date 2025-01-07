@@ -1,9 +1,9 @@
 {
   "license": "MIT",
   "tasks": {
-    "dev": "deno run -A --node-modules-dir npm:vite",
-    "build": "deno run -A --node-modules-dir npm:vite build",
-    "ts:check": "deno run -A --node-modules-dir npm:vue-tsc --noEmit"
+    "dev": "deno run -A npm:vite",
+    "build": "deno run -A npm:vite build",
+    "ts:check": "deno run -A npm:vue-tsc --noEmit"
   },
   "imports": {
     "vue": "npm:vue@^3.4",

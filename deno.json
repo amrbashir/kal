@@ -3,6 +3,7 @@
   "workspace": {
     "members": ["kal-ui"]
   },
+  "nodeModulesDir": "auto",
   "compilerOptions": {
     "lib": ["dom", "deno.ns"],
     "verbatimModuleSyntax": true

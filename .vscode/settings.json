@@ -1,4 +1,5 @@
 {
+  "deno.enable": true,
   "deno.disablePaths": [
     "./kal-ui/src"
   ],
