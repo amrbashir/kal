@@ -6,12 +6,12 @@ use serde::Serialize;
 
 #[derive(Serialize, Debug, Clone)]
 pub struct SearchResultItem<'a> {
+    pub id: Cow<'a, str>,
+    pub score: i64,
     pub primary_text: Cow<'a, str>,
     pub secondary_text: Cow<'a, str>,
     pub icon: Icon<'a>,
     pub needs_confirmation: bool,
-    pub id: Cow<'a, str>,
-    pub score: i64,
 }
 
 pub trait IntoSearchResultItem {
