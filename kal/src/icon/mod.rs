@@ -1,9 +1,9 @@
 use std::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, IntoStaticStr};
+use strum::{AsRefStr, EnumString};
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconType {
     Path,
     Svg,
@@ -40,7 +40,7 @@ impl<'a> Icon<'a> {
     }
 }
 
-#[derive(EnumString, IntoStaticStr)]
+#[derive(EnumString, AsRefStr, Clone, Copy)]
 pub enum BuiltinIcon {
     Directory,
     Url,
@@ -67,7 +67,7 @@ impl BuiltinIcon {
             Self::Lock => Icon::svg(include_str!("./Lock.svg").into()),
             Self::Calculator => Icon::svg(include_str!("./Calculator.svg").into()),
             Self::Workflow => Icon::svg(include_str!("./Workflow.svg").into()),
-            _ => Icon::builtin(Cow::Borrowed(self.into())),
+            _ => Icon::builtin(Cow::Borrowed(self.as_ref())),
         }
     }
 

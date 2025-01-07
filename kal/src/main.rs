@@ -1,4 +1,4 @@
-use std::{cell::RefCell, path::PathBuf};
+use std::{cell::RefCell, path::PathBuf, str::FromStr};
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -47,7 +47,7 @@ mod webview_window;
 
 #[cfg(not(debug_assertions))]
 #[derive(rust_embed::RustEmbed)]
-#[folder = "../dist"]
+#[folder = "../kal-ui/dist"]
 pub(crate) struct EmbededAssets;
 
 #[tracing::instrument(level = "trace")]
@@ -264,7 +264,7 @@ fn process_ipc_events(
     let (event, payload) = request
         .split_once("::")
         .with_context(|| "Invalid IPC call syntax")?;
-    let event: IPCEvent = event.into();
+    let event = IPCEvent::from_str(event)?;
 
     match event {
         IPCEvent::Search => {
