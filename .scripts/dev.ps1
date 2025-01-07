@@ -1,9 +1,9 @@
-# "pnpm dev" (vite dev server) process info
-$pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
-$pnpmDevInfo.Arguments = "-Command pnpm dev"
-$pnpmDevInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
-$pnpmDev = New-Object System.Diagnostics.Process
-$pnpmDev.StartInfo = $pnpmDevInfo
+# "deno task dev" (vite dev server) process info
+$devTaskInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
+$devTaskInfo.Arguments = "-Command deno task --recursive dev"
+$devTaskInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
+$denoTask = New-Object System.Diagnostics.Process
+$denoTask.StartInfo = $devTaskInfo
 
 # "cargo run" process info
 $cargoRunInfo = New-Object System.Diagnostics.ProcessStartInfo "cargo"
@@ -13,7 +13,7 @@ $cargoRun = New-Object System.Diagnostics.Process
 $cargoRun.StartInfo = $cargoRunInfo
 
 # Start
-[void]$pnpmDev.start()
+[void]$denoTask.start()
 [void]$cargoRun.start()
 
 # Setup file watcher for the rust code
@@ -39,5 +39,5 @@ try {
 } finally {
   $fileWatcher.Dispose();
   $cargoRun.kill();
-  $pnpmDev.kill();
+  $denoTask.kill();
 }

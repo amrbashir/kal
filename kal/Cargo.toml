@@ -1,0 +1,60 @@
+[package]
+name = "kal"
+version = "0.0.0"
+description = "Keyboard-driven app launcher and productivity tool."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[build-dependencies]
+embed-manifest = "1.4"
+
+[dependencies]
+wry = "0.42"
+tao = "0.29"
+serde = "1"
+serde_json = "1"
+toml = "0.8"
+rust-embed = "8.1"
+serialize-to-javascript = "0.1"
+fuzzy-matcher = "0.3"
+dirs = "5.0"
+percent-encoding = "2.3"
+dunce = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tracing-appender = "0.2"
+url = { version = "2.5", features = ["serde"] }
+window-vibrancy = "0.5"
+global-hotkey = "0.4"
+calculator-rs = "0.1"
+arboard = "3.4"
+png = "0.17"
+strum = { version = "0.26", features = ["derive"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+softbuffer = "0.4"
+webview2-com = "0.33"
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+version = "0.58"
+features = [
+  "Win32_Foundation",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Storage_FileSystem",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_Graphics_Dwm",
+  "Win32_System_Shutdown",
+  "Win32_System_Power",
+  "Win32_Storage_Packaging_Appx",
+  "Win32_System_Registry",
+  "Win32_Security",
+  "Win32_System_IO",
+  "Win32_Graphics_Gdi",
+  "Management_Deployment",
+  "ApplicationModel",
+  "Foundation_Collections",
+]

@@ -1,0 +1,11 @@
+{
+  "license": "MIT",
+  "workspace": {
+    "members": ["kal-ui"]
+  },
+  "compilerOptions": {
+    "lib": ["dom", "deno.ns"],
+    "verbatimModuleSyntax": true
+  },
+  "unstable": ["fmt-component"]
+}

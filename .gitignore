@@ -1,9 +1,7 @@
 target/
 node_modules/
 dist/
-
-rls/
-.vscode/
+.vite/
 
 logs
 *.log
