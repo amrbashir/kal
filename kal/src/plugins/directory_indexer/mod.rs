@@ -7,7 +7,7 @@ use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::icon::{BuiltinIcon, Icon};
+use crate::icon::{self, BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
 use crate::utils::{self, thread, IteratorExt, PathExt, ResolveEnvVars};
 
@@ -53,7 +53,7 @@ impl IntoSearchResultItem for DirEntry {
                 secondary_text: self.path.to_string_lossy(),
                 icon: match &self.icon {
                     Some(path) => Icon::path(path.to_string_lossy()),
-                    None => BuiltinIcon::Directory.icon(),
+                    None => BuiltInIcon::Directory.icon(),
                 },
                 needs_confirmation: false,
                 id: self.id.as_str().into(),
@@ -123,7 +123,7 @@ impl crate::plugin::Plugin for Plugin {
 
         thread::spawn(move || {
             std::fs::create_dir_all(icons_dir)?;
-            utils::extract_icons(paths)
+            icon::extract_multiple(paths)
         });
 
         Ok(())

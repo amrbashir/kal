@@ -9,22 +9,24 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+use crate::utils;
+
 /// Extract icons as png from paths.
-pub fn extract_icons<I, P, P2>(files: I) -> anyhow::Result<()>
+pub fn extract_multiple<I, P, P2>(files: I) -> anyhow::Result<()>
 where
     I: IntoIterator<Item = (P, P2)>,
     P: AsRef<Path>,
     P2: AsRef<Path>,
 {
     for (src, out) in files {
-        extract_icon(src, out)?;
+        extract(src, out)?;
     }
 
     Ok(())
 }
 
 /// Extract icon as png from path and cache it.
-pub fn extract_icon_cached<P, P2>(file: P, out: P2) -> anyhow::Result<()>
+pub fn extract_cached<P, P2>(file: P, out: P2) -> anyhow::Result<()>
 where
     P: AsRef<Path>,
     P2: AsRef<Path>,
@@ -41,13 +43,13 @@ where
 
     let file = file.as_ref().to_path_buf();
 
-    super::thread::spawn(move || extract_icon(file, out)); // TODO: use async
+    utils::thread::spawn(move || extract(file, out)); // TODO: use async
 
     Ok(())
 }
 
 /// Extract icon as png from path.
-pub fn extract_icon<P, P2>(file: P, out: P2) -> anyhow::Result<()>
+pub fn extract<P, P2>(file: P, out: P2) -> anyhow::Result<()>
 where
     P: AsRef<Path>,
     P2: AsRef<Path>,

@@ -2,9 +2,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use crate::windowing::vibrancy::Vibrancy;
+use crate::webview_window::Vibrancy;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppearanceConfig {
@@ -175,12 +176,28 @@ impl Config {
                 Self::from_toml(&toml)
             }
             false => {
-                tracing::error!("Config file wasn't found, falling back to default");
+                tracing::warn!("Config file wasn't found, falling back to default");
                 Config::default()
             }
         };
         tracing::info!("Config loaded: {config:?}");
         Ok(config)
+    }
+
+    /// Loads config from a canonical path
+    pub fn load() -> anyhow::Result<Self> {
+        #[cfg(debug_assertions)]
+        let path = std::env::current_dir()
+            .context("Failed to get current directory path")?
+            .join("kal.toml");
+
+        #[cfg(not(debug_assertions))]
+        let path = dirs::home_dir()
+            .context("Failed to get $HOME dir path")?
+            .join(".config")
+            .join("kal.toml");
+
+        Self::load_from_path(path)
     }
 
     /// Gets the specified plugin config
@@ -195,9 +212,7 @@ impl Config {
                 c.inner.clone().and_then(|c| {
                     toml::Table::try_into(c)
                         .inspect_err(|e| {
-                            tracing::error!(
-                        "Failed to deserialize {name} config, failling back to default: {e}"
-                    );
+                            tracing::error!("Failed to deserialize {name} config, failling back to default: {e}");
                         })
                         .ok()
                 })

@@ -2,7 +2,7 @@ import { Icon, IconType } from "./search_result_item";
 
 export function makeIconHTML(icon: Icon): string {
   switch (icon.type) {
-    case IconType.BuiltinIcon:
+    case IconType.BuiltIn:
       return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}?type=builtin" />`;
     case IconType.Svg:
       return icon.data;

@@ -8,13 +8,17 @@ use wry::http::header::CONTENT_TYPE;
 use wry::http::{Request, Response};
 use wry::WebViewId;
 
-use crate::windowing::ipc;
+use crate::ipc;
+
+mod extract;
+
+pub use self::extract::*;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconType {
     Path,
     Svg,
-    BuiltinIcon,
+    BuiltIn,
     Url,
 }
 
@@ -25,30 +29,29 @@ pub struct Icon<'a> {
 }
 
 impl<'a> Icon<'a> {
+    #[inline]
+    pub fn new(data: Cow<'a, str>, r#type: IconType) -> Self {
+        Self { data, r#type }
+    }
+
+    #[inline]
     pub fn path(data: Cow<'a, str>) -> Self {
-        Self {
-            data,
-            r#type: IconType::Path,
-        }
+        Self::new(data, IconType::Path)
     }
 
-    pub fn builtin(data: Cow<'a, str>) -> Self {
-        Self {
-            data,
-            r#type: IconType::BuiltinIcon,
-        }
-    }
-
+    #[inline]
     pub fn svg(data: Cow<'a, str>) -> Self {
-        Self {
-            data,
-            r#type: IconType::Svg,
-        }
+        Self::new(data, IconType::Svg)
+    }
+
+    #[inline]
+    pub fn builtin(data: Cow<'a, str>) -> Self {
+        Self::new(data, IconType::BuiltIn)
     }
 }
 
 #[derive(EnumString, AsRefStr, Clone, Copy)]
-pub enum BuiltinIcon {
+pub enum BuiltInIcon {
     Directory,
     Url,
     Shell,
@@ -62,26 +65,26 @@ pub enum BuiltinIcon {
     Workflow,
 }
 
-impl BuiltinIcon {
+impl BuiltInIcon {
     pub fn icon(&self) -> Icon<'_> {
         match self {
-            Self::Shutdown => Icon::svg(include_str!("./Shutdown.svg").into()),
-            Self::Restart => Icon::svg(include_str!("./Restart.svg").into()),
-            Self::SignOut => Icon::svg(include_str!("./Signout.svg").into()),
-            Self::Hibernate => Icon::svg(include_str!("./Hibernate.svg").into()),
-            Self::Sleep => Icon::svg(include_str!("./Sleep.svg").into()),
-            Self::Directory => Icon::svg(include_str!("./Folder.svg").into()),
-            Self::Lock => Icon::svg(include_str!("./Lock.svg").into()),
-            Self::Calculator => Icon::svg(include_str!("./Calculator.svg").into()),
-            Self::Workflow => Icon::svg(include_str!("./Workflow.svg").into()),
+            Self::Shutdown => Icon::svg(include_str!("./built-in-icons/Shutdown.svg").into()),
+            Self::Restart => Icon::svg(include_str!("./built-in-icons/Restart.svg").into()),
+            Self::SignOut => Icon::svg(include_str!("./built-in-icons/Signout.svg").into()),
+            Self::Hibernate => Icon::svg(include_str!("./built-in-icons/Hibernate.svg").into()),
+            Self::Sleep => Icon::svg(include_str!("./built-in-icons/Sleep.svg").into()),
+            Self::Directory => Icon::svg(include_str!("./built-in-icons/Folder.svg").into()),
+            Self::Lock => Icon::svg(include_str!("./built-in-icons/Lock.svg").into()),
+            Self::Calculator => Icon::svg(include_str!("./built-in-icons/Calculator.svg").into()),
+            Self::Workflow => Icon::svg(include_str!("./built-in-icons/Workflow.svg").into()),
             _ => Icon::builtin(Cow::Borrowed(self.as_ref())),
         }
     }
 
     pub fn bytes(&self) -> &'static [u8] {
         match self {
-            Self::Url => include_bytes!("./url.png"),
-            Self::Shell => include_bytes!("./shell.png"),
+            Self::Url => include_bytes!("./built-in-icons/Url.png"),
+            Self::Shell => include_bytes!("./built-in-icons/Shell.png"),
             _ => unreachable!(),
         }
     }
@@ -89,10 +92,10 @@ impl BuiltinIcon {
 
 /// `kalicon://` protocol
 #[tracing::instrument]
-pub fn kalicon_protocol<'a>(
+pub fn protocol<'a>(
     _webview_id: WebViewId,
     request: Request<Vec<u8>>,
-) -> Result<Response<Cow<'a, [u8]>>, anyhow::Error> {
+) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 
@@ -100,7 +103,7 @@ pub fn kalicon_protocol<'a>(
     if query.map(|q| q.contains("type=builtin")).unwrap_or(false) {
         return Response::builder()
             .header(CONTENT_TYPE, "image/png")
-            .body(Cow::Borrowed(BuiltinIcon::from_str(path.as_ref())?.bytes()))
+            .body(Cow::Borrowed(BuiltInIcon::from_str(path.as_ref())?.bytes()))
             .map_err(Into::into);
     }
 
@@ -110,10 +113,10 @@ pub fn kalicon_protocol<'a>(
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") => "image/jpeg",
         Some("svg") => "image/svg+xml",
-        _ => return ipc::error_response("Only png,jpg and svg icons are supported"),
+        _ => return ipc::response::error("Only png,jpg and svg icons are supported"),
     };
 
-    ipc::base_response()
+    ipc::response::base()
         .header(CONTENT_TYPE, mimetype)
         .body(std::fs::read(path)?.into())
         .map_err(Into::into)

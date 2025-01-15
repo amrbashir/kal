@@ -14,7 +14,7 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
 use crate::config::Config;
-use crate::icon::{BuiltinIcon, Icon};
+use crate::icon::{BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
 use crate::utils::{self, IteratorExt};
 
@@ -56,7 +56,7 @@ impl IntoSearchResultItem for PackagedApp {
                     .icon
                     .as_ref()
                     .map(|i| Icon::path(i.to_string_lossy()))
-                    .unwrap_or_else(|| BuiltinIcon::Directory.icon()),
+                    .unwrap_or_else(|| BuiltInIcon::Directory.icon()),
                 needs_confirmation: false,
                 id: self.id.as_str().into(),
                 score,

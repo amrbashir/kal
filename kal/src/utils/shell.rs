@@ -150,7 +150,7 @@ where
 mod ffi {
     use super::*;
 
-    #[inline]
+
     pub unsafe fn ShellExecuteW<P1, P2, P3, P4>(
         hwnd: Option<HWND>,
         lpoperation: P1,

@@ -5,7 +5,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::Icon;
+use crate::icon::{self, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
 use crate::utils::{self, PathExt};
 
@@ -25,7 +25,7 @@ impl EverythingEntry {
         let is_dir = path.metadata().map(|m| m.is_dir()).unwrap_or_default();
         let id = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         let icon = icons_dir.join(&name).with_extra_extension("png");
-        let _ = utils::extract_icon_cached(&path, &icon);
+        let _ = icon::extract_cached(&path, &icon);
         Self {
             name,
             path,

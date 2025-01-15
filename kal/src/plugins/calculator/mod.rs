@@ -3,7 +3,7 @@ use std::path::Path;
 use calculator_rs::Calculate;
 
 use crate::config::Config;
-use crate::icon::BuiltinIcon;
+use crate::icon::BuiltInIcon;
 use crate::search_result_item::SearchResultItem;
 
 pub struct Plugin {
@@ -24,14 +24,13 @@ impl Plugin {
     const NAME: &'static str = "Calculator";
     const ID: &'static str = "Calculator-99999-item";
 
-    #[inline]
     fn item(&self) -> SearchResultItem<'_> {
         SearchResultItem {
             primary_text: self.last_calculation.as_str().into(),
             secondary_text: "Press Enter to copy to clipboard".into(),
             needs_confirmation: false,
             id: Self::ID.into(),
-            icon: BuiltinIcon::Calculator.icon(),
+            icon: BuiltInIcon::Calculator.icon(),
             score: 99999, // should always be the first one
         }
     }

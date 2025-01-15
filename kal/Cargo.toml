@@ -12,7 +12,7 @@ embed-manifest = "1.4"
 
 [dependencies]
 wry = { git = "https://github.com/tauri-apps/wry", rev = "95a9319f24cb62add69d468ec0f60530b608fe6b" }
-tao = { git = "https://github.com/tauri-apps/tao", rev = "543e1177ee0cba01af0109806e8e7468497ab913" }
+winit = { git = "https://github.com/rust-windowing/winit", rev = "69382fda9aaa09ce674637afd31ad7da0f9d87e8" }
 serde = "1"
 serde_json = "1"
 toml = "0.8"
@@ -27,7 +27,6 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-appender = "0.2"
 url = { version = "2.5", features = ["serde"] }
-window-vibrancy = "0.5"
 global-hotkey = "0.6"
 calculator-rs = "0.1"
 arboard = "3.4"

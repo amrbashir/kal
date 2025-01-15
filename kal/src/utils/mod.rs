@@ -1,11 +1,9 @@
-pub mod icon;
 pub mod path;
 pub mod shell;
 pub mod thread;
 
-pub use icon::*;
-pub use path::*;
-pub use shell::*;
+pub use self::path::*;
+pub use self::shell::*;
 
 pub trait IteratorExt: Iterator {
     fn collect_non_empty<B: FromIterator<Self::Item>>(self) -> Option<B>;

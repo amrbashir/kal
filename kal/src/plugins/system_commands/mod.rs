@@ -7,7 +7,7 @@ use windows::Win32::System::Power::SetSuspendState;
 use windows::Win32::System::Shutdown::LockWorkStation;
 
 use crate::config::Config;
-use crate::icon::{BuiltinIcon, Icon};
+use crate::icon::{BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
 use crate::utils::IteratorExt;
 
@@ -63,12 +63,12 @@ impl SystemCommand {
 
     fn icon(&self) -> Icon {
         match self {
-            Self::Shutdown => BuiltinIcon::Shutdown.icon(),
-            Self::Restart => BuiltinIcon::Restart.icon(),
-            Self::SignOut => BuiltinIcon::SignOut.icon(),
-            Self::Lock => BuiltinIcon::Lock.icon(),
-            Self::Hibernate => BuiltinIcon::Hibernate.icon(),
-            Self::Sleep => BuiltinIcon::Sleep.icon(),
+            Self::Shutdown => BuiltInIcon::Shutdown.icon(),
+            Self::Restart => BuiltInIcon::Restart.icon(),
+            Self::SignOut => BuiltInIcon::SignOut.icon(),
+            Self::Lock => BuiltInIcon::Lock.icon(),
+            Self::Hibernate => BuiltInIcon::Hibernate.icon(),
+            Self::Sleep => BuiltInIcon::Sleep.icon(),
         }
     }
 

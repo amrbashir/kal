@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::config::Config;
-use crate::icon::{BuiltinIcon, Icon};
+use crate::icon::{BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
-use crate::utils::{self, IteratorExt};
+use crate::utils::{self, IteratorExt, ResolveEnvVars};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", untagged)]
@@ -41,13 +41,16 @@ struct Workflow<'a> {
 
 impl<'a> Workflow<'a> {
     fn icon(&self) -> Icon<'a> {
-        self.icon.clone().unwrap_or(BuiltinIcon::Workflow.icon())
+        self.icon.clone().unwrap_or(BuiltInIcon::Workflow.icon())
     }
 
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         for step in &self.steps {
             match &step {
-                WorkflowStep::Path { path, .. } => utils::execute(path, elevated)?,
+                WorkflowStep::Path { path, .. } => {
+                    let path = path.resolve_vars();
+                    utils::execute(path, elevated)?
+                }
                 WorkflowStep::Url { url } => utils::open_url(url)?,
                 WorkflowStep::Shell {
                     shell,
@@ -74,7 +77,7 @@ impl IntoSearchResultItem for Workflow<'_> {
             .map(|score| SearchResultItem {
                 primary_text: self.name.as_str().into(),
                 id: self.id.as_str().into(),
-                secondary_text: self.description.as_deref().unwrap_or_default().into(),
+                secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
                 icon: self.icon(),
                 needs_confirmation: self.needs_confirmation,
                 score,
