@@ -1,15 +1,26 @@
 use std::sync::mpsc;
 
-use serialize_to_javascript::{
-    default_template as default_js_template, DefaultTemplate, Options as JsSerializeOptions,
-    Template as JsTemplate,
-};
+use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use winit::dpi::LogicalSize;
 use winit::event_loop::ActiveEventLoop;
 
 use crate::app::{App, AppEvent};
 use crate::ipc::IpcEvent;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
+
+const INIT_TEMPLATE: &str = r#"(function () {
+  window.KAL.config = __RAW_config__;
+
+  let custom_css = __TEMPLATE_custom_css__;
+  if (custom_css) {
+    window.addEventListener("DOMContentLoaded", () => {
+      const style = document.createElement("style");
+      style.textContent = custom_css;
+      const head = document.head ?? document.querySelector("head") ?? document.body;
+      head.appendChild(style);
+    });
+  }
+})();"#;
 
 impl App {
     const MAIN_WINDOW_KEY: &str = "main";
@@ -21,7 +32,6 @@ impl App {
         let url = "kal://localhost";
 
         #[derive(JsTemplate)]
-        #[default_js_template("./init.js")]
         struct InitScript {
             #[raw]
             config: String,
@@ -38,7 +48,7 @@ impl App {
             .transpose()?;
 
         let js_ser_opts = JsSerializeOptions::default();
-        let init_script = InitScript { config, custom_css }.render_default(&js_ser_opts)?;
+        let init_script = InitScript { config, custom_css }.render(INIT_TEMPLATE, &js_ser_opts)?;
 
         let sender = self.sender.clone();
         let proxy = self.event_loop_proxy.clone();
