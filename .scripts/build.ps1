@@ -1,2 +1,2 @@
-pnpm build
+pnpm -r build
 cargo build --release

@@ -1,0 +1,18 @@
+{
+  "name": "kal",
+  "version": "0.0.0",
+  "description": "Keyboard-driven app launcher and productivity tool.",
+  "author": "Amr Bashir <contact@amrbashir.me>",
+  "repository": "https://github.com/amrbashir/kal",
+  "license": "MIT",
+  "private": "true",
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3"
+  },
+  "packageManager": "pnpm@9.15.3"
+}

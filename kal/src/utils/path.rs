@@ -55,7 +55,7 @@ impl<T: AsRef<Path>> ResolveEnvVars for T {
                         // $Env:LOCALAPPDATA
                         let prefix = &bytes[..5.min(bytes.len())];
                         let prefix = unsafe { OsStr::from_encoded_bytes_unchecked(prefix) };
-                        if prefix.to_ascii_lowercase() == "$env:" {
+                        if prefix.eq_ignore_ascii_case("$env:") {
                             let var = &bytes[5..];
                             let var = unsafe { OsStr::from_encoded_bytes_unchecked(var) };
                             if let Ok(value) = std::env::var(var) {

@@ -1,5 +1,5 @@
 import { createApp } from "vue";
-import { router } from "./router.ts";
+import { router } from "./router";
 import {
   allComponents,
   baseLayerLuminance,

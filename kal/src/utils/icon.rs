@@ -1,12 +1,11 @@
 use std::fs::File;
 use std::io::BufWriter;
+use std::ops::Deref;
 use std::path::Path;
 
 use anyhow::Context;
 use windows::core::*;
-use windows::Win32::Foundation::*;
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::System::LibraryLoader::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -56,7 +55,7 @@ where
     let file = file.as_ref();
 
     let file = HSTRING::from(file);
-    let file = file.as_wide();
+    let file = file.deref();
 
     let len = file.len().min(128);
     let mut path = [0_u16; 128];
@@ -65,7 +64,7 @@ where
     let mut index = 0;
 
     // TODO: fix icons failing to be extracted
-    let hicon = unsafe { ExtractAssociatedIconW(GetModuleHandleW(None)?, &mut path, &mut index) };
+    let hicon = unsafe { ExtractAssociatedIconW(None, &mut path, &mut index) };
     let hicon = unsafe { Owned::new(hicon) };
 
     let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
@@ -91,13 +90,13 @@ unsafe fn hicon_to_rgba8(hicon: HICON) -> anyhow::Result<(Vec<u8>, u32, u32)> {
 
     let mut info = ICONINFO::default();
     GetIconInfo(hicon, &mut info)?;
-    if !DeleteObject(info.hbmMask).as_bool() {
+    if !DeleteObject(info.hbmMask.into()).as_bool() {
         return Err(windows::core::Error::from_win32().into());
     }
 
     let mut bitmap = BITMAP::default();
     let result = GetObjectW(
-        info.hbmColor,
+        info.hbmColor.into(),
         bitmap_size_i32,
         Some(&mut bitmap as *mut _ as *mut _),
     );
@@ -113,7 +112,7 @@ unsafe fn hicon_to_rgba8(hicon: HICON) -> anyhow::Result<(Vec<u8>, u32, u32)> {
         .context("failed to get buf_size")?;
     let mut buf: Vec<u8> = Vec::with_capacity(buf_size);
 
-    let dc = GetDC(HWND::default());
+    let dc = GetDC(None);
     assert!(!dc.is_invalid());
 
     let mut bitmap_info = BITMAPINFOHEADER {
@@ -141,9 +140,9 @@ unsafe fn hicon_to_rgba8(hicon: HICON) -> anyhow::Result<(Vec<u8>, u32, u32)> {
     assert!(result == bitmap.bmHeight);
     buf.set_len(buf.capacity());
 
-    let result = ReleaseDC(HWND::default(), dc);
+    let result = ReleaseDC(None, dc);
     assert!(result == 1);
-    DeleteObject(info.hbmColor).unwrap();
+    DeleteObject(info.hbmColor.into()).unwrap();
 
     for chunk in buf.chunks_exact_mut(4) {
         let [b, _, r, _] = chunk else { unreachable!() };

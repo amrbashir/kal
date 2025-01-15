@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
 interface Window {
-  ipc: { postMessage(msg: string): void };
   KAL: {
     config?: {
       appearance: {
@@ -12,14 +11,10 @@ interface Window {
     };
 
     ipc: {
-      send(
-        event: import("./ipc_event.ts").IPCEvent,
-        ...payload: unknown[]
-      ): void;
-      on<T>(
-        event: import("./ipc_event.ts").IPCEvent,
-        eventHandler: (...payload: T[]) => void,
-      ): void;
+      makeProtocolUrl(protocol: string, path: string): string;
+      makeProtocolFileSrc(protocol: string, filePath: string): string;
+      invoke<T>(action: IpcAction, ...payload: any[]): Promise<T>;
+      on<T>(event: IpcEvent, handler: (payload?: T) => void);
     };
   };
 }

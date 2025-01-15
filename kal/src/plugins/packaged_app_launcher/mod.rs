@@ -167,14 +167,14 @@ fn app_from_manifest(
     // Skip apps that don't want to be listed
     let app_list_entry = unsafe { manifest.GetStringValue(w!("AppListEntry"))? };
     if !app_list_entry.is_null() {
-        let app_list_entry = unsafe { app_list_entry.to_hstring()? };
+        let app_list_entry = unsafe { app_list_entry.to_hstring() };
         if app_list_entry == "none" {
             return Ok(None);
         }
     }
 
-    let appid = unsafe { manifest.GetAppUserModelId()?.to_hstring()? };
-    let mut display_name = unsafe { manifest.GetStringValue(w!("DisplayName"))?.to_hstring()? };
+    let appid = unsafe { manifest.GetAppUserModelId()?.to_hstring() };
+    let mut display_name = unsafe { manifest.GetStringValue(w!("DisplayName"))?.to_hstring() };
 
     let full_name = package
         .Id()
@@ -230,5 +230,5 @@ fn resource_from_pri(full_name: &str, key: &str) -> anyhow::Result<HSTRING> {
         out.truncate(i + 1);
     }
 
-    HSTRING::from_wide(&out).map_err(Into::into)
+    Ok(HSTRING::from_wide(&out))
 }

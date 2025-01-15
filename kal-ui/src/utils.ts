@@ -1,38 +1,17 @@
-export interface Icon {
-  data: string;
-  type: IconType;
-}
+import { Icon, IconType } from "./search_result_item";
 
-export enum IconType {
-  Path = "Path",
-  Svg = "Svg",
-  BuiltinIcon = "BuiltinIcon",
-  Url = "Url",
-}
-
-export function convertFileSrc(protocol: string, filePath: string): string {
-  const path = encodeURIComponent(filePath);
-  return navigator.userAgent.includes("Windows")
-    ? `http://${protocol}.localhost/${path}`
-    : `${protocol}://${path}`;
-}
-
-export function getIconHtml(icon: Icon): string {
+export function makeIconHTML(icon: Icon): string {
   switch (icon.type) {
+    case IconType.BuiltinIcon:
+      return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}?type=builtin" />`;
     case IconType.Svg:
       return icon.data;
+    case IconType.Path:
+      return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}?type=path" />`;
     case IconType.Url:
       return `<img src="${icon.data}" />`;
-    case IconType.BuiltinIcon:
-      return `<img src="${
-        convertFileSrc(
-          "kalasset",
-          icon.data,
-        )
-      }?type=builtin" />`;
-    case IconType.Path:
     default:
-      return `<img src="${convertFileSrc("kalasset", icon.data)}?type=path" />`;
+      throw `Icon type \`${icon.type}\` not implemented`;
   }
 }
 

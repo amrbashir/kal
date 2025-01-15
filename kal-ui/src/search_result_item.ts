@@ -1,4 +1,14 @@
-import type { Icon } from "./utils.ts";
+export interface Icon {
+  data: string;
+  type: IconType;
+}
+
+export enum IconType {
+  Path = "Path",
+  Svg = "Svg",
+  BuiltinIcon = "BuiltinIcon",
+  Url = "Url",
+}
 
 export interface SearchResultItem {
   primary_text: string;

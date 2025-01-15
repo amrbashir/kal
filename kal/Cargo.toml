@@ -11,8 +11,8 @@ edition = "2021"
 embed-manifest = "1.4"
 
 [dependencies]
-wry = "0.48"
-tao = "0.31"
+wry = { git = "https://github.com/tauri-apps/wry", rev = "95a9319f24cb62add69d468ec0f60530b608fe6b" }
+tao = { git = "https://github.com/tauri-apps/tao", rev = "543e1177ee0cba01af0109806e8e7468497ab913" }
 serde = "1"
 serde_json = "1"
 toml = "0.8"
@@ -36,10 +36,10 @@ strum = { version = "0.26", features = ["derive"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"
-webview2-com = "0.34"
+webview2-com = "0.35"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
-version = "0.58"
+version = "0.59"
 features = [
   "Win32_Foundation",
   "Win32_UI_WindowsAndMessaging",
@@ -49,10 +49,11 @@ features = [
   "Win32_Graphics_Dwm",
   "Win32_System_Shutdown",
   "Win32_System_Power",
-  "Win32_Storage_Packaging_Appx",
   "Win32_System_Registry",
-  "Win32_Security",
+  "Win32_System_Com",
   "Win32_System_IO",
+  "Win32_Storage_Packaging_Appx",
+  "Win32_Security",
   "Win32_Graphics_Gdi",
   "Management_Deployment",
   "ApplicationModel",

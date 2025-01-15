@@ -39,7 +39,7 @@ pub trait Plugin: Debug {
     }
 
     /// Called when `CtrlLeft + O` are pressed
-    fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
+    fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -160,9 +160,9 @@ impl PluginStoreInner {
         plugin.execute(id, elevated)
     }
 
-    pub fn reveal_in_dir(&mut self, id: &str) -> anyhow::Result<()> {
+    pub fn show_item_in_dir(&mut self, id: &str) -> anyhow::Result<()> {
         let plugin = self.find_plugin(|p| id.starts_with(p.name()))?;
-        plugin.reveal_in_dir(id)
+        plugin.show_item_in_dir(id)
     }
 
     pub fn results<'a, 'b>(
@@ -224,7 +224,7 @@ impl PluginStore {
         self.lock().execute(id, elevated)
     }
 
-    pub fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
-        self.lock().reveal_in_dir(id)
+    pub fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
+        self.lock().show_item_in_dir(id)
     }
 }

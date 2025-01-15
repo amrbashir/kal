@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::vibrancy::Vibrancy;
+use crate::windowing::vibrancy::Vibrancy;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppearanceConfig {

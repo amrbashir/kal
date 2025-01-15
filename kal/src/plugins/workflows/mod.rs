@@ -62,7 +62,7 @@ impl<'a> Workflow<'a> {
     }
 }
 
-impl<'a> IntoSearchResultItem for Workflow<'a> {
+impl IntoSearchResultItem for Workflow<'_> {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
@@ -93,7 +93,7 @@ struct PluginConfig<'a> {
     workflows: Vec<Workflow<'a>>,
 }
 
-impl<'a> Plugin<'a> {
+impl Plugin<'_> {
     const NAME: &'static str = "Workflows";
 
     fn update_ids(&mut self) {

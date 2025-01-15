@@ -37,7 +37,7 @@ impl App {
         utils::execute(&self.path, elevated)
     }
 
-    fn reveal_in_dir(&self) -> anyhow::Result<()> {
+    fn show_item_in_dir(&self) -> anyhow::Result<()> {
         utils::reveal_in_dir(&self.path)
     }
 }
@@ -169,9 +169,9 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
+    fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
         if let Some(app) = self.apps.iter().find(|app| app.id == id) {
-            app.reveal_in_dir()?;
+            app.show_item_in_dir()?;
         }
         Ok(())
     }

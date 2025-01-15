@@ -1,9 +1,9 @@
-# "deno task dev" (vite dev server) process info
-$devTaskInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
-$devTaskInfo.Arguments = "-Command deno task --recursive dev"
-$devTaskInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
-$denoTask = New-Object System.Diagnostics.Process
-$denoTask.StartInfo = $devTaskInfo
+# "pnpm dev" (vite dev server) process info
+$pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
+$pnpmDevInfo.Arguments = "-Command pnpm -r dev"
+$pnpmDevInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
+$pnpmDev = New-Object System.Diagnostics.Process
+$pnpmDev.StartInfo = $pnpmDevInfo
 
 # "cargo run" process info
 $cargoRunInfo = New-Object System.Diagnostics.ProcessStartInfo "cargo"
@@ -13,7 +13,7 @@ $cargoRun = New-Object System.Diagnostics.Process
 $cargoRun.StartInfo = $cargoRunInfo
 
 # Start
-[void]$denoTask.start()
+[void]$pnpmDev.start()
 [void]$cargoRun.start()
 
 # Setup file watcher for the rust code
@@ -26,10 +26,9 @@ try {
   do {
     $result = $fileWatcher.WaitForChanged([System.IO.WatcherChangeTypes]::Changed, 1000)
     if (
-      ($result.Name -like 'src\core\*') -or
-      ($result.Name -like 'src\common\*.rs') -or
-      ($result.Name -like 'Cargo.toml') -or
-      ($result.Name -like 'Cargo.lock')
+      ($result.Name -like '*.rs') -or
+      ($result.Name -like '*Cargo.toml') -or
+      ($result.Name -like '*Cargo.lock')
     ) {
       $cargoRun.kill()
       [void]$cargoRun.start()
@@ -39,5 +38,5 @@ try {
 } finally {
   $fileWatcher.Dispose();
   $cargoRun.kill();
-  $denoTask.kill();
+  $pnpmDev.kill();
 }

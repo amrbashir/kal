@@ -1,28 +1,22 @@
 <script lang="ts" setup>
 import { onMounted, ref } from "vue";
-import { SearchResultItem } from "../search_result_item";
-import { IPCEvent } from "../ipc_event";
-import { getIconHtml, isVScrollable } from "../utils";
+import { makeIconHTML, isVScrollable } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
 import { watchDebounced } from "@vueuse/core";
+import { SearchResultItem } from "../search_result_item";
+import { IpcEvent, IpcAction } from "../ipc";
 
 const inputRef = ref<Element | null>(null);
 onMounted(() =>
-  window.KAL.ipc.on(IPCEvent.FocusInput, () => {
+  window.KAL.ipc.on(IpcEvent.FocusInput, () => {
     const shadowRoot = inputRef.value?.shadowRoot;
     const input = shadowRoot?.querySelector<HTMLInputElement>("#control");
     input?.focus();
     input?.select();
-  })
+  }),
 );
 
 const refreshingIndex = ref(false);
-onMounted(() =>
-  window.KAL.ipc.on(IPCEvent.RefreshingIndexFinished, () => {
-    setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for nicer animation
-    search(currentQuery.value);
-  })
-);
 
 const gettingConfirmation = ref(false);
 const gettingConfirmationIndex = ref(0);
@@ -34,13 +28,11 @@ function resetConfirm() {
 const currentSelection = ref(0);
 function updateSelection(e: KeyboardEvent) {
   if (e.key === "ArrowDown") {
-    currentSelection.value = currentSelection.value === results.value.length - 1
-      ? 0
-      : currentSelection.value + 1;
+    currentSelection.value =
+      currentSelection.value === results.value.length - 1 ? 0 : currentSelection.value + 1;
   } else {
-    currentSelection.value = currentSelection.value === 0
-      ? results.value.length - 1
-      : currentSelection.value - 1;
+    currentSelection.value =
+      currentSelection.value === 0 ? results.value.length - 1 : currentSelection.value - 1;
   }
 }
 
@@ -49,11 +41,12 @@ function scrollSelected() {
   // avoid scrolling if container is not scrollable atm
   if (!isVScrollable(resultsContainerRef.value)) return;
 
-  const block: ScrollLogicalPosition = currentSelection.value === 0
-    ? "end"
-    : currentSelection.value === results.value.length - 1
-    ? "start"
-    : "nearest";
+  const block: ScrollLogicalPosition =
+    currentSelection.value === 0
+      ? "end"
+      : currentSelection.value === results.value.length - 1
+        ? "start"
+        : "nearest";
 
   resultItemRefs.value[currentSelection.value]?.scrollIntoView({
     behavior: "smooth",
@@ -63,25 +56,22 @@ function scrollSelected() {
 
 const results = ref<SearchResultItem[]>([]);
 const resultItemRefs = ref<(HTMLElement | null)[]>([]);
-onMounted(() =>
-  window.KAL.ipc.on(IPCEvent.Results, (payload: SearchResultItem[]) => {
-    currentSelection.value = 0;
-    results.value = payload;
-  })
-);
 
 const currentQuery = ref("");
 watchDebounced(currentQuery, (query) => search(query), {
-  debounce: 300,
-  maxWait: 3000,
+  debounce: 200,
+  maxWait: 1000,
 });
 
-function search(query: string) {
+async function search(query: string) {
   if (query) {
-    window.KAL.ipc.send(IPCEvent.Search, query);
+    const response: SearchResultItem[] = await window.KAL.ipc.invoke(IpcAction.Search, query);
+
+    currentSelection.value = 0;
+    results.value = response;
   } else {
     results.value = [];
-    window.KAL.ipc.send(IPCEvent.ClearResults);
+    await window.KAL.ipc.invoke(IpcAction.ClearResults);
   }
 }
 
@@ -90,15 +80,13 @@ function resetQuery() {
   currentSelection.value = 0;
 }
 
-function executeItem(e: { shiftKey: boolean }, index: number) {
+async function executeItem(e: { shiftKey: boolean }, index: number) {
   let item = results.value[index];
   const confirm = item.needs_confirmation;
 
   if (
     (!confirm && gettingConfirmation.value) ||
-    (confirm &&
-      gettingConfirmation.value &&
-      gettingConfirmationIndex.value !== index)
+    (confirm && gettingConfirmation.value && gettingConfirmationIndex.value !== index)
   ) {
     resetConfirm();
   }
@@ -108,14 +96,13 @@ function executeItem(e: { shiftKey: boolean }, index: number) {
     gettingConfirmationIndex.value = index;
   } else {
     resetConfirm();
-    console.log(item);
-    window.KAL.ipc.send(IPCEvent.Execute, item.id, e.shiftKey);
+    await window.KAL.ipc.invoke(IpcAction.Execute, e.shiftKey, item.id);
   }
 }
 
-function showItemInDir(index: number) {
+async function showItemInDir(index: number) {
   let item = results.value[index];
-  window.KAL.ipc.send(IPCEvent.OpenLocation, item.id);
+  await window.KAL.ipc.invoke(IpcAction.ShowItemInDir, item.id);
 }
 
 function onChange(e: InputEvent) {
@@ -125,14 +112,14 @@ function onChange(e: InputEvent) {
   }
 }
 
-function onkeydown(e: KeyboardEvent) {
+async function onkeydown(e: KeyboardEvent) {
   if (gettingConfirmation.value && e.key !== "Enter") {
     resetConfirm();
   }
 
   if (e.key === "Escape") {
     e.preventDefault();
-    window.KAL.ipc.send(IPCEvent.HideMainWindow);
+    await window.KAL.ipc.invoke(IpcAction.HideMainWindow);
   }
 
   if (["ArrowDown", "ArrowUp"].includes(e.key)) {
@@ -153,17 +140,17 @@ function onkeydown(e: KeyboardEvent) {
 
   if (e.ctrlKey && e.key === "r") {
     e.preventDefault();
-    window.KAL.ipc.send(IPCEvent.RefreshIndex);
     refreshingIndex.value = true;
+    await window.KAL.ipc.invoke(IpcAction.RefreshIndex);
+    setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for nicer animation
+    search(currentQuery.value);
   }
 }
 
 // styles
-const neutralForegroundHover10percent = `${
-  neutralForegroundHover
-    .getValueFor(document.documentElement)
-    .toColorString()
-}1A`;
+const neutralForegroundHover10percent = `${neutralForegroundHover
+  .getValueFor(document.documentElement)
+  .toColorString()}1A`;
 const bgPrimaryColor = window.KAL.config?.appearance.transparent
   ? "bg-transparent"
   : "bg-[rgba(21,_20,_20,_0.75)]";
@@ -177,13 +164,7 @@ const resultsRowHeightPx = `${resultsRowHeight}px`;
   <main class="w-100vw h-100vh overflow-hidden">
     <div
       :style="{ height: `${inputHeight}px` }"
-      :class='
-        [
-          "p-2",
-          results.length === 0 ? "rd-2" : "rd-[0.5rem_0.5rem_0_0]",
-          bgPrimaryColor,
-        ]
-      '
+      :class="['p-2', results.length === 0 ? 'rd-2' : 'rd-[0.5rem_0.5rem_0_0]', bgPrimaryColor]"
     >
       <fluent-search
         ref="inputRef"
@@ -203,8 +184,7 @@ const resultsRowHeightPx = `${resultsRowHeight}px`;
             >
               <path
                 d="M5.463 4.433A9.961 9.961 0 0 1 12 2c5.523 0 10 4.477 10 10c0 2.136-.67 4.116-1.81 5.74L17 12h3A8 8 0 0 0 6.46 6.228l-.997-1.795zm13.074 15.134A9.961 9.961 0 0 1 12 22C6.477 22 2 17.523 2 12c0-2.136.67-4.116 1.81-5.74L7 12H4a8 8 0 0 0 13.54 5.772l.997 1.795z"
-              >
-              </path>
+              ></path>
             </svg>
           </span>
         </Transition>
@@ -231,9 +211,8 @@ const resultsRowHeightPx = `${resultsRowHeight}px`;
         <div
           :style="{ width: `${resultsRowHeight}px` }"
           class="flex-shrink-0 h-full grid place-items-center children:w-50% children:h-50%"
-          v-html="getIconHtml(item.icon)"
-        >
-        </div>
+          v-html="makeIconHTML(item.icon)"
+        ></div>
 
         <div
           class="overflow-hidden h-full flex flex-1 flex-col justify-center children:overflow-hidden children:text-nowrap children:text-ellipsis"
@@ -250,10 +229,7 @@ const resultsRowHeightPx = `${resultsRowHeight}px`;
           <Transition name="slide-fade">
             <span
               class="text-orange-300"
-              v-if="
-                gettingConfirmation &&
-                gettingConfirmationIndex == index
-              "
+              v-if="gettingConfirmation && gettingConfirmationIndex == index"
             >
               Are your sure?
             </span>
@@ -280,8 +256,7 @@ ul fluent-option[aria-selected="false"] {
   background-color: transparent;
 }
 ul fluent-option[aria-selected="true"],
-/*
- TODO: find out if we can remove the following fallback rules
+/* TODO: find out if we can remove the following fallback rules
        when going from 0 results to more than one result,
        aria-selected for the first element is still "false"
        even though currentselection is 0

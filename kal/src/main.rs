@@ -1,67 +1,90 @@
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::path::PathBuf;
-use std::str::FromStr;
+use std::rc::Rc;
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 use plugin::PluginStore;
-use tao::dpi::{LogicalPosition, LogicalSize};
+use strum::{AsRefStr, EnumString};
+use tao::dpi::LogicalSize;
 use tao::event::{Event, StartCause, WindowEvent};
 use tao::event_loop::{
     ControlFlow, DeviceEventFilter, EventLoop, EventLoopBuilder, EventLoopProxy,
 };
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
-use webview_window::WebViewWindowBuilder;
+use windowing::ipc;
 #[cfg(windows)]
 use windows::Win32::{Foundation::*, UI::WindowsAndMessaging::*};
+use wry::http::{Request, Response};
 
 use crate::config::Config;
-#[cfg(not(debug_assertions))]
-use crate::event::WebviewEvent;
-use crate::event::{emit_event, AppEvent, IPCEvent, ThreadEvent, KAL_IPC_INIT_SCRIPT};
 use crate::utils::thread;
-use crate::webview_window::WebViewWindow;
+use crate::windowing::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 mod config;
-mod event;
 mod icon;
 mod plugin;
 mod plugins;
-mod protocol;
 mod search_result_item;
 mod utils;
-mod vibrancy;
-mod webview_window;
+mod windowing;
 
-#[cfg(not(debug_assertions))]
-#[derive(rust_embed::RustEmbed)]
-#[folder = "../kal-ui/dist"]
-pub(crate) struct EmbededAssets;
+#[derive(EnumString, AsRefStr)]
+pub enum IpcAction {
+    Search,
+    ClearResults,
+    Execute,
+    ShowItemInDir,
+    RefreshIndex,
+    HideMainWindow,
+}
+
+#[derive(EnumString, AsRefStr)]
+pub enum IpcEvent {
+    FocusInput,
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
+#[cfg(all(windows, not(debug_assertions)))]
+pub enum WebviewEvent {
+    /// The webview gained or lost focus
+    ///
+    /// Currently, it is only used on Windows
+    #[cfg(windows)]
+    Focus(bool),
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum AppEvent {
+    /// Describes an event from a [`WebView`]
+    #[cfg(all(windows, not(debug_assertions)))]
+    Webview {
+        event: WebviewEvent,
+        window_id: tao::window::WindowId,
+    },
+    /// A HotKey event.
+    HotKey(global_hotkey::GlobalHotKeyEvent),
+}
 
 #[tracing::instrument(level = "trace")]
 fn create_main_window(
-    config: &Config,
     event_loop: &EventLoop<AppEvent>,
+    app_state: &Rc<RefCell<AppState<AppEvent>>>,
 ) -> anyhow::Result<WebViewWindow> {
-    let (m_size, m_pos) = {
-        let monitor = event_loop
-            .primary_monitor()
-            .with_context(|| "Failed to get primary monitor")?;
-        (
-            monitor.size().to_logical::<u32>(monitor.scale_factor()),
-            monitor.position().to_logical::<u32>(monitor.scale_factor()),
-        )
-    };
-
     #[cfg(debug_assertions)]
     let url = "http://localhost:9010";
     #[cfg(not(debug_assertions))]
     let url = "kal://localhost";
 
     let serialize_options = serialize_to_javascript::Options::default();
+
+    let config = &app_state.borrow().config;
 
     let css_script = match config.appearance.custom_css_file {
         Some(ref file) => {
@@ -85,36 +108,31 @@ fn create_main_window(
         None => None,
     };
 
-    let main_window = WebViewWindowBuilder::new()
+    let builder = WebViewWindowBuilder::new()
         .url(url)
-        .initialization_script(KAL_IPC_INIT_SCRIPT)
-        .initialization_script(&format!(
-            "(function () {{ window.KAL.config = {}; }})()",
+        .ipc(&process_ipc)
+        .init_script(&format!(
+            "(function () {{ window.KAL = {{}}; window.KAL.config = {}; }})()",
             serialize_to_javascript::Serialized::new(
                 &serde_json::value::to_raw_value(&config).unwrap_or_default(),
                 &serialize_options,
             ),
         ))
-        .initialization_script_opt(css_script.as_deref())
+        .init_script_opt(css_script.as_deref())
         .inner_size(LogicalSize::new(
             config.appearance.window_width,
             config.appearance.input_height,
         ))
-        .position(LogicalPosition::new(
-            m_pos.x + (m_size.width / 2 - config.appearance.window_width / 2),
-            m_pos.y + (m_size.height / 4),
-        ))
+        .center(true)
         .decorations(false)
         .resizable(false)
         .visible(false)
+        .vibrancy(config.appearance.vibrancy)
         .transparent(config.appearance.transparent)
         .skip_taskbar(cfg!(any(windows, target_os = "linux")))
-        .devtools(cfg!(debug_assertions))
-        .build(event_loop)?;
+        .devtools(true);
 
-    if let Some(vibrancy) = &config.appearance.vibrancy {
-        vibrancy.apply(&main_window)?;
-    }
+    let main_window = builder.build(event_loop, app_state)?;
 
     Ok(main_window)
 }
@@ -125,16 +143,16 @@ fn show_main_window(app_state: &mut AppState<AppEvent>) -> anyhow::Result<()> {
     #[cfg(windows)]
     app_state.store_foreground_hwnd();
 
-    let main_window = &app_state.main_window;
+    let main_window = &app_state.main_window();
     main_window.window().set_visible(true);
     main_window.window().set_focus();
-    emit_event(main_window.webview(), IPCEvent::FocusInput, ())
+    main_window.emit(IpcEvent::FocusInput, ())
 }
 
 /// Hides the main window and restores focus to the previous foreground window if needed
 #[tracing::instrument(level = "trace")]
 fn hide_main_window(app_state: &AppState<AppEvent>, #[allow(unused)] restore_focus: bool) {
-    app_state.main_window.window().set_visible(false);
+    app_state.main_window().window().set_visible(false);
 
     #[cfg(windows)]
     if restore_focus {
@@ -170,7 +188,7 @@ fn resize_main_window_for_results(main_window: &WebViewWindow, config: &Config, 
 struct AppState<T: 'static> {
     config: Config,
 
-    main_window: WebViewWindow,
+    main_window: Option<WebViewWindow>,
     #[cfg(windows)]
     previously_foreground_hwnd: HWND,
 
@@ -203,7 +221,6 @@ impl<T: 'static> std::fmt::Debug for AppState<T> {
 impl<T: 'static> AppState<T> {
     fn new(
         config: Config,
-        main_window: WebViewWindow,
         plugin_store: PluginStore,
         proxy: EventLoopProxy<T>,
         data_dir: PathBuf,
@@ -211,7 +228,7 @@ impl<T: 'static> AppState<T> {
     ) -> anyhow::Result<Self> {
         Ok(Self {
             config,
-            main_window,
+            main_window: None,
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
             plugin_store,
@@ -220,6 +237,16 @@ impl<T: 'static> AppState<T> {
             data_dir,
             config_file,
         })
+    }
+
+    #[inline]
+    fn main_window(&self) -> &WebViewWindow {
+        self.main_window.as_ref().unwrap()
+    }
+
+    #[inline]
+    fn main_window_mut(&mut self) -> &mut WebViewWindow {
+        self.main_window.as_mut().unwrap()
     }
 
     #[cfg(windows)]
@@ -234,20 +261,18 @@ impl<T: 'static> AppState<T> {
 }
 
 #[tracing::instrument(level = "trace")]
-fn process_ipc_events(
-    request: &str,
-    app_state: &RefCell<AppState<AppEvent>>,
-) -> anyhow::Result<()> {
-    let (event, payload) = request
-        .split_once("::")
-        .with_context(|| "Invalid IPC call syntax")?;
-    let event = IPCEvent::from_str(event)?;
+fn process_ipc<'a>(
+    app_state: &Rc<RefCell<AppState<AppEvent>>>,
+    request: Request<Vec<u8>>,
+) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
+    let action: IpcAction = request.uri().path()[1..].try_into()?;
 
-    match event {
-        IPCEvent::Search => {
+    match action {
+        IpcAction::Search => {
             let app_state = app_state.borrow();
 
-            let query = serde_json::from_str::<&str>(payload)?;
+            let body = request.body();
+            let query = std::str::from_utf8(body)?;
 
             let mut results = Vec::new();
 
@@ -260,68 +285,57 @@ fn process_ipc_events(
             let min = std::cmp::min(app_state.config.general.max_search_results, results.len());
             let final_results = &results[..min];
 
-            emit_event(
-                app_state.main_window.webview(),
-                IPCEvent::Results,
-                final_results,
-            )?;
-            resize_main_window_for_results(&app_state.main_window, &app_state.config, min);
+            let main_window = app_state.main_window();
+            resize_main_window_for_results(main_window, &app_state.config, min);
+            return ipc::make_json_response(&final_results);
         }
 
-        IPCEvent::Execute => {
+        IpcAction::ClearResults => {
+            let app_state = app_state.borrow();
+            resize_main_window_for_results(app_state.main_window(), &app_state.config, 0);
+        }
+
+        IpcAction::Execute => {
             let mut app_state = app_state.borrow_mut();
-            let (id, elevated) = serde_json::from_str::<(&str, bool)>(payload)?;
+            let payload = request.body();
+            let elevated: bool = payload[0] == 1;
+            let id = std::str::from_utf8(&payload[1..])?;
             app_state.plugin_store.execute(id, elevated)?;
             hide_main_window(&app_state, false);
         }
 
-        IPCEvent::OpenLocation => {
+        IpcAction::ShowItemInDir => {
             let app_state = app_state.borrow();
-            let id = serde_json::from_str::<&str>(payload)?;
-            app_state.plugin_store.reveal_in_dir(id)?;
+            let id = std::str::from_utf8(request.body())?;
+            app_state.plugin_store.show_item_in_dir(id)?;
             hide_main_window(&app_state, false);
         }
 
-        IPCEvent::ClearResults => {
-            let app_state = app_state.borrow();
-            resize_main_window_for_results(&app_state.main_window, &app_state.config, 0);
+        IpcAction::RefreshIndex => {
+            let mut app_state = app_state.borrow_mut();
+            let config = Config::load_from_path(&app_state.config_file)?;
+            app_state.plugin_store.refresh(&config)?;
         }
 
-        IPCEvent::RefreshIndex => {
-            let app_state = app_state.borrow();
-            let proxy = app_state.proxy.clone();
-            let mut plugin_store = app_state.plugin_store.clone();
-            let config_file = app_state.config_file.clone();
-            thread::spawn(move || {
-                let config = Config::load_from_path(config_file)?;
-                plugin_store.refresh(&config)?;
-                proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::RefreshingIndexFinished))?;
-                proxy.send_event(AppEvent::ThreadEvent(ThreadEvent::UpdateConfig(config)))?;
-                Ok(())
-            });
-        }
-
-        IPCEvent::HideMainWindow => {
+        IpcAction::HideMainWindow => {
             hide_main_window(&app_state.borrow(), true);
         }
-
-        _ => {}
     }
 
-    Ok(())
+    ipc::empty_response()
 }
 
 #[tracing::instrument(level = "trace")]
 fn process_events(
-    event: &Event<AppEvent>,
     app_state: &RefCell<AppState<AppEvent>>,
+    event: &Event<AppEvent>,
 ) -> anyhow::Result<()> {
     match event {
         // clear window surface on windows for transparent windows
         #[cfg(windows)]
         Event::NewEvents(StartCause::Init) | Event::RedrawRequested(_) => {
             let mut app_state = app_state.borrow_mut();
-            app_state.main_window.clear_window_surface()?;
+            app_state.main_window_mut().clear_window_surface()?;
         }
 
         #[cfg(all(not(windows), not(debug_assertions)))]
@@ -343,10 +357,10 @@ fn process_events(
 
         Event::UserEvent(event) => match event {
             #[cfg(all(windows, not(debug_assertions)))]
-            AppEvent::WebviewEvent { event, window_id } => match event {
+            AppEvent::Webview { event, window_id } => match event {
                 WebviewEvent::Focus(focus) => {
                     let app_state = app_state.borrow();
-                    let main_window = &app_state.main_window.window();
+                    let main_window = &app_state.main_window().window();
                     // hide main window when the webview loses focus
                     if *window_id == main_window.id() && !focus {
                         main_window.set_visible(false);
@@ -356,29 +370,12 @@ fn process_events(
 
             AppEvent::HotKey(e) if e.state == HotKeyState::Pressed => {
                 let mut app_state = app_state.borrow_mut();
-                if app_state.main_window.window().is_visible() {
+                if app_state.main_window().window().is_visible() {
                     hide_main_window(&app_state, true);
                 } else {
                     show_main_window(&mut app_state)?;
                 }
             }
-
-            AppEvent::Ipc(_window_id, request) => {
-                process_ipc_events(request, app_state)?;
-            }
-
-            AppEvent::ThreadEvent(event) => match event {
-                ThreadEvent::RefreshingIndexFinished => {
-                    emit_event(
-                        app_state.borrow().main_window.webview(),
-                        IPCEvent::RefreshingIndexFinished,
-                        (),
-                    )?;
-                }
-                ThreadEvent::UpdateConfig(c) => {
-                    app_state.borrow_mut().config = c.clone();
-                }
-            },
 
             _ => {}
         },
@@ -418,18 +415,19 @@ fn run(data_dir: PathBuf) -> anyhow::Result<()> {
         }
     }));
 
-    let main_window = create_main_window(&config, &event_loop)?;
-    let main_window_id = main_window.window().id();
-
     let app_state = AppState::new(
         config,
-        main_window,
         plugin_store,
         event_loop.create_proxy(),
         data_dir,
         config_file,
     )?;
-    let app_state = RefCell::new(app_state);
+
+    let app_state = Rc::new(RefCell::new(app_state));
+
+    let main_window = create_main_window(&event_loop, &app_state)?;
+    let main_window_id = main_window.window().id();
+    app_state.borrow_mut().main_window = Some(main_window);
 
     event_loop.run(move |event, _event_loop, control_flow| {
         if let Event::WindowEvent {
@@ -443,7 +441,7 @@ fn run(data_dir: PathBuf) -> anyhow::Result<()> {
             }
         }
 
-        if let Err(e) = process_events(&event, &app_state) {
+        if let Err(e) = process_events(&app_state, &event) {
             tracing::error!("{e}");
         }
     });

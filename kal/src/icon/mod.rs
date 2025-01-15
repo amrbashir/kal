@@ -1,7 +1,14 @@
 use std::borrow::Cow;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
+use wry::http::header::CONTENT_TYPE;
+use wry::http::{Request, Response};
+use wry::WebViewId;
+
+use crate::windowing::ipc;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IconType {
@@ -78,4 +85,36 @@ impl BuiltinIcon {
             _ => unreachable!(),
         }
     }
+}
+
+/// `kalicon://` protocol
+#[tracing::instrument]
+pub fn kalicon_protocol<'a>(
+    _webview_id: WebViewId,
+    request: Request<Vec<u8>>,
+) -> Result<Response<Cow<'a, [u8]>>, anyhow::Error> {
+    let path = &request.uri().path()[1..];
+    let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
+
+    let query = request.uri().query();
+    if query.map(|q| q.contains("type=builtin")).unwrap_or(false) {
+        return Response::builder()
+            .header(CONTENT_TYPE, "image/png")
+            .body(Cow::Borrowed(BuiltinIcon::from_str(path.as_ref())?.bytes()))
+            .map_err(Into::into);
+    }
+
+    let path = dunce::canonicalize(PathBuf::from(&*path))?;
+
+    let mimetype = match path.extension().unwrap_or_default().to_str() {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        _ => return ipc::error_response("Only png,jpg and svg icons are supported"),
+    };
+
+    ipc::base_response()
+        .header(CONTENT_TYPE, mimetype)
+        .body(std::fs::read(path)?.into())
+        .map_err(Into::into)
 }

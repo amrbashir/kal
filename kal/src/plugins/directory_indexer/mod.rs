@@ -38,7 +38,7 @@ impl DirEntry {
         utils::execute(&self.path, elevated)
     }
 
-    fn reveal_in_dir(&self) -> anyhow::Result<()> {
+    fn show_item_in_dir(&self) -> anyhow::Result<()> {
         utils::reveal_in_dir(&self.path)
     }
 }
@@ -148,9 +148,9 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    fn reveal_in_dir(&self, id: &str) -> anyhow::Result<()> {
+    fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
         if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
-            entry.reveal_in_dir()?;
+            entry.show_item_in_dir()?;
         }
         Ok(())
     }

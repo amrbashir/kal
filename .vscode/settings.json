@@ -1,9 +1,3 @@
 {
-  "deno.enable": true,
-  "deno.disablePaths": [
-    "./kal-ui/src"
-  ],
-  "[jsonc][json][javascript][typescript][javascriptreact][typescriptreact][html][css][scss][vue]": {
-    "editor.defaultFormatter": "denoland.vscode-deno"
-  }
+  "rust-analyzer.rustfmt.extraArgs": ["+nightly"]
 }

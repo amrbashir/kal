@@ -11,7 +11,7 @@ pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) -> anyhow::Resu
     let app = HSTRING::from(app.as_ref());
     unsafe {
         ffi::ShellExecuteW(
-            HWND::default(),
+            None,
             if elevated {
                 w!("runas")
             } else {
@@ -30,7 +30,7 @@ pub fn open_url(url: &Url) -> anyhow::Result<()> {
     let url = HSTRING::from(url.as_str());
     unsafe {
         ffi::ShellExecuteW(
-            HWND::default(),
+            None,
             w!("open"),
             PCWSTR::from_raw(url.as_ptr()),
             PCWSTR::null(),
@@ -83,7 +83,7 @@ pub fn reveal_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
         if let Err(e) = SHOpenFolderAndSelectItems(dir_item.0, Some(&[path_item.0]), 0) {
             if e.code().0 == ERROR_FILE_NOT_FOUND.0 as i32 {
                 ffi::ShellExecuteW(
-                    HWND::default(),
+                    None,
                     w!("open"),
                     PCWSTR::from_raw(dir.as_ptr()),
                     PCWSTR::null(),
@@ -127,7 +127,7 @@ where
         let cwd = cwd.as_ref().map(|cwd| HSTRING::from(cwd.as_ref()));
 
         ffi::ShellExecuteW(
-            HWND::default(),
+            None,
             if elevated {
                 w!("runas")
             } else {
@@ -151,8 +151,8 @@ mod ffi {
     use super::*;
 
     #[inline]
-    pub unsafe fn ShellExecuteW<P0, P1, P2, P3, P4>(
-        hwnd: P0,
+    pub unsafe fn ShellExecuteW<P1, P2, P3, P4>(
+        hwnd: Option<HWND>,
         lpoperation: P1,
         lpfile: P2,
         lpparameters: P3,
@@ -160,7 +160,6 @@ mod ffi {
         nshowcmd: SHOW_WINDOW_CMD,
     ) -> anyhow::Result<()>
     where
-        P0: Param<HWND>,
         P1: Param<PCWSTR>,
         P2: Param<PCWSTR>,
         P3: Param<PCWSTR>,
