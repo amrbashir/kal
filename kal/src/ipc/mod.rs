@@ -50,25 +50,18 @@ pub fn emit(
 }
 
 impl App {
-    fn resize_main_window_for_results(&self, count: usize) {
+    fn resize_main_window_for_items(&self, count: usize) {
         let main_window = self.main_window();
 
-        let count = count as u32;
-        let gaps = count.saturating_sub(1);
-
-        let results_height = if count == 0 {
+        let items_height = if count == 0 {
             0
         } else {
-            std::cmp::min(
-                count * self.config.appearance.results_row_height
-                    + self.config.appearance.results_padding
-                    + gaps * self.config.appearance.results_row_gap
-                    + self.config.appearance.results_divier,
-                self.config.appearance.results_height,
-            )
+            let count = std::cmp::min(count, self.config.appearance.max_items as usize) as u32;
+            let item_height = self.config.appearance.item_height + self.config.appearance.item_gap;
+            self.config.appearance.input_items_gap + count * item_height
         };
 
-        let height = results_height + self.config.appearance.input_height;
+        let height = self.config.appearance.input_height + items_height + Self::MAGIC_BORDERS;
 
         let size = LogicalSize::new(self.config.appearance.window_width, height);
         let _ = main_window.window().request_surface_size(size.into());
@@ -96,11 +89,11 @@ impl App {
                 let min = std::cmp::min(self.config.general.max_search_results, results.len());
                 let final_results = &results[..min];
 
-                self.resize_main_window_for_results(min);
+                self.resize_main_window_for_items(min);
                 return response::json(&final_results);
             }
 
-            IpcAction::ClearResults => self.resize_main_window_for_results(0),
+            IpcAction::ClearResults => self.resize_main_window_for_items(0),
 
             IpcAction::Execute => {
                 let payload = request.body();

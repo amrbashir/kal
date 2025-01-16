@@ -10,7 +10,7 @@ use winit::event_loop::ActiveEventLoop;
 use winit::platform::windows::*;
 use winit::window::{Window, WindowAttributes, WindowId};
 use wry::http::{Method, Request, Response};
-use wry::{WebView, WebViewBuilder, WebViewId};
+use wry::{WebView, WebViewBuilder, WebViewBuilderExtWindows, WebViewId};
 
 use crate::{icon, ipc};
 
@@ -36,7 +36,8 @@ impl WebViewWindowBuilder<'_> {
     pub fn new() -> Self {
         let webview_builder = WebViewBuilder::new()
             .with_initialization_script(include_str!("./ipc/ipc.js"))
-            .with_hotkeys_zoom(false);
+            .with_hotkeys_zoom(false)
+            .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
 
         let window_attrs = WindowAttributes::default()
             .with_class_name("KalWindowClass")

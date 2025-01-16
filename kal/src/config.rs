@@ -13,16 +13,14 @@ pub struct AppearanceConfig {
     pub window_width: u32,
     #[serde(default = "default_input_height")]
     pub input_height: u32,
-    #[serde(default = "default_results_height")]
-    pub results_height: u32,
-    #[serde(default = "default_results_divier")]
-    pub results_divier: u32,
-    #[serde(default = "default_results_padding")]
-    pub results_padding: u32,
-    #[serde(default = "default_results_row_height")]
-    pub results_row_height: u32,
-    #[serde(default = "default_results_row_gap")]
-    pub results_row_gap: u32,
+    #[serde(default = "default_input_items_gap")]
+    pub input_items_gap: u32,
+    #[serde(default = "default_max_items")]
+    pub max_items: u32,
+    #[serde(default = "default_item_height")]
+    pub item_height: u32,
+    #[serde(default = "default_item_gap")]
+    pub item_gap: u32,
     #[serde(default = "default_true")]
     pub transparent: bool,
     #[serde(default = "default_true")]
@@ -36,21 +34,18 @@ fn default_window_width() -> u32 {
     600
 }
 fn default_input_height() -> u32 {
-    60
+    65
 }
-fn default_results_height() -> u32 {
-    480
-}
-fn default_results_divier() -> u32 {
-    1
-}
-fn default_results_padding() -> u32 {
+fn default_input_items_gap() -> u32 {
     16
 }
-fn default_results_row_height() -> u32 {
-    60
+fn default_max_items() -> u32 {
+    8
 }
-fn default_results_row_gap() -> u32 {
+fn default_item_height() -> u32 {
+    50
+}
+fn default_item_gap() -> u32 {
     4
 }
 fn default_vibrancy() -> Option<Vibrancy> {
@@ -65,11 +60,10 @@ impl Default for AppearanceConfig {
         Self {
             window_width: default_window_width(),
             input_height: default_input_height(),
-            results_height: default_results_height(),
-            results_divier: default_results_divier(),
-            results_padding: default_results_padding(),
-            results_row_height: default_results_row_height(),
-            results_row_gap: default_results_row_gap(),
+            input_items_gap: default_input_items_gap(),
+            max_items: default_max_items(),
+            item_height: default_item_height(),
+            item_gap: default_item_gap(),
             transparent: true,
             shadows: true,
             vibrancy: default_vibrancy(),

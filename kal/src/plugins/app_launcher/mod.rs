@@ -49,7 +49,7 @@ impl IntoSearchResultItem for App {
             .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
             .map(|score| SearchResultItem {
                 primary_text: self.name.to_string_lossy(),
-                secondary_text: self.path.to_string_lossy(),
+                secondary_text: "Application".into(),
                 icon: Icon::path(self.icon.to_string_lossy()),
                 needs_confirmation: false,
                 id: self.id.as_str().into(),

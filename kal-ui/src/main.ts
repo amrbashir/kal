@@ -10,9 +10,6 @@ import App from "./App.vue";
 import "uno.css";
 
 provideFluentDesignSystem().register(allComponents);
-baseLayerLuminance.setValueFor(
-  document.documentElement,
-  StandardLuminance.DarkMode,
-);
+baseLayerLuminance.setValueFor(document.documentElement, StandardLuminance.DarkMode);
 
-createApp(App).use(router).mount("#app");
+createApp(App).use(router).mount("body");

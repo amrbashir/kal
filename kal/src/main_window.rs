@@ -1,8 +1,11 @@
 use std::sync::mpsc;
 
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED};
 use winit::dpi::LogicalSize;
 use winit::event_loop::ActiveEventLoop;
+use wry::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 use crate::app::{App, AppEvent};
 use crate::ipc::IpcEvent;
@@ -25,11 +28,15 @@ const INIT_TEMPLATE: &str = r#"(function () {
 impl App {
     const MAIN_WINDOW_KEY: &str = "main";
 
+    /// Magic number accounting for top and bottom border
+    /// for undecorated window with shadows
+    pub const MAGIC_BORDERS: u32 = 2;
+
     pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
         #[cfg(debug_assertions)]
-        let url = "http://localhost:9010";
+        let url = "http://localhost:9010/Run";
         #[cfg(not(debug_assertions))]
-        let url = "kal://localhost";
+        let url = "kal://localhost/Run";
 
         #[derive(JsTemplate)]
         struct InitScript {
@@ -58,16 +65,14 @@ impl App {
             .init_script(&init_script.into_string())
             .ipc(move |_, request| {
                 let (tx, rx) = mpsc::sync_channel(1);
-                let _ = sender
-                    .send(AppEvent::Ipc { request, tx })
-                    .inspect_err(|e| tracing::error!("{e}"));
+                let event = AppEvent::Ipc { request, tx };
+                let _ = sender.send(event).inspect_err(|e| tracing::error!("{e}"));
                 proxy.wake_up();
-
                 webview2_com::wait_with_pump(rx).unwrap()
             })
             .inner_size(LogicalSize::new(
                 self.config.appearance.window_width,
-                self.config.appearance.input_height,
+                self.config.appearance.input_height + Self::MAGIC_BORDERS,
             ))
             .center(true)
             .decorations(false)
@@ -79,6 +84,21 @@ impl App {
             .devtools(true);
 
         let window = builder.build(event_loop)?;
+
+        // disable hiding/showing animations
+        let RawWindowHandle::Win32(raw) = window.window().window_handle().unwrap().as_raw() else {
+            unreachable!()
+        };
+        let enabled = 1;
+        unsafe {
+            DwmSetWindowAttribute(
+                HWND(raw.hwnd.get() as _),
+                DWMWA_TRANSITIONS_FORCEDISABLED,
+                &enabled as *const _ as *const _,
+                std::mem::size_of_val(&enabled) as u32,
+            )?;
+        }
+
         self.windows.insert(Self::MAIN_WINDOW_KEY, window);
 
         Ok(())
