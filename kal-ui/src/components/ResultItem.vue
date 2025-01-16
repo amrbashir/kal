@@ -44,6 +44,14 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
 </template>
 
 <style scoped>
+* {
+  --base-height-multiplier: 12;
+}
+fluent-option::before {
+  width: 3px;
+  left: 0;
+}
+
 ul fluent-option::part(content) {
   height: v-bind(itemHeight);
 }

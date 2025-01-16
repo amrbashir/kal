@@ -34,14 +34,14 @@ pub struct WebViewWindowBuilder<'a> {
 
 impl WebViewWindowBuilder<'_> {
     pub fn new() -> Self {
+        let window_attrs = WindowAttributes::default()
+            .with_class_name("KalWindowClass")
+            .with_clip_children(false);
+
         let webview_builder = WebViewBuilder::new()
             .with_initialization_script(include_str!("./ipc/ipc.js"))
             .with_hotkeys_zoom(false)
             .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
-
-        let window_attrs = WindowAttributes::default()
-            .with_class_name("KalWindowClass")
-            .with_clip_children(false);
 
         Self {
             window_attrs,
@@ -254,6 +254,33 @@ impl WebViewWindow {
 
     pub fn emit(&self, event: impl AsRef<str>, payload: impl Serialize) -> anyhow::Result<()> {
         ipc::emit(self.webview(), event, payload)
+    }
+
+    #[cfg(windows)]
+    pub fn set_dwmwa_transitions(&self, enable: bool) -> anyhow::Result<()> {
+        use windows::Win32::Foundation::{BOOL, HWND};
+        use windows::Win32::Graphics::Dwm::{
+            DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED,
+        };
+        use wry::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+
+        // disable hiding/showing animations
+        let RawWindowHandle::Win32(raw) = self.window.window_handle().unwrap().as_raw() else {
+            unreachable!()
+        };
+
+        let hwnd = HWND(raw.hwnd.get() as _);
+        let enable = BOOL(!enable as _);
+        unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_TRANSITIONS_FORCEDISABLED,
+                &enable as *const _ as *const _,
+                std::mem::size_of::<BOOL>() as u32,
+            )
+            .inspect_err(|e| tracing::error!("{e}"))
+            .map_err(Into::into)
+        }
     }
 
     #[cfg(windows)]

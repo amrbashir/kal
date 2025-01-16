@@ -43,7 +43,7 @@ fn default_max_items() -> u32 {
     8
 }
 fn default_item_height() -> u32 {
-    50
+    55
 }
 fn default_item_gap() -> u32 {
     4

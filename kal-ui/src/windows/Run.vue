@@ -4,6 +4,7 @@ import { isVScrollable } from "../utils";
 import { watchDebounced } from "@vueuse/core";
 import { SearchResultItem } from "../search_result_item";
 import { IpcEvent, IpcAction } from "../ipc";
+import { accentFillRest } from "@fluentui/web-components";
 import RefreshIcon from "../components/RefreshIcon.vue";
 import ResultItem from "../components/ResultItem.vue";
 
@@ -144,6 +145,8 @@ async function onkeydown(e: KeyboardEvent) {
 }
 
 // styles
+const accentColor = accentFillRest.getValueFor(document.documentElement).toColorString();
+const systemAccentColor = window.KAL.systemAccentColor ?? accentColor;
 const isTransparent = window.KAL.config.appearance.transparent;
 const bgPrimaryColor = isTransparent ? "bg-transparent" : "bg-[rgba(21,_20,_20,_0.75)]";
 const inputHeight = `${window.KAL.config.appearance.input_height}px`;
@@ -194,3 +197,9 @@ const itemsContainerHeight = `calc(100% - ${inputHeight})`;
     </ul>
   </main>
 </template>
+
+<style scoped>
+* {
+  --accent-fill-rest: v-bind(systemAccentColor);
+}
+</style>

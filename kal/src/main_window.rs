@@ -1,17 +1,16 @@
 use std::sync::mpsc;
 
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
-use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED};
 use winit::dpi::LogicalSize;
 use winit::event_loop::ActiveEventLoop;
-use wry::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 use crate::app::{App, AppEvent};
 use crate::ipc::IpcEvent;
+use crate::utils;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 const INIT_TEMPLATE: &str = r#"(function () {
+  window.KAL.systemAccentColor = __TEMPLATE_system_accent_color__;
   window.KAL.config = __RAW_config__;
 
   let custom_css = __TEMPLATE_custom_css__;
@@ -38,10 +37,13 @@ impl App {
         #[cfg(not(debug_assertions))]
         let url = "kal://localhost/Run";
 
+        let system_accent_color = utils::system_accent_color();
+
         #[derive(JsTemplate)]
         struct InitScript {
             #[raw]
             config: String,
+            system_accent_color: Option<String>,
             custom_css: Option<String>,
         }
 
@@ -55,7 +57,12 @@ impl App {
             .transpose()?;
 
         let js_ser_opts = JsSerializeOptions::default();
-        let init_script = InitScript { config, custom_css }.render(INIT_TEMPLATE, &js_ser_opts)?;
+        let init_script = InitScript {
+            config,
+            custom_css,
+            system_accent_color,
+        }
+        .render(INIT_TEMPLATE, &js_ser_opts)?;
 
         let sender = self.sender.clone();
         let proxy = self.event_loop_proxy.clone();
@@ -85,19 +92,8 @@ impl App {
 
         let window = builder.build(event_loop)?;
 
-        // disable hiding/showing animations
-        let RawWindowHandle::Win32(raw) = window.window().window_handle().unwrap().as_raw() else {
-            unreachable!()
-        };
-        let enabled = 1;
-        unsafe {
-            DwmSetWindowAttribute(
-                HWND(raw.hwnd.get() as _),
-                DWMWA_TRANSITIONS_FORCEDISABLED,
-                &enabled as *const _ as *const _,
-                std::mem::size_of_val(&enabled) as u32,
-            )?;
-        }
+        #[cfg(windows)]
+        let _ = window.set_dwmwa_transitions(false);
 
         self.windows.insert(Self::MAIN_WINDOW_KEY, window);
 

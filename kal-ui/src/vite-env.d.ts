@@ -2,6 +2,8 @@
 
 interface Window {
   KAL: {
+    systemAccentColor?: string;
+
     config: {
       appearance: {
         transparent?: boolean;

@@ -2,8 +2,17 @@ pub mod path;
 pub mod shell;
 pub mod thread;
 
+use windows::UI::ViewManagement::*;
+
 pub use self::path::*;
 pub use self::shell::*;
+
+pub fn system_accent_color() -> Option<String> {
+    let settings = UISettings::new().ok()?;
+    let color = settings.GetColorValue(UIColorType::AccentLight2).ok()?;
+    let color_rgb = format!("rgba({},{},{},{})", color.R, color.G, color.B, color.A);
+    Some(color_rgb)
+}
 
 pub trait IteratorExt: Iterator {
     fn collect_non_empty<B: FromIterator<Self::Item>>(self) -> Option<B>;
