@@ -1,60 +1,58 @@
-use std::ffi::OsString;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::icon::{self, Icon};
+use crate::icon::{self};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
-use crate::utils::{self, thread, IteratorExt, PathExt, ResolveEnvVars};
+use crate::utils::{thread, IteratorExt};
+
+mod packaged_app;
+mod program;
 
 #[derive(Debug)]
-struct App {
-    name: OsString,
-    path: PathBuf,
-    icon: PathBuf,
-    id: String,
+enum App {
+    Program(program::Program),
+    Packaged(packaged_app::PackagedApp),
 }
 
 impl App {
-    fn new(path: PathBuf, icons_dir: &Path) -> Self {
-        let name = path.file_stem().unwrap_or_default().to_os_string();
-        let filename = path.file_name().unwrap_or_default().to_os_string();
-        let icon = icons_dir.join(&filename).with_extra_extension("png");
-        let id = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
-        Self {
-            name,
-            path,
-            icon,
-            id,
+    fn id(&self) -> &str {
+        match self {
+            App::Program(program) => &program.id,
+            App::Packaged(packaged_app) => &packaged_app.id,
+        }
+    }
+
+    fn icon_path(&self) -> Option<(PathBuf, PathBuf)> {
+        match self {
+            App::Program(program) => Some((program.path.clone(), program.icon.clone())),
+            App::Packaged(_) => None,
         }
     }
 
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
-        utils::execute(&self.path, elevated)
+        match self {
+            App::Program(program) => program.execute(elevated),
+            App::Packaged(packaged_app) => packaged_app.execute(elevated),
+        }
     }
 
     fn show_item_in_dir(&self) -> anyhow::Result<()> {
-        utils::reveal_in_dir(&self.path)
+        match self {
+            App::Program(program) => program.show_item_in_dir(),
+            App::Packaged(_) => Ok(()),
+        }
     }
 }
 
 impl IntoSearchResultItem for App {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
-        matcher
-            .fuzzy_match(&self.name.to_string_lossy(), query)
-            .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
-            .map(|score| SearchResultItem {
-                primary_text: self.name.to_string_lossy(),
-                secondary_text: "Application".into(),
-                icon: Icon::path(self.icon.to_string_lossy()),
-                needs_confirmation: false,
-                id: self.id.as_str().into(),
-                score,
-            })
+        match self {
+            App::Program(program) => program.fuzzy_match(query, matcher),
+            App::Packaged(packaged_app) => packaged_app.fuzzy_match(query, matcher),
+        }
     }
 }
 
@@ -62,6 +60,7 @@ impl IntoSearchResultItem for App {
 pub struct Plugin {
     paths: Vec<String>,
     extensions: Vec<String>,
+    include_packaged_apps: bool,
     icons_dir: PathBuf,
     apps: Vec<App>,
 }
@@ -72,6 +71,8 @@ struct PluginConfig {
     paths: Vec<String>,
     #[serde(default = "default_extensions")]
     extensions: Vec<String>,
+    #[serde(default = "default_include_packaged_apps")]
+    include_packaged_apps: bool,
 }
 
 fn default_paths() -> Vec<String> {
@@ -86,11 +87,16 @@ fn default_extensions() -> Vec<String> {
     vec!["exe".to_string(), "lnk".to_string()]
 }
 
+fn default_include_packaged_apps() -> bool {
+    true
+}
+
 impl Default for PluginConfig {
     fn default() -> Self {
         Self {
             paths: default_paths(),
             extensions: default_extensions(),
+            include_packaged_apps: default_include_packaged_apps(),
         }
     }
 }
@@ -102,17 +108,19 @@ impl Plugin {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.paths = config.paths;
         self.extensions = config.extensions;
+        self.include_packaged_apps = config.include_packaged_apps;
     }
 
     fn find_apps(&mut self) {
-        self.apps = self
-            .paths
-            .iter()
-            .map(ResolveEnvVars::resolve_vars)
-            .filter_map(|p| filter_path_entries_by_extensions(p, &self.extensions).ok())
-            .flatten()
-            .map(|e| App::new(e.path(), &self.icons_dir))
-            .collect::<Vec<App>>();
+        self.apps = program::find_all_in_paths(&self.paths, &self.extensions, &self.icons_dir)
+            .map(App::Program)
+            .collect();
+
+        if self.include_packaged_apps {
+            if let Ok(packaged_apps) = packaged_app::find_all() {
+                self.apps.extend(packaged_apps.map(App::Packaged));
+            }
+        }
     }
 }
 
@@ -122,6 +130,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(Self {
             paths: config.paths,
             extensions: config.extensions,
+            include_packaged_apps: config.include_packaged_apps,
             icons_dir: data_dir.join("icons"),
             apps: Vec::new(),
         })
@@ -139,7 +148,7 @@ impl crate::plugin::Plugin for Plugin {
         let paths = self
             .apps
             .iter()
-            .map(|app| (app.path.clone(), app.icon.clone()))
+            .filter_map(App::icon_path)
             .collect::<Vec<_>>();
 
         thread::spawn(move || {
@@ -163,48 +172,16 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(app) = self.apps.iter().find(|app| app.id == id) {
+        if let Some(app) = self.apps.iter().find(|app| app.id() == id) {
             app.execute(elevated)?;
         }
         Ok(())
     }
 
     fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
-        if let Some(app) = self.apps.iter().find(|app| app.id == id) {
+        if let Some(app) = self.apps.iter().find(|app| app.id() == id) {
             app.show_item_in_dir()?;
         }
         Ok(())
     }
-}
-
-fn filter_path_entries_by_extensions<P>(
-    path: P,
-    extensions: &[String],
-) -> anyhow::Result<Vec<fs::DirEntry>>
-where
-    P: AsRef<Path>,
-{
-    let mut filtered = Vec::new();
-
-    let entries = fs::read_dir(path)?;
-    for entry in entries.flatten() {
-        if let Ok(metadata) = entry.metadata() {
-            if metadata.is_dir() {
-                let filtered_entries = filter_path_entries_by_extensions(entry.path(), extensions)?;
-                filtered.extend(filtered_entries);
-            } else {
-                let path = entry.path();
-                let extension = path
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                if extensions.contains(&extension) {
-                    filtered.push(entry);
-                }
-            }
-        }
-    }
-
-    Ok(filtered)
 }

@@ -1,5 +1,4 @@
 use std::ffi::OsString;
-use std::path::Path;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -13,25 +12,23 @@ use windows::Win32::Storage::Packaging::Appx::{
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
-use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
-use crate::utils::{self, IteratorExt};
+use crate::utils;
 
 const MS_RESOURCE: &str = "ms-resource:";
-const PACKAGED_APP: &str = "Packaged App";
 
 #[derive(Debug)]
-struct PackagedApp {
-    name: OsString,
-    icon: Option<OsString>,
-    appid: String,
-    id: String,
+pub struct PackagedApp {
+    pub name: OsString,
+    pub icon: Option<OsString>,
+    pub appid: String,
+    pub id: String,
 }
 
 impl PackagedApp {
-    fn new(name: OsString, icon: Option<OsString>, appid: String) -> Self {
-        let id = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
+    pub fn new(name: OsString, icon: Option<OsString>, appid: String) -> Self {
+        let id = format!("{}:{}", super::Plugin::NAME, name.to_string_lossy());
         Self {
             name,
             id,
@@ -40,7 +37,7 @@ impl PackagedApp {
         }
     }
 
-    fn execute(&self, elevated: bool) -> anyhow::Result<()> {
+    pub fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         utils::execute(format!("shell:AppsFolder\\{}", self.appid), elevated)
     }
 }
@@ -51,7 +48,7 @@ impl IntoSearchResultItem for PackagedApp {
             .fuzzy_match(&self.name.to_string_lossy(), query)
             .map(|score| SearchResultItem {
                 primary_text: self.name.to_string_lossy(),
-                secondary_text: PACKAGED_APP.into(),
+                secondary_text: "Packaged App".into(),
                 icon: self
                     .icon
                     .as_ref()
@@ -64,62 +61,17 @@ impl IntoSearchResultItem for PackagedApp {
     }
 }
 
-#[derive(Debug)]
-pub struct Plugin {
-    apps: Vec<PackagedApp>,
-}
+pub fn find_all() -> anyhow::Result<impl Iterator<Item = PackagedApp>> {
+    let pm = PackageManager::new()?;
 
-impl Plugin {
-    const NAME: &'static str = "PackagedAppLauncher";
+    let packages = pm.FindPackagesByUserSecurityId(&HSTRING::default())?;
 
-    fn find_packaged_apps(&mut self) -> anyhow::Result<()> {
-        let pm = PackageManager::new()?;
+    let factory: IAppxFactory = unsafe { CoCreateInstance(&AppxFactory, None, CLSCTX_ALL)? };
 
-        let packages = pm.FindPackagesByUserSecurityId(&HSTRING::default())?;
-
-        let factory: IAppxFactory = unsafe { CoCreateInstance(&AppxFactory, None, CLSCTX_ALL)? };
-
-        self.apps = packages
-            .into_iter()
-            .filter_map(|package| apps_from_package(package, &factory).ok().flatten())
-            .flatten()
-            .collect();
-
-        Ok(())
-    }
-}
-
-impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &Config, _: &Path) -> anyhow::Result<Self> {
-        Ok(Self { apps: Vec::new() })
-    }
-
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
-
-    fn refresh(&mut self, _config: &Config) -> anyhow::Result<()> {
-        self.find_packaged_apps()
-    }
-
-    fn results(
-        &mut self,
-        query: &str,
-        matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
-        Ok(self
-            .apps
-            .iter()
-            .filter_map(|app| app.fuzzy_match(query, matcher))
-            .collect_non_empty())
-    }
-
-    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(app) = self.apps.iter().find(|app| app.id == id) {
-            app.execute(elevated)?;
-        }
-        Ok(())
-    }
+    Ok(packages
+        .into_iter()
+        .filter_map(move |package| apps_from_package(package, &factory).ok().flatten())
+        .flatten())
 }
 
 fn apps_from_package(

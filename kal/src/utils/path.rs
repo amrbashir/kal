@@ -19,24 +19,19 @@ impl<T: AsRef<Path>> PathExt for T {
     }
 }
 
-/// Resolve environment variables components in a path.
-///
-/// Resolves the follwing formats:
-/// - CMD: `%variable%`
-/// - PowerShell: `$Env:variable`
-/// - Bash: `$variable`.
-pub trait ResolveEnvVars {
-    /// Resolve environment variables components in a path.
+/// Expand environment variables components in a path.
+pub trait ExpandEnvVars {
+    /// Expand environment variables components in a path.
     ///
-    /// Resolves the follwing formats:
+    /// Expands the follwing formats:
     /// - CMD: `%variable%`
     /// - PowerShell: `$Env:variable`
     /// - Bash: `$variable`.
-    fn resolve_vars(&self) -> PathBuf;
+    fn expand_vars(&self) -> PathBuf;
 }
 
-impl<T: AsRef<Path>> ResolveEnvVars for T {
-    fn resolve_vars(&self) -> PathBuf {
+impl<T: AsRef<Path>> ExpandEnvVars for T {
+    fn expand_vars(&self) -> PathBuf {
         let mut out = PathBuf::new();
 
         for c in self.as_ref().components() {
@@ -98,37 +93,37 @@ mod tests {
         std::env::set_var(var, val);
 
         assert_eq!(
-            Path::new("/path/%VAR%/to/dir").resolve_vars(),
+            Path::new("/path/%VAR%/to/dir").expand_vars(),
             os_path("/path/VALUE/to/dir")
         );
 
         assert_eq!(
-            Path::new("/path/$env:VAR/to/dir").resolve_vars(),
+            Path::new("/path/$env:VAR/to/dir").expand_vars(),
             os_path("/path/VALUE/to/dir")
         );
 
         assert_eq!(
-            Path::new("/path/$EnV:VAR/to/dir").resolve_vars(),
+            Path::new("/path/$EnV:VAR/to/dir").expand_vars(),
             os_path("/path/VALUE/to/dir")
         );
 
         assert_eq!(
-            Path::new("/path/$VAR/to/dir").resolve_vars(),
+            Path::new("/path/$VAR/to/dir").expand_vars(),
             os_path("/path/VALUE/to/dir")
         );
 
         assert_eq!(
-            Path::new("/path/%NONEXISTENTVAR%/to/dir").resolve_vars(),
+            Path::new("/path/%NONEXISTENTVAR%/to/dir").expand_vars(),
             os_path("/path/%NONEXISTENTVAR%/to/dir")
         );
 
         assert_eq!(
-            Path::new("/path/$env:NONEXISTENTVAR/to/dir").resolve_vars(),
+            Path::new("/path/$env:NONEXISTENTVAR/to/dir").expand_vars(),
             os_path("/path/$env:NONEXISTENTVAR/to/dir")
         );
 
         assert_eq!(
-            Path::new("/path/$NONEXISTENTVAR/to/dir").resolve_vars(),
+            Path::new("/path/$NONEXISTENTVAR/to/dir").expand_vars(),
             os_path("/path/$NONEXISTENTVAR/to/dir")
         );
     }

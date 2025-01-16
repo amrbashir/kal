@@ -8,7 +8,7 @@ use url::Url;
 use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
-use crate::utils::{self, IteratorExt, ResolveEnvVars};
+use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", untagged)]
@@ -48,7 +48,7 @@ impl<'a> Workflow<'a> {
         for step in &self.steps {
             match &step {
                 WorkflowStep::Path { path, .. } => {
-                    let path = path.resolve_vars();
+                    let path = path.expand_vars();
                     utils::execute(path, elevated)?
                 }
                 WorkflowStep::Url { url } => utils::open_url(url)?,

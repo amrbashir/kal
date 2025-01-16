@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::icon::{self, BuiltInIcon, Icon};
 use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
-use crate::utils::{self, thread, IteratorExt, PathExt, ResolveEnvVars};
+use crate::utils::{self, thread, ExpandEnvVars, IteratorExt, PathExt};
 
 #[derive(Debug)]
 struct DirEntry {
@@ -87,7 +87,7 @@ impl Plugin {
         self.entries = self
             .paths
             .iter()
-            .map(ResolveEnvVars::resolve_vars)
+            .map(ExpandEnvVars::expand_vars)
             .filter_map(|path| read_dir(path).ok())
             .flatten()
             .map(|e| DirEntry::new(e.path(), &self.icons_dir))
