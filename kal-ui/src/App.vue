@@ -8,15 +8,11 @@
   margin: 0;
   box-sizing: border-box;
 
-  scrollbar-color: var(--neutral-fill-strong-rest) var(--neutral-fill-layer-rest);
   scrollbar-width: thin;
 }
 
-html,
-body {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+html {
+  color-scheme: light dark;
   font-family:
     "Segoe UI Variable",
     "Segoe UI",
@@ -29,6 +25,12 @@ body {
     "Open Sans",
     "Helvetica Neue",
     sans-serif;
+}
+
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .fade-leave-active,
