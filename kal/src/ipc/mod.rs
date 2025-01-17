@@ -78,6 +78,11 @@ pub fn make_ipc_protocol(
             match sender.send(AppEvent::Ipc { request, tx }) {
                 Ok(_) => {
                     proxy.wake_up();
+
+                    #[cfg(not(windows))]
+                    unimplemented!();
+
+                    #[cfg(windows)]
                     webview2_com::wait_with_pump(rx).unwrap()
                 }
                 Err(e) => anyhow::bail!("Failed to send `AppEvent::Ipc`: {e}"),

@@ -1,10 +1,7 @@
 use std::path::Path;
-use std::process::Command;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use windows::Win32::System::Power::SetSuspendState;
-use windows::Win32::System::Shutdown::LockWorkStation;
 
 use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
@@ -93,7 +90,13 @@ impl SystemCommand {
         }
     }
 
+    #[cfg(windows)]
     fn execute(&self) -> anyhow::Result<()> {
+        use std::process::Command;
+
+        use windows::Win32::System::Power::SetSuspendState;
+        use windows::Win32::System::Shutdown::LockWorkStation;
+
         match self {
             SystemCommand::Sleep => unsafe {
                 SetSuspendState(false, true, true);
@@ -111,6 +114,11 @@ impl SystemCommand {
         }
 
         Ok(())
+    }
+
+    #[cfg(not(windows))]
+    fn execute(&self) -> anyhow::Result<()> {
+        unimplemented!()
     }
 }
 

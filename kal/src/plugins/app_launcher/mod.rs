@@ -8,12 +8,14 @@ use crate::icon::{self};
 use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
 
+#[cfg(windows)]
 mod packaged_app;
 mod program;
 
 #[derive(Debug)]
 enum App {
     Program(program::Program),
+    #[cfg(windows)]
     Packaged(packaged_app::PackagedApp),
 }
 
@@ -21,28 +23,32 @@ impl App {
     fn id(&self) -> &str {
         match self {
             App::Program(program) => &program.id,
-            App::Packaged(packaged_app) => &packaged_app.id,
+    #[cfg(windows)]
+    App::Packaged(packaged_app) => &packaged_app.id,
         }
     }
 
     fn icon_path(&self) -> Option<(PathBuf, PathBuf)> {
         match self {
             App::Program(program) => Some((program.path.clone(), program.icon.clone())),
-            App::Packaged(_) => None,
+    #[cfg(windows)]
+    App::Packaged(_) => None,
         }
     }
 
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         match self {
             App::Program(program) => program.execute(elevated),
-            App::Packaged(packaged_app) => packaged_app.execute(elevated),
+    #[cfg(windows)]
+    App::Packaged(packaged_app) => packaged_app.execute(elevated),
         }
     }
 
     fn show_item_in_dir(&self) -> anyhow::Result<()> {
         match self {
             App::Program(program) => program.show_item_in_dir(),
-            App::Packaged(_) => Ok(()),
+    #[cfg(windows)]
+    App::Packaged(_) => Ok(()),
         }
     }
 }
@@ -51,7 +57,8 @@ impl IntoResultItem for App {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         match self {
             App::Program(program) => program.fuzzy_match(query, matcher),
-            App::Packaged(packaged_app) => packaged_app.fuzzy_match(query, matcher),
+    #[cfg(windows)]
+    App::Packaged(packaged_app) => packaged_app.fuzzy_match(query, matcher),
         }
     }
 }
@@ -116,7 +123,8 @@ impl Plugin {
             .map(App::Program)
             .collect();
 
-        if self.include_packaged_apps {
+    #[cfg(windows)]
+    if self.include_packaged_apps {
             if let Ok(packaged_apps) = packaged_app::find_all() {
                 self.apps.extend(packaged_apps.map(App::Packaged));
             }

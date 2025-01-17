@@ -20,7 +20,6 @@ use wry::http::{Request, Response};
 use crate::config::Config;
 use crate::ipc::{response, IpcAction, IpcEvent};
 use crate::plugin::PluginStore;
-use crate::utils;
 use crate::webview_window::WebViewWindow;
 
 pub enum AppEvent {
@@ -261,7 +260,7 @@ impl App {
 
             #[cfg(windows)]
             AppEvent::SystemSettingsChanged => {
-                if let Some(system_accent_color) = utils::system_accent_color() {
+                if let Some(system_accent_color) = crate::utils::system_accent_color() {
                     for window in self.windows.values() {
                         window.emit(IpcEvent::UpdateSystemAccentColor, &system_accent_color)?;
                     }
@@ -301,6 +300,7 @@ impl ApplicationHandler for App {
         event: WindowEvent,
     ) {
         match event {
+            #[cfg(windows)]
             WindowEvent::RedrawRequested => {
                 for window in self.windows.values_mut() {
                     if let Err(e) = window.clear_window_surface() {

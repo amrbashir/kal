@@ -11,10 +11,12 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::platform::windows::*;
 use winit::window::{Window, WindowAttributes, WindowId};
 use wry::http::{Request, Response};
-use wry::{WebView, WebViewBuilder, WebViewBuilderExtWindows, WebViewId};
+#[cfg(windows)]
+use wry::WebViewBuilderExtWindows;
+use wry::{WebView, WebViewBuilder, WebViewId};
 
 use crate::app::AppEvent;
-use crate::{icon, ipc, utils};
+use crate::{icon, ipc};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Vibrancy {
@@ -32,21 +34,24 @@ pub struct WebViewWindowBuilder<'a> {
 
 impl WebViewWindowBuilder<'_> {
     pub fn new() -> Self {
-        let window_attrs = WindowAttributes::default()
-            .with_class_name("KalWindowClass")
-            .with_clip_children(false);
+        let mut window_attrs = WindowAttributes::default();
 
-        let system_accent_color = utils::system_accent_color();
-        let system_accent_script = format!(
-            r#"(function () {{ window.KAL.systemAccentColor = '{}'; }})()"#,
-            system_accent_color.unwrap_or_default()
-        );
-
-        let webview_builder = WebViewBuilder::new()
+        let mut webview_builder = WebViewBuilder::new()
             .with_initialization_script(ipc::INIT_SCRIPT)
-            .with_initialization_script(&system_accent_script)
-            .with_hotkeys_zoom(false)
-            .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
+            .with_hotkeys_zoom(false);
+
+        #[cfg(windows)]
+        {
+            window_attrs = window_attrs.with_class_name("KalWindowClass").with_undecorated_shadow(true).with_clip_children(false);
+            let system_accent_color = crate::utils::system_accent_color();
+            let system_accent_script = format!(
+                r#"(function () {{ window.KAL.systemAccentColor = '{}'; }})()"#,
+                system_accent_color.unwrap_or_default()
+            );
+            webview_builder = webview_builder
+                .with_initialization_script(&system_accent_script)
+                .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
+        }
 
         Self {
             window_attrs,
@@ -92,17 +97,23 @@ impl WebViewWindowBuilder<'_> {
     }
 
     pub fn skip_taskbar(mut self, skip_taskbar: bool) -> Self {
-        self.window_attrs = self.window_attrs.with_skip_taskbar(skip_taskbar);
+        #[cfg(windows)]
+        {
+            self.window_attrs = self.window_attrs.with_skip_taskbar(skip_taskbar);
+        }
         self
     }
 
     pub fn vibrancy(mut self, vibrancy: Option<Vibrancy>) -> Self {
-        self.window_attrs = self.window_attrs.with_system_backdrop(match vibrancy {
-            Some(Vibrancy::Mica) => BackdropType::MainWindow,
-            Some(Vibrancy::Tabbed) => BackdropType::TabbedWindow,
-            Some(Vibrancy::Acrylic) => BackdropType::TransientWindow,
-            _ => BackdropType::None,
-        });
+        #[cfg(windows)]
+        {
+            self.window_attrs = self.window_attrs.with_system_backdrop(match vibrancy {
+                Some(Vibrancy::Mica) => BackdropType::MainWindow,
+                Some(Vibrancy::Tabbed) => BackdropType::TabbedWindow,
+                Some(Vibrancy::Acrylic) => BackdropType::TransientWindow,
+                _ => BackdropType::None,
+            });
+        }
         self
     }
 
@@ -179,8 +190,6 @@ impl WebViewWindowBuilder<'_> {
         }
 
         let window = event_loop.create_window(self.window_attrs)?;
-
-        window.set_undecorated_shadow(true);
 
         let window: Rc<dyn Window> = Rc::from(window);
 

@@ -1,12 +1,13 @@
 pub mod path;
 pub mod shell;
 
-use windows::UI::ViewManagement::*;
-
 pub use self::path::*;
 pub use self::shell::*;
 
+#[cfg(windows)]
 pub fn system_accent_color() -> Option<String> {
+    use windows::UI::ViewManagement::*;
+
     let settings = UISettings::new().ok()?;
     let color = settings.GetColorValue(UIColorType::AccentLight2).ok()?;
     let color_rgb = format!("rgba({},{},{},{})", color.R, color.G, color.B, color.A);
