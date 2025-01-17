@@ -4,12 +4,9 @@ use winit::event_loop::ActiveEventLoop;
 
 use crate::app::App;
 use crate::ipc::IpcEvent;
-use crate::utils;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 const INIT_TEMPLATE: &str = r#"(function () {
-  window.KAL.systemAccentColor = __TEMPLATE_system_accent_color__;
-
   window.KAL.config = __RAW_config__;
 
   let custom_css = __TEMPLATE_custom_css__;
@@ -27,7 +24,6 @@ const INIT_TEMPLATE: &str = r#"(function () {
 struct InitScript<'a> {
     #[raw]
     config: &'a serde_json::value::RawValue,
-    system_accent_color: Option<&'a str>,
     custom_css: Option<&'a str>,
 }
 
@@ -44,8 +40,6 @@ impl App {
     const MAIN_WINDOW_URL: &str = "kal://localhost/";
 
     pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
-        let system_accent_color = utils::system_accent_color();
-
         let config = serde_json::value::to_raw_value(&self.config)?;
 
         let custom_css = self
@@ -60,7 +54,6 @@ impl App {
         let init_script = InitScript {
             config: &config,
             custom_css: custom_css.as_deref(),
-            system_accent_color: system_accent_color.as_deref(),
         }
         .render(INIT_TEMPLATE, &js_ser_opts)?;
 

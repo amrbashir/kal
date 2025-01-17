@@ -28,6 +28,7 @@ pub enum IpcAction {
 pub enum IpcEvent {
     FocusInput,
     UpdateConfig,
+    UpdateSystemAccentColor,
 }
 
 const EMIT_TEMPLATE: &str = r#"(function(){{

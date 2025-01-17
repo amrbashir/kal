@@ -152,7 +152,15 @@ onMounted(() =>
   }),
 );
 
-// styles
+const accentColor = accentFillRest.getValueFor(document.documentElement).toColorString();
+const systemAccentColor = ref<string>(window.KAL.systemAccentColor ?? accentColor);
+onMounted(() =>
+  window.KAL.ipc.on<string>(IpcEvent.UpdateSystemAccentColor, (newColor) => {
+    systemAccentColor.value = newColor;
+    window.KAL.systemAccentColor = newColor;
+  }),
+);
+
 const isTransparent = computed(() => config.value.appearance.transparent);
 const bgPrimaryColor = computed(() =>
   isTransparent.value ? "bg-transparent" : "bg-[rgba(21,_20,_20,_0.75)]",
@@ -160,9 +168,6 @@ const bgPrimaryColor = computed(() =>
 const inputHeight = computed(() => `${config.value.appearance.input_height}px`);
 const itemHeight = computed(() => `${config.value.appearance.item_height}px`);
 const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
-
-const accentColor = accentFillRest.getValueFor(document.documentElement).toColorString();
-const systemAccentColor = window.KAL.systemAccentColor ?? accentColor;
 </script>
 
 <template>

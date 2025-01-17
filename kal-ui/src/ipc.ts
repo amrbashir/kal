@@ -10,4 +10,5 @@ export enum IpcAction {
 export enum IpcEvent {
   FocusInput = "FocusInput",
   UpdateConfig = "UpdateConfig",
+  UpdateSystemAccentColor = "UpdateSystemAccentColor",
 }

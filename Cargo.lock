@@ -617,13 +617,12 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "dpi"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
 
 [[package]]
 name = "dpi"
 version = "0.1.1"
-source = "git+https://github.com/rust-windowing/winit?rev=69382fda#69382fda9aaa09ce674637afd31ad7da0f9d87e8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f25c0e292a7ca6d6498557ff1df68f32c99850012b6ea401cf8daf771f22ff53"
 
 [[package]]
 name = "drm"
@@ -3923,7 +3922,6 @@ checksum = "271414315aff87387382ec3d271b52d7ae78726f5d44ac98b4f4030c91880486"
 [[package]]
 name = "winit"
 version = "0.30.7"
-source = "git+https://github.com/rust-windowing/winit?rev=69382fda#69382fda9aaa09ce674637afd31ad7da0f9d87e8"
 dependencies = [
  "ahash",
  "android-activity",
@@ -3937,7 +3935,7 @@ dependencies = [
  "core-foundation 0.9.4",
  "core-graphics 0.23.2",
  "cursor-icon",
- "dpi 0.1.1 (git+https://github.com/rust-windowing/winit?rev=69382fda)",
+ "dpi 0.1.1",
  "js-sys",
  "libc",
  "memmap2",

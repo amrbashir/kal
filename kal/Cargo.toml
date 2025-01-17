@@ -12,7 +12,7 @@ embed-manifest = "1.4"
 
 [dependencies]
 wry = { git = "https://github.com/tauri-apps/wry", rev = "46db839b" }
-winit = { git = "https://github.com/rust-windowing/winit", rev = "69382fda" }
+winit = { path = "../../winit" }
 serde = "1"
 serde_json = "1"
 toml = "0.8"

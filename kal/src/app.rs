@@ -20,6 +20,7 @@ use wry::http::{Request, Response};
 use crate::config::Config;
 use crate::ipc::{response, IpcAction, IpcEvent};
 use crate::plugin::PluginStore;
+use crate::utils;
 use crate::webview_window::WebViewWindow;
 
 pub enum AppEvent {
@@ -28,6 +29,8 @@ pub enum AppEvent {
         request: wry::http::Request<Vec<u8>>,
         tx: mpsc::SyncSender<anyhow::Result<wry::http::Response<Cow<'static, [u8]>>>>,
     },
+    #[cfg(windows)]
+    SystemSettingsChanged,
 }
 
 pub struct App {
@@ -189,6 +192,49 @@ impl App {
         response::empty()
     }
 
+    #[cfg(windows)]
+    fn listen_for_settings_change(&self, event_loop: &dyn ActiveEventLoop) {
+        use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+        use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+        use winit::platform::windows::ActiveEventLoopExtWindows;
+        use wry::raw_window_handle::RawWindowHandle;
+
+        let Ok(handle) = event_loop.rwh_06_window_handle().window_handle() else {
+            return;
+        };
+
+        let RawWindowHandle::Win32(handle) = handle.as_raw() else {
+            return;
+        };
+
+        let hwnd = HWND(handle.hwnd.get() as _);
+
+        let userdata = Box::new((self.sender.clone(), self.event_loop_proxy.clone()));
+        let userdata = Box::into_raw(userdata);
+
+        let _ = unsafe { SetWindowSubclass(hwnd, Some(event_loop_subclass), 0, userdata as _) };
+
+        unsafe extern "system" fn event_loop_subclass(
+            hwnd: HWND,
+            umsg: u32,
+            wparam: WPARAM,
+            lparam: LPARAM,
+            _: usize,
+            userdata: usize,
+        ) -> LRESULT {
+            if umsg == WM_SETTINGCHANGE {
+                let userdata = userdata as *const (mpsc::Sender<AppEvent>, EventLoopProxy);
+                let (sender, proxy) = &*userdata;
+
+                let event = AppEvent::SystemSettingsChanged;
+                let _ = sender.send(event).inspect_err(|e| tracing::error!("{e}"));
+                proxy.wake_up();
+            }
+
+            DefSubclassProc(hwnd, umsg, wparam, lparam)
+        }
+    }
+
     fn app_event(
         &mut self,
         _event_loop: &dyn ActiveEventLoop,
@@ -211,6 +257,15 @@ impl App {
                     .send(res)
                     .inspect_err(|e| tracing::error!("Failed to send ipc response: {e}"));
             }
+
+            #[cfg(windows)]
+            AppEvent::SystemSettingsChanged => {
+                if let Some(system_accent_color) = utils::system_accent_color() {
+                    for window in self.windows.values() {
+                        window.emit(IpcEvent::UpdateSystemAccentColor, &system_accent_color)?;
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -218,6 +273,13 @@ impl App {
 }
 
 impl ApplicationHandler for App {
+    #[cfg(windows)]
+    fn new_events(&mut self, event_loop: &dyn ActiveEventLoop, cause: winit::event::StartCause) {
+        if cause == winit::event::StartCause::Init {
+            self.listen_for_settings_change(event_loop);
+        }
+    }
+
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         self.create_main_window(event_loop)
             .expect("Failed to create main window");

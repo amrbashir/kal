@@ -14,7 +14,7 @@ use wry::http::{Request, Response};
 use wry::{WebView, WebViewBuilder, WebViewBuilderExtWindows, WebViewId};
 
 use crate::app::AppEvent;
-use crate::{icon, ipc};
+use crate::{icon, ipc, utils};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Vibrancy {
@@ -36,8 +36,15 @@ impl WebViewWindowBuilder<'_> {
             .with_class_name("KalWindowClass")
             .with_clip_children(false);
 
+        let system_accent_color = utils::system_accent_color();
+        let system_accent_script = format!(
+            r#"(function () {{ window.KAL.systemAccentColor = '{}'; }})()"#,
+            system_accent_color.unwrap_or_default()
+        );
+
         let webview_builder = WebViewBuilder::new()
             .with_initialization_script(ipc::INIT_SCRIPT)
+            .with_initialization_script(&system_accent_script)
             .with_hotkeys_zoom(false)
             .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
 
