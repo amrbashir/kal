@@ -16,7 +16,7 @@ pub const INIT_SCRIPT: &str = include_str!("./ipc.js");
 
 #[derive(EnumString, AsRefStr)]
 pub enum IpcAction {
-    Search,
+    Query,
     ClearResults,
     Execute,
     ShowItemInDir,

@@ -129,7 +129,7 @@ impl App {
         let action: IpcAction = request.uri().path()[1..].try_into()?;
 
         match action {
-            IpcAction::Search => {
+            IpcAction::Query => {
                 let body = request.body();
                 let query = std::str::from_utf8(body)?;
 

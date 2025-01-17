@@ -55,15 +55,14 @@ const results = ref<ResultItem[]>([]);
 const resultItemRefs = useTemplateRef("result-item-refs");
 
 const currentQuery = ref("");
-watchDebounced(currentQuery, (query) => search(query), {
+watchDebounced(currentQuery, (query) => runQuery(query), {
   debounce: 200,
   maxWait: 1000,
 });
 
-async function search(query: string) {
+async function runQuery(query: string) {
   if (query) {
-    const response: ResultItem[] = await window.KAL.ipc.invoke(IpcAction.Search, query);
-
+    const response: ResultItem[] = await window.KAL.ipc.invoke(IpcAction.Query, query);
     currentSelection.value = 0;
     results.value = response;
   } else {
@@ -140,7 +139,7 @@ async function onkeydown(e: KeyboardEvent) {
     refreshingIndex.value = true;
     await window.KAL.ipc.invoke(IpcAction.RefreshIndex);
     setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for nicer animation
-    search(currentQuery.value);
+    runQuery(currentQuery.value);
   }
 }
 

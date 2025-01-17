@@ -16,7 +16,7 @@ pub trait Plugin: Debug {
 
     /// Gets the name of the plugin.
     ///
-    /// usually used to identify the origin of a [`SearchResultItem`]
+    /// usually used to identify the origin of a [`ResultItem`]
     /// and the plugin to exceute it.
     fn name(&self) -> &'static str;
 
@@ -25,7 +25,7 @@ pub trait Plugin: Debug {
         Ok(())
     }
 
-    /// Gets [SearchResultItem]s for this query
+    /// Gets [ResultItem]s for this query
     fn results(
         &mut self,
         query: &str,

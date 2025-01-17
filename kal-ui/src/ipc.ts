@@ -1,5 +1,5 @@
 export enum IpcAction {
-  Search = "Search",
+  Query = "Query",
   ClearResults = "ClearResults",
   Execute = "Execute",
   ShowItemInDir = "ShowItemInDir",
