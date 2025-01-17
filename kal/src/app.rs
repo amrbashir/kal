@@ -165,10 +165,20 @@ impl App {
             }
 
             IpcAction::RefreshIndex => {
+                let old_hotkey = self.config.general.hotkey.clone();
                 self.config = Config::load()?;
+
                 self.plugin_store.refresh(&self.config)?;
+
                 let main_window = self.main_window();
                 main_window.emit(IpcEvent::UpdateConfig, &self.config)?;
+
+                let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
+                let new_hotkey = HotKey::try_from(self.config.general.hotkey.as_str())?;
+                if old_hotkey != new_hotkey {
+                    self.global_hotkey_manager.unregister(old_hotkey)?;
+                    self.global_hotkey_manager.register(new_hotkey)?;
+                }
             }
 
             IpcAction::HideMainWindow => {
