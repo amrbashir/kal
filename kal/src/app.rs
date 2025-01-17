@@ -59,7 +59,7 @@ impl App {
         let config = Config::load()?;
 
         let mut plugin_store = crate::plugins::all(&config, &data_dir)?;
-        if let Err(e) = plugin_store.refresh(&config) {
+        if let Err(e) = plugin_store.reload(&config) {
             tracing::error!("{e}");
         }
 
@@ -167,11 +167,11 @@ impl App {
                 self.hide_main_window(false);
             }
 
-            IpcAction::RefreshIndex => {
+            IpcAction::Reload => {
                 let old_hotkey = self.config.general.hotkey.clone();
                 self.config = Config::load()?;
 
-                self.plugin_store.refresh(&self.config)?;
+                self.plugin_store.reload(&self.config)?;
 
                 let main_window = self.main_window();
                 main_window.emit(IpcEvent::UpdateConfig, &self.config)?;

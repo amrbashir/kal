@@ -20,8 +20,8 @@ pub trait Plugin: Debug {
     /// and the plugin to exceute it.
     fn name(&self) -> &'static str;
 
-    /// Refreshs the cache and configuration of the plugin
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+    /// Reloads the cache and configuration of the plugin
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -132,7 +132,7 @@ impl PluginStore {
             .collect()
     }
 
-    pub fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+    pub fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         for plugin in self.plugins.iter_mut() {
             // update plugin generic config
             let default_generic_config = plugin.default_generic_config();
@@ -145,9 +145,9 @@ impl PluginStore {
             plugin.include_in_global_results = generic_config.include_in_global_results();
             plugin.direct_activation_command = generic_config.direct_activation_command;
 
-            // run plugin refresh if enabled
+            // run plugin reload if enabled
             if plugin.enabled {
-                plugin.refresh(config)?;
+                plugin.reload(config)?;
             }
         }
 

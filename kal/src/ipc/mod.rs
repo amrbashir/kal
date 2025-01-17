@@ -20,7 +20,7 @@ pub enum IpcAction {
     ClearResults,
     Execute,
     ShowItemInDir,
-    RefreshIndex,
+    Reload,
     HideMainWindow,
 }
 

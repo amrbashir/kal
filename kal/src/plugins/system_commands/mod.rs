@@ -153,7 +153,7 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn refresh(&mut self, _config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
 

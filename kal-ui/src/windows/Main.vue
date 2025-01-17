@@ -5,7 +5,7 @@ import { watchDebounced } from "@vueuse/core";
 import { ResultItem } from "../result_item";
 import { IpcEvent, IpcAction } from "../ipc";
 import { accentFillRest } from "@fluentui/web-components";
-import RefreshIcon from "../components/RefreshIcon.vue";
+import ReloadIcon from "../components/ReloadIcon.vue";
 import ResultItemComponent from "../components/ResultItem.vue";
 
 const inputRef = useTemplateRef<HTMLElement>("input-ref");
@@ -18,7 +18,7 @@ onMounted(() =>
   }),
 );
 
-const refreshingIndex = ref(false);
+const reloading = ref(false);
 
 const gettingConfirmation = ref(false);
 const gettingConfirmationIndex = ref(0);
@@ -136,9 +136,9 @@ async function onkeydown(e: KeyboardEvent) {
 
   if (e.ctrlKey && e.key === "r") {
     e.preventDefault();
-    refreshingIndex.value = true;
-    await window.KAL.ipc.invoke(IpcAction.RefreshIndex);
-    setTimeout(() => (refreshingIndex.value = false), 500); // artifical delay for nicer animation
+    reloading.value = true;
+    await window.KAL.ipc.invoke(IpcAction.Reload);
+    setTimeout(() => (reloading.value = false), 500); // artifical delay for nicer animation
     runQuery(currentQuery.value);
   }
 }
@@ -186,7 +186,7 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
     >
       <div slot="clear-button" class="flex justify-center items-center">
         <Transition name="fade">
-          <RefreshIcon v-if="refreshingIndex" class="animate-spin" />
+          <ReloadIcon v-if="reloading" class="animate-spin" />
           <span v-else></span>
         </Transition>
       </div>

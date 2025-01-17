@@ -99,7 +99,7 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.es = config.es.unwrap_or_else(|| PathBuf::from("es"));
         Ok(())

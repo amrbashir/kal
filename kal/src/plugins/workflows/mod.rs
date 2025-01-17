@@ -123,7 +123,7 @@ impl crate::plugin::Plugin for Plugin<'_> {
         Self::NAME
     }
 
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         let config = config.plugin_config::<PluginConfig>(self.name());
 
         self.workflows = config.workflows;

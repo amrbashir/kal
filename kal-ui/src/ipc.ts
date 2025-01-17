@@ -3,7 +3,7 @@ export enum IpcAction {
   ClearResults = "ClearResults",
   Execute = "Execute",
   ShowItemInDir = "ShowItemInDir",
-  RefreshIndex = "RefreshIndex",
+  Reload = "Reload",
   HideMainWindow = "HideMainWindow",
 }
 

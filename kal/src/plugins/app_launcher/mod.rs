@@ -140,7 +140,7 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
         self.find_apps();
 
