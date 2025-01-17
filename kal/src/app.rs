@@ -18,7 +18,7 @@ use winit::window::WindowId;
 use wry::http::{Request, Response};
 
 use crate::config::Config;
-use crate::ipc::{response, IpcAction};
+use crate::ipc::{response, IpcAction, IpcEvent};
 use crate::plugin::PluginStore;
 use crate::webview_window::WebViewWindow;
 
@@ -165,9 +165,10 @@ impl App {
             }
 
             IpcAction::RefreshIndex => {
-                let config = Config::load()?;
-                self.plugin_store.refresh(&config)?;
-                self.config = config;
+                self.config = Config::load()?;
+                self.plugin_store.refresh(&self.config)?;
+                let main_window = self.main_window();
+                main_window.emit(IpcEvent::UpdateConfig, &self.config)?;
             }
 
             IpcAction::HideMainWindow => {

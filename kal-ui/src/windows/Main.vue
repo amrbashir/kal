@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref, useTemplateRef } from "vue";
+import { computed, onMounted, ref, useTemplateRef } from "vue";
 import { isVScrollable } from "../utils";
 import { watchDebounced } from "@vueuse/core";
 import { ResultItem } from "../result_item";
@@ -144,14 +144,25 @@ async function onkeydown(e: KeyboardEvent) {
   }
 }
 
+const config = ref<KalConfig>(window.KAL.config);
+onMounted(() =>
+  window.KAL.ipc.on<KalConfig>(IpcEvent.UpdateConfig, (newConfig) => {
+    config.value = newConfig;
+    window.KAL.config = newConfig;
+  }),
+);
+
 // styles
+const isTransparent = computed(() => config.value.appearance.transparent);
+const bgPrimaryColor = computed(() =>
+  isTransparent.value ? "bg-transparent" : "bg-[rgba(21,_20,_20,_0.75)]",
+);
+const inputHeight = computed(() => `${config.value.appearance.input_height}px`);
+const itemHeight = computed(() => `${config.value.appearance.item_height}px`);
+const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
+
 const accentColor = accentFillRest.getValueFor(document.documentElement).toColorString();
 const systemAccentColor = window.KAL.systemAccentColor ?? accentColor;
-const isTransparent = window.KAL.config.appearance.transparent;
-const bgPrimaryColor = isTransparent ? "bg-transparent" : "bg-[rgba(21,_20,_20,_0.75)]";
-const inputHeight = `${window.KAL.config.appearance.input_height}px`;
-const itemHeight = `${window.KAL.config.appearance.item_height}px`;
-const itemsContainerHeight = `calc(100% - ${inputHeight})`;
 </script>
 
 <template>

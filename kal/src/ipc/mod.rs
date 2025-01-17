@@ -27,6 +27,7 @@ pub enum IpcAction {
 #[derive(EnumString, AsRefStr)]
 pub enum IpcEvent {
     FocusInput,
+    UpdateConfig,
 }
 
 const EMIT_TEMPLATE: &str = r#"(function(){{
@@ -63,11 +64,12 @@ pub fn emit(
 
 pub const PROTOCOL_NAME: &str = "kalipc";
 
+type ProtocolReturn = anyhow::Result<Response<Cow<'static, [u8]>>>;
+
 pub fn make_ipc_protocol(
     sender: Sender<AppEvent>,
     proxy: EventLoopProxy,
-) -> impl Fn(WebViewId, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>> + 'static
-{
+) -> impl Fn(WebViewId, Request<Vec<u8>>) -> ProtocolReturn + 'static {
     move |_, request| match *request.method() {
         Method::OPTIONS => self::response::empty(),
         Method::POST => {

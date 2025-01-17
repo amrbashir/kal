@@ -23,8 +23,8 @@ Object.defineProperty(window, "KAL", {
         }
       },
 
-      async invoke(protocol, action, ...payload) {
-        const url = this.kalipc(protocol, action);
+      async invoke(action, ...payload) {
+        const url = this.makeProtocolUrl("kalipc", action);
 
         let buffer = new ArrayBuffer(0);
         let view = new Uint8Array(buffer);
