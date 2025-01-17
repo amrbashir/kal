@@ -59,9 +59,9 @@ impl App {
         let config = Config::load()?;
 
         let mut plugin_store = crate::plugins::all(&config, &data_dir)?;
-        let _ = plugin_store
-            .refresh(&config)
-            .inspect_err(|e| tracing::error!("{e}"));
+        if let Err(e) = plugin_store.refresh(&config) {
+            tracing::error!("{e}");
+        }
 
         let global_hotkey_manager = GlobalHotKeyManager::new()?;
         global_hotkey_manager.register(HotKey::try_from(config.general.hotkey.as_str())?)?;
@@ -226,9 +226,10 @@ impl App {
                 let userdata = userdata as *const (mpsc::Sender<AppEvent>, EventLoopProxy);
                 let (sender, proxy) = &*userdata;
 
-                let event = AppEvent::SystemSettingsChanged;
-                let _ = sender.send(event).inspect_err(|e| tracing::error!("{e}"));
-                proxy.wake_up();
+                match sender.send(AppEvent::SystemSettingsChanged) {
+                    Ok(_) => proxy.wake_up(),
+                    Err(e) => tracing::error!("{e}"),
+                }
             }
 
             DefSubclassProc(hwnd, umsg, wparam, lparam)
@@ -253,9 +254,9 @@ impl App {
 
             AppEvent::Ipc { request, tx } => {
                 let res = self.ipc_event(request);
-                let _ = tx
-                    .send(res)
-                    .inspect_err(|e| tracing::error!("Failed to send ipc response: {e}"));
+                if let Err(e) = tx.send(res) {
+                    tracing::error!("Failed to send ipc response: {e}");
+                }
             }
 
             #[cfg(windows)]
@@ -287,9 +288,9 @@ impl ApplicationHandler for App {
 
     fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
         while let Ok(action) = self.receiver.try_recv() {
-            let _ = self
-                .app_event(event_loop, action)
-                .inspect_err(|e| tracing::error!("Error while processing `AppEvent`: {e}"));
+            if let Err(e) = self.app_event(event_loop, action) {
+                tracing::error!("Error while processing `AppEvent`: {e}");
+            }
         }
     }
 
@@ -302,9 +303,9 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::RedrawRequested => {
                 for window in self.windows.values_mut() {
-                    let _ = window
-                        .clear_window_surface()
-                        .inspect_err(|e| tracing::error!("{e}"));
+                    if let Err(e) = window.clear_window_surface() {
+                        tracing::error!("{e}");
+                    }
                 }
             }
 

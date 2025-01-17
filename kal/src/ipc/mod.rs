@@ -75,10 +75,13 @@ pub fn make_ipc_protocol(
         Method::OPTIONS => self::response::empty(),
         Method::POST => {
             let (tx, rx) = mpsc::sync_channel(1);
-            let event = AppEvent::Ipc { request, tx };
-            let _ = sender.send(event).inspect_err(|e| tracing::error!("{e}"));
-            proxy.wake_up();
-            webview2_com::wait_with_pump(rx).unwrap()
+            match sender.send(AppEvent::Ipc { request, tx }) {
+                Ok(_) => {
+                    proxy.wake_up();
+                    webview2_com::wait_with_pump(rx).unwrap()
+                }
+                Err(e) => anyhow::bail!("Failed to send `AppEvent::Ipc`: {e}"),
+            }
         }
         _ => self::response::error("Only POST or OPTIONS method are supported"),
     }

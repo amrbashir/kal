@@ -247,7 +247,7 @@ impl WebViewWindow {
     }
 
     #[cfg(windows)]
-    pub fn set_dwmwa_transitions(&self, enable: bool) -> anyhow::Result<()> {
+    pub fn set_dwmwa_transitions(&self, enable: bool) {
         use windows::Win32::Foundation::{BOOL, HWND};
         use windows::Win32::Graphics::Dwm::{
             DwmSetWindowAttribute, DWMWA_TRANSITIONS_FORCEDISABLED,
@@ -260,16 +260,12 @@ impl WebViewWindow {
         };
 
         let hwnd = HWND(raw.hwnd.get() as _);
-        let enable = BOOL(!enable as _);
-        unsafe {
-            DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_TRANSITIONS_FORCEDISABLED,
-                &enable as *const _ as *const _,
-                std::mem::size_of::<BOOL>() as u32,
-            )
-            .inspect_err(|e| tracing::error!("{e}"))
-            .map_err(Into::into)
+        let disable = BOOL(!enable as _);
+        let disable = &disable as *const _ as *const _;
+        let flag = DWMWA_TRANSITIONS_FORCEDISABLED;
+        let size = std::mem::size_of::<BOOL>() as u32;
+        if let Err(e) = unsafe { DwmSetWindowAttribute(hwnd, flag, disable, size) } {
+            tracing::error!("Failed to change DWMWA_TRANSITIONS_FORCEDISABLED {e}");
         }
     }
 

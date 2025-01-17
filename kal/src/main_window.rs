@@ -80,7 +80,7 @@ impl App {
         let window = builder.build(event_loop)?;
 
         #[cfg(windows)]
-        let _ = window.set_dwmwa_transitions(false);
+        window.set_dwmwa_transitions(false);
 
         self.windows.insert(Self::MAIN_WINDOW_KEY, window);
 
