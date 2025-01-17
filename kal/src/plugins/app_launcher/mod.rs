@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::icon::{self};
 use crate::result_item::{IntoResultItem, ResultItem};
-use crate::utils::{thread, IteratorExt};
+use crate::utils::IteratorExt;
 
 mod packaged_app;
 mod program;
@@ -151,10 +151,8 @@ impl crate::plugin::Plugin for Plugin {
             .filter_map(App::icon_path)
             .collect::<Vec<_>>();
 
-        thread::spawn(move || {
-            std::fs::create_dir_all(icons_dir)?;
-            icon::extract_multiple(paths)
-        });
+        std::fs::create_dir_all(icons_dir)?;
+        icon::extract_multiple(paths)?;
 
         Ok(())
     }

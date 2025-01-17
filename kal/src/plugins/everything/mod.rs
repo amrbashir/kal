@@ -115,8 +115,13 @@ impl crate::plugin::Plugin for Plugin {
             .args(["-n", "24"]) // TODO: pull from config
             .output()?;
 
-        if !output.status.success() {
-            return Ok(None);
+        match output.status.success() {
+            true => {}
+            false => {
+                let stderr = std::str::from_utf8(&output.stderr).unwrap_or_default();
+                tracing::error!("[Plugin][Everything]: {}", stderr);
+                return Ok(None);
+            }
         }
 
         let output = String::from_utf8_lossy(output.stdout.as_slice());

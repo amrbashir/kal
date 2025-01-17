@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::icon::{self, BuiltInIcon, Icon};
 use crate::result_item::{IntoResultItem, ResultItem};
-use crate::utils::{self, thread, ExpandEnvVars, IteratorExt, PathExt};
+use crate::utils::{self, ExpandEnvVars, IteratorExt, PathExt};
 
 #[derive(Debug)]
 struct DirEntry {
@@ -121,10 +121,8 @@ impl crate::plugin::Plugin for Plugin {
             .filter_map(|e| e.icon.as_ref().map(|icon| (e.path.clone(), icon.clone())))
             .collect::<Vec<_>>();
 
-        thread::spawn(move || {
-            std::fs::create_dir_all(icons_dir)?;
-            icon::extract_multiple(paths)
-        });
+        std::fs::create_dir_all(icons_dir)?;
+        icon::extract_multiple(paths)?;
 
         Ok(())
     }

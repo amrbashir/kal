@@ -1,6 +1,5 @@
 pub mod path;
 pub mod shell;
-pub mod thread;
 
 use windows::UI::ViewManagement::*;
 

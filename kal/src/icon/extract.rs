@@ -9,8 +9,6 @@ use windows::Win32::Graphics::Gdi::*;
 use windows::Win32::UI::Shell::*;
 use windows::Win32::UI::WindowsAndMessaging::*;
 
-use crate::utils;
-
 /// Extract icons as png from paths.
 pub fn extract_multiple<I, P, P2>(files: I) -> anyhow::Result<()>
 where
@@ -43,9 +41,7 @@ where
 
     let file = file.as_ref().to_path_buf();
 
-    utils::thread::spawn(move || extract(file, out)); // TODO: use async
-
-    Ok(())
+    extract(file, out)
 }
 
 /// Extract icon as png from path.
