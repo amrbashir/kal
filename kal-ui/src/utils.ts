@@ -1,4 +1,4 @@
-import { Icon, IconType } from "./search_result_item";
+import { Icon, IconType } from "./result_item";
 
 export function makeIconHTML(icon: Icon): string {
   switch (icon.type) {

@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
-import Run from "./windows/Run.vue";
+import Main from "./windows/Main.vue";
 
 const routes = [
   {
-    path: "/Run",
-    component: Run,
+    path: "/",
+    component: Main,
   },
 ];
 

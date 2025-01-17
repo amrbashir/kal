@@ -11,13 +11,15 @@ use windows::Win32::Foundation::HWND;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
 use winit::application::ApplicationHandler;
+use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
+use wry::http::{Request, Response};
 
 use crate::config::Config;
+use crate::ipc::{response, IpcAction};
 use crate::plugin::PluginStore;
-use crate::utils::thread;
 use crate::webview_window::WebViewWindow;
 
 pub enum AppEvent {
@@ -52,12 +54,11 @@ impl App {
         let (sender, receiver) = mpsc::channel();
 
         let config = Config::load()?;
-        let plugin_store = crate::plugins::all(&config, &data_dir)?;
-        {
-            let config = config.clone();
-            let mut plugin_store = plugin_store.clone();
-            thread::spawn(move || plugin_store.refresh(&config));
-        }
+
+        let mut plugin_store = crate::plugins::all(&config, &data_dir)?;
+        let _ = plugin_store
+            .refresh(&config)
+            .inspect_err(|e| tracing::error!("{e}"));
 
         let global_hotkey_manager = GlobalHotKeyManager::new()?;
         global_hotkey_manager.register(HotKey::try_from(config.general.hotkey.as_str())?)?;
@@ -99,6 +100,82 @@ impl App {
     #[cfg(windows)]
     pub fn restore_prev_foreground_hwnd(&self) {
         let _ = unsafe { SetForegroundWindow(self.previously_foreground_hwnd) };
+    }
+
+    fn resize_main_window_for_items(&self, count: usize) {
+        let main_window = self.main_window();
+
+        let items_height = if count == 0 {
+            0
+        } else {
+            let count = std::cmp::min(count, self.config.appearance.max_items as usize) as u32;
+            let item_height = self.config.appearance.item_height + self.config.appearance.item_gap;
+            self.config.appearance.input_items_gap + count * item_height
+        };
+
+        let height = self.config.appearance.input_height + items_height + Self::MAGIC_BORDERS;
+
+        let size = LogicalSize::new(self.config.appearance.window_width, height);
+        let _ = main_window.window().request_surface_size(size.into());
+    }
+
+    pub fn ipc_event<'a>(
+        &mut self,
+        request: Request<Vec<u8>>,
+    ) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
+        let action: IpcAction = request.uri().path()[1..].try_into()?;
+
+        match action {
+            IpcAction::Search => {
+                let body = request.body();
+                let query = std::str::from_utf8(body)?;
+
+                let mut results = Vec::new();
+
+                self.plugin_store
+                    .results(query, &self.fuzzy_matcher, &mut results)?;
+
+                // sort results in reverse so higher scores are first
+                results.sort_by(|a, b| b.score.cmp(&a.score));
+
+                let min = std::cmp::min(self.config.general.max_results, results.len());
+                let final_results = &results[..min];
+
+                let json = response::json(&final_results);
+
+                self.resize_main_window_for_items(min);
+
+                return json;
+            }
+
+            IpcAction::ClearResults => self.resize_main_window_for_items(0),
+
+            IpcAction::Execute => {
+                let payload = request.body();
+                let elevated: bool = payload[0] == 1;
+                let id = std::str::from_utf8(&payload[1..])?;
+                self.plugin_store.execute(id, elevated)?;
+                self.hide_main_window(false);
+            }
+
+            IpcAction::ShowItemInDir => {
+                let id = std::str::from_utf8(request.body())?;
+                self.plugin_store.show_item_in_dir(id)?;
+                self.hide_main_window(false);
+            }
+
+            IpcAction::RefreshIndex => {
+                let config = Config::load()?;
+                self.plugin_store.refresh(&config)?;
+                self.config = config;
+            }
+
+            IpcAction::HideMainWindow => {
+                self.hide_main_window(true);
+            }
+        }
+
+        response::empty()
     }
 
     fn app_event(

@@ -1,16 +1,18 @@
 use std::borrow::Cow;
+use std::sync::mpsc::{self, Sender};
 
 use serde::Serialize;
-use serialize_to_javascript::Options as JsSerializeOptions;
+use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use strum::{AsRefStr, EnumString};
-use winit::dpi::LogicalSize;
-use wry::http::{Request, Response};
-use wry::WebView;
+use winit::event_loop::EventLoopProxy;
+use wry::http::{Method, Request, Response};
+use wry::{WebView, WebViewId};
 
-use crate::app::App;
-use crate::config::Config;
+use crate::app::AppEvent;
 
 pub mod response;
+
+pub const INIT_SCRIPT: &str = include_str!("./ipc.js");
 
 #[derive(EnumString, AsRefStr)]
 pub enum IpcAction {
@@ -27,98 +29,54 @@ pub enum IpcEvent {
     FocusInput,
 }
 
+const EMIT_TEMPLATE: &str = r#"(function(){{
+    window.KAL.ipc.__handler_store[__TEMPLATE_event__].forEach(handler => {{
+        handler(__TEMPLATE_payload__);
+    }});
+}})()"#;
+
+#[derive(JsTemplate)]
+struct EmitScript<'a> {
+    event: &'a str,
+    payload: &'a serde_json::value::RawValue,
+}
+
 pub fn emit(
     webview: &WebView,
     event: impl AsRef<str>,
     payload: impl Serialize,
 ) -> anyhow::Result<()> {
+    let payload = serde_json::value::to_raw_value(&payload)?;
+
+    let emit_script = EmitScript {
+        event: event.as_ref(),
+        payload: &payload,
+    };
+
     let js_ser_opts = JsSerializeOptions::default();
-    let payload_json = serde_json::value::to_raw_value(&payload).unwrap_or_default();
-    let payload_js = serialize_to_javascript::Serialized::new(&payload_json, &js_ser_opts);
+    let emit_script = emit_script
+        .render(EMIT_TEMPLATE, &js_ser_opts)?
+        .into_string();
 
-    let script = format!(
-        r#"(function(){{
-            window.KAL.ipc.__handler_store['{}'].forEach(handler => {{
-                handler({});
-            }});
-        }})()"#,
-        event.as_ref(),
-        payload_js,
-    );
-
-    webview.evaluate_script(&script).map_err(Into::into)
+    webview.evaluate_script(&emit_script).map_err(Into::into)
 }
 
-impl App {
-    fn resize_main_window_for_items(&self, count: usize) {
-        let main_window = self.main_window();
+pub const PROTOCOL_NAME: &str = "kalipc";
 
-        let items_height = if count == 0 {
-            0
-        } else {
-            let count = std::cmp::min(count, self.config.appearance.max_items as usize) as u32;
-            let item_height = self.config.appearance.item_height + self.config.appearance.item_gap;
-            self.config.appearance.input_items_gap + count * item_height
-        };
-
-        let height = self.config.appearance.input_height + items_height + Self::MAGIC_BORDERS;
-
-        let size = LogicalSize::new(self.config.appearance.window_width, height);
-        let _ = main_window.window().request_surface_size(size.into());
-    }
-
-    pub fn ipc_event<'a>(
-        &mut self,
-        request: Request<Vec<u8>>,
-    ) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
-        let action: IpcAction = request.uri().path()[1..].try_into()?;
-
-        match action {
-            IpcAction::Search => {
-                let body = request.body();
-                let query = std::str::from_utf8(body)?;
-
-                let mut results = Vec::new();
-
-                let mut store = self.plugin_store.lock();
-                store.results(query, &self.fuzzy_matcher, &mut results)?;
-
-                // sort results in reverse so higher scores are first
-                results.sort_by(|a, b| b.score.cmp(&a.score));
-
-                let min = std::cmp::min(self.config.general.max_search_results, results.len());
-                let final_results = &results[..min];
-
-                self.resize_main_window_for_items(min);
-                return response::json(&final_results);
-            }
-
-            IpcAction::ClearResults => self.resize_main_window_for_items(0),
-
-            IpcAction::Execute => {
-                let payload = request.body();
-                let elevated: bool = payload[0] == 1;
-                let id = std::str::from_utf8(&payload[1..])?;
-                self.plugin_store.execute(id, elevated)?;
-                self.hide_main_window(false);
-            }
-
-            IpcAction::ShowItemInDir => {
-                let id = std::str::from_utf8(request.body())?;
-                self.plugin_store.show_item_in_dir(id)?;
-                self.hide_main_window(false);
-            }
-
-            IpcAction::RefreshIndex => {
-                let config = Config::load()?;
-                self.plugin_store.refresh(&config)?;
-            }
-
-            IpcAction::HideMainWindow => {
-                self.hide_main_window(true);
-            }
+pub fn make_ipc_protocol(
+    sender: Sender<AppEvent>,
+    proxy: EventLoopProxy,
+) -> impl Fn(WebViewId, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>> + 'static
+{
+    move |_, request| match *request.method() {
+        Method::OPTIONS => self::response::empty(),
+        Method::POST => {
+            let (tx, rx) = mpsc::sync_channel(1);
+            let event = AppEvent::Ipc { request, tx };
+            let _ = sender.send(event).inspect_err(|e| tracing::error!("{e}"));
+            proxy.wake_up();
+            webview2_com::wait_with_pump(rx).unwrap()
         }
-
-        response::empty()
+        _ => self::response::error("Only POST or OPTIONS method are supported"),
     }
 }

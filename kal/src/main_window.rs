@@ -1,16 +1,15 @@
-use std::sync::mpsc;
-
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use winit::dpi::LogicalSize;
 use winit::event_loop::ActiveEventLoop;
 
-use crate::app::{App, AppEvent};
+use crate::app::App;
 use crate::ipc::IpcEvent;
 use crate::utils;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 const INIT_TEMPLATE: &str = r#"(function () {
   window.KAL.systemAccentColor = __TEMPLATE_system_accent_color__;
+
   window.KAL.config = __RAW_config__;
 
   let custom_css = __TEMPLATE_custom_css__;
@@ -24,6 +23,14 @@ const INIT_TEMPLATE: &str = r#"(function () {
   }
 })();"#;
 
+#[derive(JsTemplate)]
+struct InitScript<'a> {
+    #[raw]
+    config: &'a serde_json::value::RawValue,
+    system_accent_color: Option<&'a str>,
+    custom_css: Option<&'a str>,
+}
+
 impl App {
     const MAIN_WINDOW_KEY: &str = "main";
 
@@ -31,23 +38,16 @@ impl App {
     /// for undecorated window with shadows
     pub const MAGIC_BORDERS: u32 = 2;
 
-    pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
-        #[cfg(debug_assertions)]
-        let url = "http://localhost:9010/Run";
-        #[cfg(not(debug_assertions))]
-        let url = "kal://localhost/Run";
+    #[cfg(debug_assertions)]
+    const MAIN_WINDOW_URL: &str = "http://localhost:9010/";
+    #[cfg(not(debug_assertions))]
+    const MAIN_WINDOW_URL: &str = "kal://localhost/";
 
+    pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
         let system_accent_color = utils::system_accent_color();
 
-        #[derive(JsTemplate)]
-        struct InitScript {
-            #[raw]
-            config: String,
-            system_accent_color: Option<String>,
-            custom_css: Option<String>,
-        }
+        let config = serde_json::value::to_raw_value(&self.config)?;
 
-        let config = serde_json::to_string(&self.config)?;
         let custom_css = self
             .config
             .appearance
@@ -58,9 +58,9 @@ impl App {
 
         let js_ser_opts = JsSerializeOptions::default();
         let init_script = InitScript {
-            config,
-            custom_css,
-            system_accent_color,
+            config: &config,
+            custom_css: custom_css.as_deref(),
+            system_accent_color: system_accent_color.as_deref(),
         }
         .render(INIT_TEMPLATE, &js_ser_opts)?;
 
@@ -68,15 +68,9 @@ impl App {
         let proxy = self.event_loop_proxy.clone();
 
         let builder = WebViewWindowBuilder::new()
-            .url(url)
+            .url(Self::MAIN_WINDOW_URL)
             .init_script(&init_script.into_string())
-            .ipc(move |_, request| {
-                let (tx, rx) = mpsc::sync_channel(1);
-                let event = AppEvent::Ipc { request, tx };
-                let _ = sender.send(event).inspect_err(|e| tracing::error!("{e}"));
-                proxy.wake_up();
-                webview2_com::wait_with_pump(rx).unwrap()
-            })
+            .ipc(sender, proxy)
             .inner_size(LogicalSize::new(
                 self.config.appearance.window_width,
                 self.config.appearance.input_height + Self::MAGIC_BORDERS,

@@ -4,7 +4,7 @@ use calculator_rs::Calculate;
 
 use crate::config::Config;
 use crate::icon::BuiltInIcon;
-use crate::search_result_item::SearchResultItem;
+use crate::result_item::ResultItem;
 
 pub struct Plugin {
     clipboard: Option<arboard::Clipboard>,
@@ -24,8 +24,8 @@ impl Plugin {
     const NAME: &'static str = "Calculator";
     const ID: &'static str = "Calculator-99999-item";
 
-    fn item(&self) -> SearchResultItem<'_> {
-        SearchResultItem {
+    fn item(&self) -> ResultItem<'_> {
+        ResultItem {
             primary_text: self.last_calculation.as_str().into(),
             secondary_text: "Press Enter to copy to clipboard".into(),
             needs_confirmation: false,
@@ -72,7 +72,7 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
         if query.starts_with(|c: char| c.is_ascii_digit()) {
             query
                 .calculate()

@@ -8,7 +8,7 @@ use windows::Win32::System::Shutdown::LockWorkStation;
 
 use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
 
 #[derive(Clone, Copy, Debug)]
@@ -114,14 +114,14 @@ impl SystemCommand {
     }
 }
 
-impl IntoSearchResultItem for SystemCommand {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+impl IntoResultItem for SystemCommand {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher.fuzzy_match(self.as_ref(), query).map(|score| {
             let primary_text = self.as_ref().into();
             let icon = self.icon();
             let id = self.id().into();
             let secondary_text = self.description().into();
-            SearchResultItem {
+            ResultItem {
                 primary_text,
                 secondary_text,
                 icon,
@@ -161,7 +161,7 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
         Ok(self
             .commands
             .iter()

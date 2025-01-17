@@ -2,11 +2,11 @@
 import { onMounted, ref, useTemplateRef } from "vue";
 import { isVScrollable } from "../utils";
 import { watchDebounced } from "@vueuse/core";
-import { SearchResultItem } from "../search_result_item";
+import { ResultItem } from "../result_item";
 import { IpcEvent, IpcAction } from "../ipc";
 import { accentFillRest } from "@fluentui/web-components";
 import RefreshIcon from "../components/RefreshIcon.vue";
-import ResultItem from "../components/ResultItem.vue";
+import ResultItemComponent from "../components/ResultItem.vue";
 
 const inputRef = useTemplateRef<HTMLElement>("input-ref");
 onMounted(() =>
@@ -51,7 +51,7 @@ function scrollSelected() {
   });
 }
 
-const results = ref<SearchResultItem[]>([]);
+const results = ref<ResultItem[]>([]);
 const resultItemRefs = useTemplateRef("result-item-refs");
 
 const currentQuery = ref("");
@@ -62,7 +62,7 @@ watchDebounced(currentQuery, (query) => search(query), {
 
 async function search(query: string) {
   if (query) {
-    const response: SearchResultItem[] = await window.KAL.ipc.invoke(IpcAction.Search, query);
+    const response: ResultItem[] = await window.KAL.ipc.invoke(IpcAction.Search, query);
 
     currentSelection.value = 0;
     results.value = response;
@@ -185,7 +185,7 @@ const itemsContainerHeight = `calc(100% - ${inputHeight})`;
       class="overflow-x-hidden overflow-y-auto px-4 pt-4 children:mb-1"
       tabindex="-1"
     >
-      <ResultItem
+      <ResultItemComponent
         :itemHeight
         v-for="(item, index) in results"
         ref="result-item-refs"

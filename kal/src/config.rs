@@ -77,18 +77,15 @@ pub struct GeneralConfig {
     /// A string of hotkey
     #[serde(default = "default_hotkey")]
     pub hotkey: String,
-    /// A vector of glob patterns
-    #[serde(default)]
-    pub blacklist: Vec<String>,
-    #[serde(default = "default_max_search_results")]
-    pub max_search_results: usize,
+    #[serde(default = "default_max_results")]
+    pub max_results: usize,
 }
 
 fn default_hotkey() -> String {
     "Alt+Space".to_string()
 }
 
-fn default_max_search_results() -> usize {
+fn default_max_results() -> usize {
     24
 }
 
@@ -96,8 +93,7 @@ impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             hotkey: default_hotkey(),
-            blacklist: Vec::new(),
-            max_search_results: default_max_search_results(),
+            max_results: default_max_results(),
         }
     }
 }
@@ -202,14 +198,15 @@ impl Config {
     {
         self.plugins
             .get(name)
+            .and_then(|c| c.inner.clone())
             .and_then(|c| {
-                c.inner.clone().and_then(|c| {
-                    toml::Table::try_into(c)
-                        .inspect_err(|e| {
-                            tracing::error!("Failed to deserialize {name} config, failling back to default: {e}");
-                        })
-                        .ok()
-                })
+                toml::Table::try_into(c)
+                    .inspect_err(|e| {
+                        tracing::error!(
+                            "Failed to deserialize {name} config, failling back to default: {e}"
+                        );
+                    })
+                    .ok()
             })
             .unwrap_or_default()
     }

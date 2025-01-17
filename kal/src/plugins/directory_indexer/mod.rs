@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::icon::{self, BuiltInIcon, Icon};
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::{self, thread, ExpandEnvVars, IteratorExt, PathExt};
 
 #[derive(Debug)]
@@ -43,12 +43,12 @@ impl DirEntry {
     }
 }
 
-impl IntoSearchResultItem for DirEntry {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+impl IntoResultItem for DirEntry {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
             .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
-            .map(|score| SearchResultItem {
+            .map(|score| ResultItem {
                 primary_text: self.name.to_string_lossy(),
                 secondary_text: self.path.to_string_lossy(),
                 icon: match &self.icon {
@@ -133,7 +133,7 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
         Ok(self
             .entries
             .iter()

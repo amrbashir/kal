@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::icon::{self};
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::{thread, IteratorExt};
 
 mod packaged_app;
@@ -47,8 +47,8 @@ impl App {
     }
 }
 
-impl IntoSearchResultItem for App {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+impl IntoResultItem for App {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         match self {
             App::Program(program) => program.fuzzy_match(query, matcher),
             App::Packaged(packaged_app) => packaged_app.fuzzy_match(query, matcher),
@@ -163,7 +163,7 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
         Ok(self
             .apps
             .iter()

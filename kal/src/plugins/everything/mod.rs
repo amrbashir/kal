@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{self, Icon};
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::{self, PathExt};
 
 #[derive(Debug)]
@@ -48,9 +48,9 @@ impl EverythingEntry {
     }
 }
 
-impl IntoSearchResultItem for EverythingEntry {
-    fn fuzzy_match(&self, _query: &str, _matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
-        Some(SearchResultItem {
+impl IntoResultItem for EverythingEntry {
+    fn fuzzy_match(&self, _query: &str, _matcher: &SkimMatcherV2) -> Option<ResultItem> {
+        Some(ResultItem {
             primary_text: self.name.to_string_lossy(),
             secondary_text: self.path.to_string_lossy(),
             icon: Icon::path(self.icon.to_string_lossy()),
@@ -109,7 +109,7 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
         let output = std::process::Command::new(&self.es)
             .arg(query)
             .args(["-n", "24"]) // TODO: pull from config

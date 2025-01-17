@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
@@ -65,8 +65,8 @@ impl<'a> Workflow<'a> {
     }
 }
 
-impl IntoSearchResultItem for Workflow<'_> {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+impl IntoResultItem for Workflow<'_> {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
             .or_else(|| {
@@ -74,7 +74,7 @@ impl IntoSearchResultItem for Workflow<'_> {
                     .as_ref()
                     .and_then(|description| matcher.fuzzy_match(description, query))
             })
-            .map(|score| SearchResultItem {
+            .map(|score| ResultItem {
                 primary_text: self.name.as_str().into(),
                 id: self.id.as_str().into(),
                 secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
@@ -136,7 +136,7 @@ impl crate::plugin::Plugin for Plugin<'_> {
         &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>> {
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
         Ok(self
             .workflows
             .iter()

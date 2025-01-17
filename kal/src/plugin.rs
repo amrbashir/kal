@@ -1,13 +1,12 @@
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard};
 
 use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::search_result_item::SearchResultItem;
+use crate::result_item::ResultItem;
 
 #[allow(unused_variables)]
 pub trait Plugin: Debug {
@@ -31,7 +30,7 @@ pub trait Plugin: Debug {
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<SearchResultItem<'_>>>>;
+    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>>;
 
     /// Called when `Enter` or `Shift + Enter` are pressed
     fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
@@ -58,11 +57,11 @@ pub struct PluginEntry {
     pub enabled: bool,
     pub include_in_global_results: bool,
     pub direct_activation_command: Option<String>,
-    plugin: Box<dyn Plugin + Send + 'static>,
+    plugin: Box<dyn Plugin>,
 }
 
 impl Deref for PluginEntry {
-    type Target = dyn Plugin + Send + 'static;
+    type Target = dyn Plugin;
 
     fn deref(&self) -> &Self::Target {
         self.plugin.as_ref()
@@ -74,8 +73,14 @@ impl DerefMut for PluginEntry {
     }
 }
 
+impl<P: Plugin + 'static> From<P> for PluginEntry {
+    fn from(value: P) -> Self {
+        Self::new(value)
+    }
+}
+
 impl PluginEntry {
-    fn new<P: Plugin + Send + 'static>(plugin: P) -> Self {
+    fn new<P: Plugin + 'static>(plugin: P) -> Self {
         let config = plugin.default_generic_config();
         Self {
             enabled: config.enabled.unwrap_or(true),
@@ -101,19 +106,13 @@ impl PluginEntry {
 }
 
 #[derive(Debug)]
-pub struct PluginStoreInner {
+pub struct PluginStore {
     pub plugins: Vec<PluginEntry>,
 }
 
-impl PluginStoreInner {
-    pub fn new() -> Self {
-        Self {
-            plugins: Vec::new(),
-        }
-    }
-
-    pub fn add<P: Plugin + Send + 'static>(&mut self, plugin: P) {
-        self.plugins.push(PluginEntry::new(plugin))
+impl PluginStore {
+    pub fn new(plugins: Vec<PluginEntry>) -> Self {
+        Self { plugins }
     }
 
     pub fn find_plugin<F: FnMut(&&mut PluginEntry) -> bool>(
@@ -169,7 +168,7 @@ impl PluginStoreInner {
         &'a mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-        results: &'b mut Vec<SearchResultItem<'a>>,
+        results: &'b mut Vec<ResultItem<'a>>,
     ) -> anyhow::Result<()>
     where
         'a: 'b,
@@ -198,33 +197,5 @@ impl PluginStoreInner {
         }
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PluginStore(Arc<Mutex<PluginStoreInner>>);
-
-impl PluginStore {
-    pub fn new() -> Self {
-        Self(Arc::new(Mutex::new(PluginStoreInner::new())))
-    }
-
-    pub fn lock(&self) -> MutexGuard<'_, PluginStoreInner> {
-        self.0
-            .lock()
-            .inspect_err(|e| tracing::error!("{e}"))
-            .unwrap()
-    }
-
-    pub fn refresh(&mut self, config: &Config) -> anyhow::Result<()> {
-        self.lock().refresh(config)
-    }
-
-    pub fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        self.lock().execute(id, elevated)
-    }
-
-    pub fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
-        self.lock().show_item_in_dir(id)
     }
 }

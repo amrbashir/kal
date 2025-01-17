@@ -13,7 +13,7 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
 use crate::icon::{BuiltInIcon, Icon};
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils;
 
 const MS_RESOURCE: &str = "ms-resource:";
@@ -42,11 +42,11 @@ impl PackagedApp {
     }
 }
 
-impl IntoSearchResultItem for PackagedApp {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+impl IntoResultItem for PackagedApp {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
-            .map(|score| SearchResultItem {
+            .map(|score| ResultItem {
                 primary_text: self.name.to_string_lossy(),
                 secondary_text: "Packaged App".into(),
                 icon: self

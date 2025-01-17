@@ -1,17 +1,19 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::sync::mpsc::Sender;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use winit::dpi::{LogicalPosition, Position, Size};
-use winit::event_loop::ActiveEventLoop;
+use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 #[cfg(windows)]
 use winit::platform::windows::*;
 use winit::window::{Window, WindowAttributes, WindowId};
-use wry::http::{Method, Request, Response};
+use wry::http::{Request, Response};
 use wry::{WebView, WebViewBuilder, WebViewBuilderExtWindows, WebViewId};
 
+use crate::app::AppEvent;
 use crate::{icon, ipc};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -22,14 +24,10 @@ pub enum Vibrancy {
     Blur,
 }
 
-type ProtocolHandler =
-    dyn Fn(WebViewId, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>>;
-
 pub struct WebViewWindowBuilder<'a> {
     window_attrs: WindowAttributes,
     webview_builder: WebViewBuilder<'a>,
     center: bool,
-    ipc_handler: Option<Box<ProtocolHandler>>,
 }
 
 impl WebViewWindowBuilder<'_> {
@@ -39,7 +37,7 @@ impl WebViewWindowBuilder<'_> {
             .with_clip_children(false);
 
         let webview_builder = WebViewBuilder::new()
-            .with_initialization_script(include_str!("./ipc/ipc.js"))
+            .with_initialization_script(ipc::INIT_SCRIPT)
             .with_hotkeys_zoom(false)
             .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
 
@@ -47,7 +45,6 @@ impl WebViewWindowBuilder<'_> {
             window_attrs,
             webview_builder,
             center: false,
-            ipc_handler: None,
         }
     }
 
@@ -112,15 +109,6 @@ impl WebViewWindowBuilder<'_> {
         self
     }
 
-    pub fn ipc<F>(mut self, handler: F) -> Self
-    where
-        F: Fn(WebViewId, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>>
-            + 'static,
-    {
-        self.ipc_handler.replace(Box::new(handler));
-        self
-    }
-
     pub fn protocol<F>(mut self, name: &str, handler: F) -> Self
     where
         F: Fn(WebViewId, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>>
@@ -137,29 +125,24 @@ impl WebViewWindowBuilder<'_> {
         self
     }
 
+    pub fn ipc(mut self, sender: Sender<AppEvent>, proxy: EventLoopProxy) -> Self {
+        self = self.protocol(ipc::PROTOCOL_NAME, ipc::make_ipc_protocol(sender, proxy));
+        self
+    }
+
     pub fn devtools(mut self, devtools: bool) -> Self {
         self.webview_builder = self.webview_builder.with_devtools(devtools);
         self
     }
 
     pub fn build(mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<WebViewWindow> {
-        self = self.protocol("kalicon", icon::protocol);
+        self = self.protocol(icon::PROTOCOL_NAME, icon::protocol);
         #[cfg(not(debug_assertions))]
         {
             self = self.protocol(
                 crate::embedded_assets::PROTOCOL_NAME,
                 crate::embedded_assets::protocol,
             );
-        }
-
-        if let Some(ipc_handler) = self.ipc_handler.take() {
-            self = self.protocol("kalipc", move |webview_id, request| {
-                match *request.method() {
-                    Method::OPTIONS => ipc::response::empty(),
-                    Method::POST => ipc_handler(webview_id, request),
-                    _ => ipc::response::error("Only POST or OPTIONS method are supported"),
-                }
-            });
         }
 
         if self.center {

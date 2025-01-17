@@ -10,7 +10,7 @@ export enum IconType {
   Url = "Url",
 }
 
-export interface SearchResultItem {
+export interface ResultItem {
   primary_text: string;
   secondary_text: string;
   icon: Icon;

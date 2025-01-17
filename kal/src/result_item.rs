@@ -6,7 +6,7 @@ use serde::Serialize;
 use crate::icon::Icon;
 
 #[derive(Serialize, Debug, Clone)]
-pub struct SearchResultItem<'a> {
+pub struct ResultItem<'a> {
     pub id: Cow<'a, str>,
     pub score: i64,
     pub primary_text: Cow<'a, str>,
@@ -15,6 +15,6 @@ pub struct SearchResultItem<'a> {
     pub needs_confirmation: bool,
 }
 
-pub trait IntoSearchResultItem {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem>;
+pub trait IntoResultItem {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem>;
 }

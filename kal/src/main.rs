@@ -13,7 +13,7 @@ mod ipc;
 mod main_window;
 mod plugin;
 mod plugins;
-mod search_result_item;
+mod result_item;
 mod utils;
 mod webview_window;
 

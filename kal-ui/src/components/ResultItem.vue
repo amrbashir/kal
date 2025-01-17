@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { SearchResultItem } from "../search_result_item";
+import { ResultItem } from "../result_item";
 import { makeIconHTML } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
 
 defineProps<{
-  item: SearchResultItem;
+  item: ResultItem;
   selected: boolean;
   showConfirm: boolean;
   itemHeight: string;

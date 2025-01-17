@@ -6,7 +6,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
 use crate::icon::Icon;
-use crate::search_result_item::{IntoSearchResultItem, SearchResultItem};
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, PathExt};
 
 #[derive(Debug)]
@@ -40,12 +40,12 @@ impl Program {
     }
 }
 
-impl IntoSearchResultItem for Program {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<SearchResultItem> {
+impl IntoResultItem for Program {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
             .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
-            .map(|score| SearchResultItem {
+            .map(|score| ResultItem {
                 primary_text: self.name.to_string_lossy(),
                 secondary_text: "Application".into(),
                 icon: Icon::path(self.icon.to_string_lossy()),

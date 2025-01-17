@@ -90,6 +90,8 @@ impl BuiltInIcon {
     }
 }
 
+pub const PROTOCOL_NAME: &str = "kalicon";
+
 /// `kalicon://` protocol
 #[tracing::instrument]
 pub fn protocol<'a>(
