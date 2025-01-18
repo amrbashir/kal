@@ -22,7 +22,7 @@ pub enum IconType {
     Url,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 pub struct Icon<'a> {
     pub data: Cow<'a, str>,
     pub r#type: IconType,
@@ -40,13 +40,32 @@ impl<'a> Icon<'a> {
     }
 
     #[inline]
-    pub fn svg(data: Cow<'a, str>) -> Self {
-        Self::new(data, IconType::Svg)
-    }
-
-    #[inline]
     pub fn builtin(data: Cow<'a, str>) -> Self {
         Self::new(data, IconType::BuiltIn)
+    }
+}
+
+impl<'de> Deserialize<'de> for Icon<'_> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        pub struct IconDeser<'a> {
+            pub data: Cow<'a, str>,
+            pub r#type: IconType,
+        }
+
+        let mut icon = IconDeser::deserialize(deserializer)?;
+        if icon.r#type == IconType::BuiltIn {
+            let builtin = BuiltInIcon::from_str(&icon.data).map_err(serde::de::Error::custom)?;
+            icon.data = builtin.icon().data.into_owned().into();
+        };
+
+        Ok(Self {
+            data: icon.data,
+            r#type: icon.r#type,
+        })
     }
 }
 
@@ -68,24 +87,19 @@ pub enum BuiltInIcon {
 impl BuiltInIcon {
     pub fn icon(&self) -> Icon<'_> {
         match self {
-            Self::Shutdown => Icon::svg(include_str!("./built-in-icons/Shutdown.svg").into()),
-            Self::Restart => Icon::svg(include_str!("./built-in-icons/Restart.svg").into()),
-            Self::SignOut => Icon::svg(include_str!("./built-in-icons/Signout.svg").into()),
-            Self::Hibernate => Icon::svg(include_str!("./built-in-icons/Hibernate.svg").into()),
-            Self::Sleep => Icon::svg(include_str!("./built-in-icons/Sleep.svg").into()),
-            Self::Directory => Icon::svg(include_str!("./built-in-icons/Folder.svg").into()),
-            Self::Lock => Icon::svg(include_str!("./built-in-icons/Lock.svg").into()),
-            Self::Calculator => Icon::svg(include_str!("./built-in-icons/Calculator.svg").into()),
-            Self::Workflow => Icon::svg(include_str!("./built-in-icons/Workflow.svg").into()),
-            _ => Icon::builtin(Cow::Borrowed(self.as_ref())),
-        }
-    }
-
-    pub fn bytes(&self) -> &'static [u8] {
-        match self {
-            Self::Url => include_bytes!("./built-in-icons/Url.png"),
-            Self::Shell => include_bytes!("./built-in-icons/Shell.png"),
-            _ => unreachable!(),
+            Self::Shutdown => Icon::builtin(include_str!("./built-in-icons/Shutdown.svg").into()),
+            Self::Restart => Icon::builtin(include_str!("./built-in-icons/Restart.svg").into()),
+            Self::SignOut => Icon::builtin(include_str!("./built-in-icons/Signout.svg").into()),
+            Self::Hibernate => Icon::builtin(include_str!("./built-in-icons/Hibernate.svg").into()),
+            Self::Sleep => Icon::builtin(include_str!("./built-in-icons/Sleep.svg").into()),
+            Self::Directory => Icon::builtin(include_str!("./built-in-icons/Folder.svg").into()),
+            Self::Lock => Icon::builtin(include_str!("./built-in-icons/Lock.svg").into()),
+            Self::Calculator => {
+                Icon::builtin(include_str!("./built-in-icons/Calculator.svg").into())
+            }
+            Self::Workflow => Icon::builtin(include_str!("./built-in-icons/Workflow.svg").into()),
+            Self::Shell => Icon::builtin(include_str!("./built-in-icons/Shell.svg").into()),
+            Self::Url => Icon::builtin(include_str!("./built-in-icons/Url.svg").into()),
         }
     }
 }
@@ -100,14 +114,6 @@ pub fn protocol<'a>(
 ) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
-
-    let query = request.uri().query();
-    if query.map(|q| q.contains("type=builtin")).unwrap_or(false) {
-        return Response::builder()
-            .header(CONTENT_TYPE, "image/png")
-            .body(Cow::Borrowed(BuiltInIcon::from_str(path.as_ref())?.bytes()))
-            .map_err(Into::into);
-    }
 
     let path = dunce::canonicalize(PathBuf::from(&*path))?;
 

@@ -46,7 +46,7 @@ impl<'a> Workflow<'a> {
 
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
         for step in &self.steps {
-            match &step {
+            match step {
                 WorkflowStep::Path { path, .. } => {
                     let path = path.expand_vars();
                     utils::execute(path, elevated)?
@@ -57,7 +57,13 @@ impl<'a> Workflow<'a> {
                     script,
                     working_directory,
                     hidden,
-                } => utils::execute_in_shell(shell, script, working_directory, hidden, elevated)?,
+                } => utils::execute_in_shell(
+                    shell.as_ref(),
+                    script,
+                    working_directory.as_ref(),
+                    *hidden,
+                    elevated,
+                )?,
             }
         }
 
@@ -114,9 +120,13 @@ impl crate::plugin::Plugin for Plugin<'_> {
     fn new(config: &Config, _data_dir: &Path) -> anyhow::Result<Self> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
-        Ok(Self {
+        let mut plugin = Self {
             workflows: config.workflows,
-        })
+        };
+
+        plugin.update_ids();
+
+        Ok(plugin)
     }
 
     fn name(&self) -> &'static str {

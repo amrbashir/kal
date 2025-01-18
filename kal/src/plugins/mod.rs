@@ -7,6 +7,7 @@ mod app_launcher;
 mod calculator;
 mod directory_indexer;
 mod everything;
+mod shell;
 mod system_commands;
 mod workflows;
 
@@ -18,6 +19,7 @@ pub fn all(config: &Config, data_dir: &Path) -> anyhow::Result<PluginStore> {
         system_commands::Plugin::new(config, data_dir)?.into(),
         calculator::Plugin::new(config, data_dir)?.into(),
         everything::Plugin::new(config, data_dir)?.into(),
+        shell::Plugin::new(config, data_dir)?.into(),
     ]);
     Ok(store)
 }

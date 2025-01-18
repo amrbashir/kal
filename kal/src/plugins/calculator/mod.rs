@@ -37,7 +37,12 @@ impl Plugin {
 
     fn try_clipboard(&mut self) {
         if self.clipboard.is_none() {
-            self.clipboard = arboard::Clipboard::new().ok();
+            match arboard::Clipboard::new() {
+                Ok(clipboard) => self.clipboard = Some(clipboard),
+                Err(e) => {
+                    tracing::error!("[Plugin][Calculator]: Failed to initialize clipboard: {e}")
+                }
+            }
         }
     }
 

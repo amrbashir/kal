@@ -6,6 +6,14 @@ pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) -> anyhow::Resu
     imp::execute(app, elevated)
 }
 
+pub fn execute_with_args(
+    app: impl AsRef<std::ffi::OsStr>,
+    args: impl AsRef<std::ffi::OsStr>,
+    elevated: bool,
+) -> anyhow::Result<()> {
+    imp::execute_with_args(app, args, elevated)
+}
+
 pub fn open_url(url: &Url) -> anyhow::Result<()> {
     imp::open_url(url)
 }
@@ -52,8 +60,32 @@ mod imp {
                 } else {
                     PCWSTR::null()
                 },
-                PCWSTR::from_raw(app.as_ptr()),
+                &app,
                 PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+            .map(|_| ())
+        }
+    }
+
+    pub fn execute_with_args(
+        app: impl AsRef<std::ffi::OsStr>,
+        args: impl AsRef<std::ffi::OsStr>,
+        elevated: bool,
+    ) -> anyhow::Result<()> {
+        let app = HSTRING::from(app.as_ref());
+        let args = HSTRING::from(args.as_ref());
+        unsafe {
+            ffi::ShellExecuteW(
+                None,
+                if elevated {
+                    w!("runas")
+                } else {
+                    PCWSTR::null()
+                },
+                &app,
+                &args,
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
             )
@@ -67,7 +99,7 @@ mod imp {
             ffi::ShellExecuteW(
                 None,
                 w!("open"),
-                PCWSTR::from_raw(url.as_ptr()),
+                &url,
                 PCWSTR::null(),
                 PCWSTR::null(),
                 SW_SHOWNORMAL,
@@ -120,7 +152,7 @@ mod imp {
                     ffi::ShellExecuteW(
                         None,
                         w!("open"),
-                        PCWSTR::from_raw(dir.as_ptr()),
+                        &dir,
                         PCWSTR::null(),
                         PCWSTR::null(),
                         SW_SHOWNORMAL,
