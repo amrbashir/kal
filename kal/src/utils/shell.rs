@@ -27,10 +27,10 @@ pub fn reveal_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
 }
 
 pub fn execute_in_shell<S, P>(
-    shell: &Option<S>,
-    script: &S,
-    cwd: &Option<P>,
-    hidden: &Option<bool>,
+    shell: Option<S>,
+    script: S,
+    cwd: Option<P>,
+    hidden: Option<bool>,
     elevated: bool,
 ) -> anyhow::Result<()>
 where
@@ -167,10 +167,10 @@ mod imp {
     }
 
     pub fn execute_in_shell<S, P>(
-        shell: &Option<S>,
-        script: &S,
-        cwd: &Option<P>,
-        hidden: &Option<bool>,
+        shell: Option<S>,
+        script: S,
+        cwd: Option<P>,
+        hidden: Option<bool>,
         elevated: bool,
     ) -> anyhow::Result<()>
     where
@@ -191,7 +191,10 @@ mod imp {
         unsafe {
             let shell = HSTRING::from(shell);
             let args = HSTRING::from(args);
-            let cwd = cwd.as_ref().map(|cwd| HSTRING::from(cwd.as_ref()));
+            let cwd = cwd
+                .as_ref()
+                .map(|cwd| HSTRING::from(cwd.as_ref()))
+                .unwrap_or_default();
 
             ffi::ShellExecuteW(
                 None,
@@ -200,10 +203,9 @@ mod imp {
                 } else {
                     PCWSTR::null()
                 },
-                PCWSTR::from_raw(shell.as_ptr()),
-                PCWSTR::from_raw(args.as_ptr()),
-                cwd.map(|cwd| PCWSTR::from_raw(cwd.as_ptr()))
-                    .unwrap_or_else(PCWSTR::null),
+                &shell,
+                &args,
+                &cwd,
                 if hidden.unwrap_or(false) {
                     SW_HIDE
                 } else {
@@ -270,10 +272,10 @@ mod imp {
     }
 
     pub fn execute_in_shell<S, P>(
-        shell: &Option<S>,
-        script: &S,
-        cwd: &Option<P>,
-        hidden: &Option<bool>,
+        shell: Option<S>,
+        script: S,
+        cwd: Option<P>,
+        hidden: Option<bool>,
         elevated: bool,
     ) -> anyhow::Result<()>
     where
