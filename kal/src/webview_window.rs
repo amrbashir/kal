@@ -42,7 +42,10 @@ impl WebViewWindowBuilder<'_> {
 
         #[cfg(windows)]
         {
-            window_attrs = window_attrs.with_class_name("KalWindowClass").with_undecorated_shadow(true).with_clip_children(false);
+            window_attrs = window_attrs
+                .with_class_name("KalWindowClass")
+                .with_undecorated_shadow(true)
+                .with_clip_children(false);
             let system_accent_color = crate::utils::system_accent_color();
             let system_accent_script = format!(
                 r#"(function () {{ window.KAL.systemAccentColor = '{}'; }})()"#,
@@ -137,7 +140,7 @@ impl WebViewWindowBuilder<'_> {
                 .with_custom_protocol(name.to_string(), move |webview_id, req| {
                     match handler(webview_id, req) {
                         Ok(res) => res,
-                        Err(e) => ipc::response::error_owned(e.to_string()).unwrap(),
+                        Err(e) => ipc::response::error_owned(format!("{e:?}")).unwrap(),
                     }
                 });
         self

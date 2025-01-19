@@ -14,6 +14,20 @@ where
     Ok(())
 }
 
+/// Extract icons as png from paths and cache it..
+pub fn extract_multiple_cached<I, P, P2>(files: I) -> anyhow::Result<()>
+where
+    I: IntoIterator<Item = (P, P2)>,
+    P: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    for (src, out) in files {
+        extract_cached(src, out)?;
+    }
+
+    Ok(())
+}
+
 /// Extract icon as png from path and cache it.
 pub fn extract_cached<P, P2>(file: P, out: P2) -> anyhow::Result<()>
 where

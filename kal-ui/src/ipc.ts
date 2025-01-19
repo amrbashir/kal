@@ -1,8 +1,7 @@
-export enum IpcAction {
+export enum IpcCommand {
   Query = "Query",
   ClearResults = "ClearResults",
-  Execute = "Execute",
-  ShowItemInDir = "ShowItemInDir",
+  RunAction = "RunAction",
   Reload = "Reload",
   HideMainWindow = "HideMainWindow",
 }

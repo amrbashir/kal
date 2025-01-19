@@ -1,12 +1,13 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref, useTemplateRef } from "vue";
-import { isVScrollable } from "../utils";
+import { isEventForHotkey as isEventForAccelerator, isVScrollable } from "../utils";
 import { watchDebounced } from "@vueuse/core";
-import { ResultItem } from "../result_item";
-import { IpcEvent, IpcAction } from "../ipc";
-import { accentFillRest } from "@fluentui/web-components";
+import { ResultItem, Action } from "../result_item";
 import ReloadIcon from "../components/ReloadIcon.vue";
 import ResultItemComponent from "../components/ResultItem.vue";
+import { IpcCommand, IpcEvent } from "../ipc";
+import { useConfig } from "../composables/config";
+import { useSystemAccentColor } from "../composables/systemAccentColor";
 
 const inputRef = useTemplateRef<HTMLElement>("input-ref");
 onMounted(() =>
@@ -18,43 +19,17 @@ onMounted(() =>
   }),
 );
 
-const reloading = ref(false);
-
-const gettingConfirmation = ref(false);
-const gettingConfirmationIndex = ref(0);
-function resetConfirm() {
-  gettingConfirmation.value = false;
-  gettingConfirmationIndex.value = 0;
-}
-
-const currentSelection = ref(0);
-function updateSelection(e: KeyboardEvent) {
-  const current = currentSelection.value;
-  if (e.key === "ArrowUp") {
-    currentSelection.value = current === 0 ? results.value.length - 1 : current - 1;
-  } else {
-    currentSelection.value = current === results.value.length - 1 ? 0 : current + 1;
-  }
-}
-
+const resultItemRefs = useTemplateRef("result-item-refs");
 const itemsContainerRef = useTemplateRef<HTMLElement>("items-container-ref");
-function scrollSelected() {
-  // avoid scrolling if container is not scrollable atm
-  if (!isVScrollable(itemsContainerRef.value)) return;
-
-  const current = currentSelection.value;
-  const block = current === 0 ? "end" : current === results.value.length - 1 ? "start" : "nearest";
-  console.log(resultItemRefs.value?.[current]);
-  resultItemRefs.value?.[current]?.$el.scrollIntoView({
-    behavior: "smooth",
-    block,
-  });
-}
 
 const results = ref<ResultItem[]>([]);
-const resultItemRefs = useTemplateRef("result-item-refs");
+
+const reloading = ref(false);
 
 const currentQuery = ref("");
+const currentSelection = ref(0);
+const currentSelectedItem = computed(() => results.value[currentSelection.value]);
+
 watchDebounced(currentQuery, (query) => runQuery(query), {
   debounce: 200,
   maxWait: 1000,
@@ -62,12 +37,12 @@ watchDebounced(currentQuery, (query) => runQuery(query), {
 
 async function runQuery(query: string) {
   if (query) {
-    const response: ResultItem[] = await window.KAL.ipc.invoke(IpcAction.Query, query);
+    const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
     currentSelection.value = 0;
     results.value = response;
   } else {
     results.value = [];
-    await window.KAL.ipc.invoke(IpcAction.ClearResults);
+    await window.KAL.ipc.invoke(IpcCommand.ClearResults);
   }
 }
 
@@ -76,46 +51,63 @@ function resetQuery() {
   currentSelection.value = 0;
 }
 
-async function executeItem(e: { shiftKey: boolean }, index: number) {
-  let item = results.value[index];
-  const confirm = item.needs_confirmation;
+async function hideMainWindow() {
+  await window.KAL.ipc.invoke(IpcCommand.HideMainWindow);
+}
 
-  if (
-    (!confirm && gettingConfirmation.value) ||
-    (confirm && gettingConfirmation.value && gettingConfirmationIndex.value !== index)
-  ) {
-    resetConfirm();
-  }
+async function runAction(action: Action) {
+  const payload = `${action.id}#${currentSelectedItem.value.id}`;
+  await window.KAL.ipc.invoke(IpcCommand.RunAction, payload);
+}
 
-  if (confirm && !gettingConfirmation.value) {
-    gettingConfirmation.value = true;
-    gettingConfirmationIndex.value = index;
+function updateSelection(e: KeyboardEvent) {
+  const current = currentSelection.value;
+  if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) {
+    currentSelection.value = current === 0 ? results.value.length - 1 : current - 1;
   } else {
-    resetConfirm();
-    await window.KAL.ipc.invoke(IpcAction.Execute, e.shiftKey, item.id);
+    currentSelection.value = current === results.value.length - 1 ? 0 : current + 1;
   }
 }
 
-async function showItemInDir(index: number) {
-  let item = results.value[index];
-  await window.KAL.ipc.invoke(IpcAction.ShowItemInDir, item.id);
+function scrollSelected() {
+  // avoid scrolling if container is not scrollable atm
+  if (!isVScrollable(itemsContainerRef.value)) return;
+
+  const current = currentSelection.value;
+  const block = current === 0 ? "end" : current === results.value.length - 1 ? "start" : "nearest";
+  resultItemRefs.value?.[current]?.$el.scrollIntoView({
+    behavior: "smooth",
+    block,
+  });
 }
 
-function onChange(e: InputEvent) {
+async function reload() {
+  reloading.value = true;
+  await window.KAL.ipc.invoke(IpcCommand.Reload);
+  reloading.value = false;
+  runQuery(currentQuery.value);
+}
+
+function onInputChange(e: InputEvent) {
   if (e.target && "value" in e.target && e.target.value === "") {
-    resetConfirm();
     resetQuery();
   }
 }
 
-async function onkeydown(e: KeyboardEvent) {
-  if (gettingConfirmation.value && e.key !== "Enter") {
-    resetConfirm();
+async function onInputKeyDown(e: KeyboardEvent) {
+  if (currentSelectedItem.value?.actions) {
+    for (const action of currentSelectedItem.value.actions) {
+      if (action.accelerator && isEventForAccelerator(e, action.accelerator)) {
+        e.preventDefault();
+        await runAction(action);
+        return;
+      }
+    }
   }
 
   if (e.key === "Escape") {
     e.preventDefault();
-    await window.KAL.ipc.invoke(IpcAction.HideMainWindow);
+    await hideMainWindow();
   }
 
   if (["ArrowDown", "Tab", "ArrowUp"].includes(e.key)) {
@@ -124,41 +116,14 @@ async function onkeydown(e: KeyboardEvent) {
     scrollSelected();
   }
 
-  if (e.key === "Enter") {
-    e.preventDefault();
-    executeItem(e, currentSelection.value);
-  }
-
-  if (e.ctrlKey && e.key === "o") {
-    e.preventDefault();
-    showItemInDir(currentSelection.value);
-  }
-
   if (e.ctrlKey && e.key === "r") {
     e.preventDefault();
-    reloading.value = true;
-    await window.KAL.ipc.invoke(IpcAction.Reload);
-    setTimeout(() => (reloading.value = false), 500); // artifical delay for nicer animation
-    runQuery(currentQuery.value);
+    await reload();
   }
 }
 
-const config = ref<KalConfig>(window.KAL.config);
-onMounted(() =>
-  window.KAL.ipc.on<KalConfig>(IpcEvent.UpdateConfig, (newConfig) => {
-    config.value = newConfig;
-    window.KAL.config = newConfig;
-  }),
-);
-
-const accentColor = accentFillRest.getValueFor(document.documentElement).toColorString();
-const systemAccentColor = ref<string>(window.KAL.systemAccentColor ?? accentColor);
-onMounted(() =>
-  window.KAL.ipc.on<string>(IpcEvent.UpdateSystemAccentColor, (newColor) => {
-    systemAccentColor.value = newColor;
-    window.KAL.systemAccentColor = newColor;
-  }),
-);
+const config = useConfig();
+const systemAccentColor = useSystemAccentColor();
 
 const isTransparent = computed(() => config.value.appearance.transparent);
 const bgPrimaryColor = computed(() =>
@@ -166,7 +131,7 @@ const bgPrimaryColor = computed(() =>
 );
 const inputHeight = computed(() => `${config.value.appearance.input_height}px`);
 const itemHeight = computed(() => `${config.value.appearance.item_height}px`);
-const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
+const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`);
 </script>
 
 <template>
@@ -181,8 +146,8 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
       ]"
       placeholder="Start typing..."
       v-model="currentQuery"
-      @keydown="onkeydown"
-      @change="onChange"
+      @keydown="onInputKeyDown"
+      @change="onInputChange"
     >
       <div slot="clear-button" class="flex justify-center items-center">
         <Transition name="fade">
@@ -197,7 +162,7 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
     <ul
       ref="items-container-ref"
       :style="{ height: itemsContainerHeight }"
-      class="overflow-x-hidden overflow-y-auto px-4 pt-4 children:mb-1"
+      class="overflow-x-hidden overflow-y-auto p-4 children:mb-1"
       tabindex="-1"
     >
       <ResultItemComponent
@@ -206,14 +171,12 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight})`);
         ref="result-item-refs"
         :item
         :selected="index === currentSelection"
-        :showConfirm="gettingConfirmation && gettingConfirmationIndex == index"
-        @click="(e: MouseEvent) => executeItem(e, index)"
       />
     </ul>
   </main>
 </template>
 
-<style scoped>
+<style>
 * {
   --accent-fill-rest: v-bind(systemAccentColor);
 }

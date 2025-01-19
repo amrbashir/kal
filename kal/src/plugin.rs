@@ -1,12 +1,10 @@
 use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
-use anyhow::Context;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::result_item::ResultItem;
+use crate::result_item::QueryReturn;
 
 #[allow(unused_variables)]
 pub trait Plugin: Debug {
@@ -26,21 +24,7 @@ pub trait Plugin: Debug {
     }
 
     /// Gets [ResultItem]s for this query
-    fn results(
-        &mut self,
-        query: &str,
-        matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>>;
-
-    /// Called when `Enter` or `Shift + Enter` are pressed
-    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    /// Called when `CtrlLeft + O` are pressed
-    fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
-        Ok(())
-    }
+    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn>;
 
     /// Default generic config
     fn default_generic_config(&self) -> GenericPluginConfig {
@@ -49,153 +33,5 @@ pub trait Plugin: Debug {
             include_in_global_results: Some(true),
             direct_activation_command: None,
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct PluginEntry {
-    pub enabled: bool,
-    pub include_in_global_results: bool,
-    pub direct_activation_command: Option<String>,
-    plugin: Box<dyn Plugin>,
-}
-
-impl Deref for PluginEntry {
-    type Target = dyn Plugin;
-
-    fn deref(&self) -> &Self::Target {
-        self.plugin.as_ref()
-    }
-}
-impl DerefMut for PluginEntry {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.plugin.as_mut()
-    }
-}
-
-impl<P: Plugin + 'static> From<P> for PluginEntry {
-    fn from(value: P) -> Self {
-        Self::new(value)
-    }
-}
-
-impl PluginEntry {
-    fn new<P: Plugin + 'static>(plugin: P) -> Self {
-        let config = plugin.default_generic_config();
-        Self {
-            enabled: config.enabled.unwrap_or(true),
-            include_in_global_results: config.include_in_global_results.unwrap_or(true),
-            direct_activation_command: config.direct_activation_command,
-            plugin: Box::new(plugin),
-        }
-    }
-
-    pub fn is_directly_invoked(&self, query: &str) -> bool {
-        self.direct_activation_command
-            .as_deref()
-            .map(|c| query.starts_with(c))
-            .unwrap_or(false)
-    }
-
-    pub fn invoke_cmd_len(&self) -> usize {
-        self.direct_activation_command
-            .as_ref()
-            .map(|c| c.len())
-            .unwrap_or_default()
-    }
-}
-
-#[derive(Debug)]
-pub struct PluginStore {
-    pub plugins: Vec<PluginEntry>,
-}
-
-impl PluginStore {
-    pub fn new(plugins: Vec<PluginEntry>) -> Self {
-        Self { plugins }
-    }
-
-    pub fn find_plugin<F: FnMut(&&mut PluginEntry) -> bool>(
-        &mut self,
-        f: F,
-    ) -> anyhow::Result<&mut PluginEntry> {
-        self.plugins
-            .iter_mut()
-            .find(f)
-            .context("Couldn't find plugin")
-    }
-
-    pub fn queriable_plugins(&mut self) -> Vec<&mut PluginEntry> {
-        self.plugins
-            .iter_mut()
-            .filter(|p| p.enabled && p.include_in_global_results)
-            .collect()
-    }
-
-    pub fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
-        for plugin in self.plugins.iter_mut() {
-            // update plugin generic config
-            let default_generic_config = plugin.default_generic_config();
-            let generic_config = config
-                .generic_config(plugin.name())
-                .map(|c| c.apply_from(&default_generic_config))
-                .unwrap_or_else(|| default_generic_config);
-
-            plugin.enabled = generic_config.enabled();
-            plugin.include_in_global_results = generic_config.include_in_global_results();
-            plugin.direct_activation_command = generic_config.direct_activation_command;
-
-            // run plugin reload if enabled
-            if plugin.enabled {
-                plugin.reload(config)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        let plugin = self.find_plugin(|p| id.starts_with(p.name()))?;
-        plugin.execute(id, elevated)
-    }
-
-    pub fn show_item_in_dir(&mut self, id: &str) -> anyhow::Result<()> {
-        let plugin = self.find_plugin(|p| id.starts_with(p.name()))?;
-        plugin.show_item_in_dir(id)
-    }
-
-    pub fn results<'a, 'b>(
-        &'a mut self,
-        query: &str,
-        matcher: &SkimMatcherV2,
-        results: &'b mut Vec<ResultItem<'a>>,
-    ) -> anyhow::Result<()>
-    where
-        'a: 'b,
-    {
-        // check if a plugin is being invoked directly
-        if let Some(idx) = self
-            .plugins
-            .iter()
-            .position(|p| p.is_directly_invoked(query))
-        {
-            let invoke_cmd_len = self.plugins[idx].invoke_cmd_len();
-            let new_query = &query[invoke_cmd_len..];
-            if !new_query.is_empty() {
-                if let Ok(Some(res)) = self.plugins[idx].results(new_query, matcher) {
-                    results.extend(res);
-                }
-            }
-        } else {
-            // otherwise get result from all queriable plugins
-            for plugin in self.queriable_plugins() {
-                let Ok(Some(res)) = plugin.results(query, matcher) else {
-                    continue;
-                };
-                results.extend(res);
-            }
-        }
-
-        Ok(())
     }
 }

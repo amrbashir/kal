@@ -10,10 +10,17 @@ export enum IconType {
   Url = "Url",
 }
 
+export interface Action {
+  id: string;
+  icon?: Icon;
+  accelerator?: string;
+  description?: string;
+}
+
 export interface ResultItem {
+  id: string;
+  icon: Icon;
   primary_text: string;
   secondary_text: string;
-  icon: Icon;
-  needs_confirmation: boolean;
-  id: string;
+  actions: Action[];
 }

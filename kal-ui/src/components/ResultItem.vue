@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { ResultItem } from "../result_item";
+import { IpcCommand } from "../ipc";
+import { Action, ResultItem } from "../result_item";
 import { makeIconHTML } from "../utils";
 import { neutralForegroundHover } from "@fluentui/web-components";
 
-defineProps<{
+const props = defineProps<{
   item: ResultItem;
   selected: boolean;
-  showConfirm: boolean;
   itemHeight: string;
 }>();
+
+async function runAction(action: Action) {
+  const payload = `${action.id}#${props.item.id}`;
+  await window.KAL.ipc.invoke(IpcCommand.RunAction, payload);
+}
 
 const hoverBgColor = neutralForegroundHover.getValueFor(document.documentElement).toColorString();
 const hoverBgColor10Percent = `${hoverBgColor}1A`;
@@ -16,9 +21,10 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
 
 <template>
   <fluent-option
-    class="w-full part:content:flex part:content:w-full"
-    :class="{ selected }"
+    class="w-full part:content:flex part:content:w-full last:children:hover:flex bg-transparent before:left-0"
+    :class="{ 'selected before:bg-[var(--accent-fill-rest)]': selected }"
     :style="{ height: itemHeight }"
+    @click="runAction(item.actions[0])"
   >
     <div
       :style="{ width: itemHeight }"
@@ -35,10 +41,19 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
       </span>
     </div>
 
-    <div class="flex justify-center items-center mr-2">
-      <Transition name="slide-fade">
-        <span class="text-[var(--accent-fill-rest)]" v-if="showConfirm"> Proceed? </span>
-      </Transition>
+    <div
+      v-if="item.actions"
+      class="justify-center items-center mr-2 gap-2 hidden"
+      :class="{ flex: selected }"
+    >
+      <button
+        class="py-2 px-2 bg-transparent outline-none b-solid b-1px b-transparent hover:bg-white/10 hover:b-white/20 rounded"
+        v-for="action in item.actions.slice(1)"
+        :title="`${action.description} (${action.accelerator})`"
+        @click.stop="runAction(action)"
+      >
+        <div v-if="action.icon" class="h-4 w-4" v-html="makeIconHTML(action.icon)"></div>
+      </button>
     </div>
   </fluent-option>
 </template>
@@ -47,26 +62,13 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
 * {
   --base-height-multiplier: 12;
 }
-fluent-option::before {
-  width: 3px;
-  left: 0;
-}
 
 ul fluent-option::part(content) {
   height: v-bind(itemHeight);
 }
 
-ul fluent-option {
-  background-color: transparent;
-  outline: none;
-}
-
 ul fluent-option:hover,
 ul fluent-option.selected {
-  background: v-bind(hoverBgColor10Percent);
-}
-
-ul fluent-option.selected::before {
-  background: var(--accent-fill-rest);
+  background-color: v-bind(hoverBgColor10Percent);
 }
 </style>

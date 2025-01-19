@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::path::PathBuf;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -13,7 +14,7 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
 use crate::icon::{BuiltInIcon, Icon};
-use crate::result_item::{IntoResultItem, ResultItem};
+use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils;
 
 const MS_RESOURCE: &str = "ms-resource:";
@@ -24,21 +25,51 @@ pub struct PackagedApp {
     pub icon: Option<OsString>,
     pub appid: String,
     pub id: String,
+    pub location: PathBuf,
 }
 
 impl PackagedApp {
-    pub fn new(name: OsString, icon: Option<OsString>, appid: String) -> Self {
+    pub fn new(name: OsString, icon: Option<OsString>, appid: String, location: PathBuf) -> Self {
         let id = format!("{}:{}", super::Plugin::NAME, name.to_string_lossy());
         Self {
             name,
             id,
             icon,
             appid,
+            location,
         }
     }
 
-    pub fn execute(&self, elevated: bool) -> anyhow::Result<()> {
-        utils::execute(format!("shell:AppsFolder\\{}", self.appid), elevated)
+    fn item(&self, score: i64) -> ResultItem {
+        let icon = self
+            .icon
+            .as_ref()
+            .map(|i| Icon::path(i.to_string_lossy()))
+            .unwrap_or_else(|| BuiltInIcon::BlankFile.icon());
+
+        let appid = self.appid.clone();
+        let open = Action::primary(move |_| {
+            let path = format!("shell:AppsFolder\\{}", appid);
+            utils::execute(path, false)
+        });
+
+        let appid = self.appid.clone();
+        let open_elevated = Action::open_elevated(move |_| {
+            let path = format!("shell:AppsFolder\\{}", appid);
+            utils::execute(path, true)
+        });
+
+        let location = self.location.clone();
+        let open_location = Action::open_location(move |_| utils::open_dir(&location));
+
+        ResultItem {
+            id: self.id.clone(),
+            icon,
+            primary_text: self.name.to_string_lossy().into_owned(),
+            secondary_text: "Packaged Application".into(),
+            actions: vec![open, open_elevated, open_location],
+            score,
+        }
     }
 }
 
@@ -46,18 +77,7 @@ impl IntoResultItem for PackagedApp {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
-            .map(|score| ResultItem {
-                primary_text: self.name.to_string_lossy(),
-                secondary_text: "Packaged App".into(),
-                icon: self
-                    .icon
-                    .as_ref()
-                    .map(|i| Icon::path(i.to_string_lossy()))
-                    .unwrap_or_else(|| BuiltInIcon::Directory.icon()),
-                needs_confirmation: false,
-                id: self.id.as_str().into(),
-                score,
-            })
+            .map(|score| self.item(score))
     }
 }
 
@@ -145,11 +165,14 @@ fn app_from_manifest(
         .and_then(|uri| uri.RawUri())
         .map(|u| u.to_os_string());
 
-    Ok(Some(PackagedApp::new(
+    let packaged = PackagedApp::new(
         display_name.to_os_string(),
         logo.ok(),
         appid.to_string(),
-    )))
+        PathBuf::from(package.InstalledPath()?.to_os_string()),
+    );
+
+    Ok(Some(packaged))
 }
 
 /// From: https://github.com/microsoft/PowerToys/blob/fef50971af193a8c04c697022b6c7c880edcdc46/src/modules/launcher/Plugins/Microsoft.Plugin.Program/Programs/UWPApplication.cs#L293

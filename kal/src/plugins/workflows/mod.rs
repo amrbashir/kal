@@ -7,10 +7,75 @@ use url::Url;
 
 use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
-use crate::result_item::{IntoResultItem, ResultItem};
+use crate::result_item::{Action, IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Debug)]
+pub struct Plugin {
+    workflows: Vec<Workflow>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
+struct PluginConfig {
+    #[serde(default)]
+    workflows: Vec<Workflow>,
+}
+
+impl Plugin {
+    const NAME: &'static str = "Workflows";
+
+    fn update_ids(&mut self) {
+        for (idx, workflow) in self.workflows.iter_mut().enumerate() {
+            workflow.id = if workflow.id.is_empty() {
+                format!("{}:{idx}", Self::NAME)
+            } else {
+                format!("{}:{}", Self::NAME, workflow.id)
+            };
+        }
+    }
+}
+
+impl crate::plugin::Plugin for Plugin {
+    fn new(config: &Config, _data_dir: &Path) -> anyhow::Result<Self> {
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+
+        let mut plugin = Self {
+            workflows: config.workflows,
+        };
+
+        plugin.update_ids();
+
+        Ok(plugin)
+    }
+
+    fn name(&self) -> &'static str {
+        Self::NAME
+    }
+
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+        let config = config.plugin_config::<PluginConfig>(self.name());
+
+        self.workflows = config.workflows;
+        self.update_ids();
+
+        Ok(())
+    }
+
+    fn query(
+        &mut self,
+        query: &str,
+        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+    ) -> anyhow::Result<QueryReturn> {
+        Ok(self
+            .workflows
+            .iter()
+            .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
+            .collect_non_empty::<Vec<_>>()
+            .into())
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", untagged)]
 enum WorkflowStep {
     Path {
@@ -27,20 +92,20 @@ enum WorkflowStep {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Workflow<'a> {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Workflow {
     name: String,
     #[serde(default)]
     id: String,
     description: Option<String>,
-    icon: Option<Icon<'a>>,
+    icon: Option<Icon>,
     #[serde(default)]
     needs_confirmation: bool,
     steps: Vec<WorkflowStep>,
 }
 
-impl<'a> Workflow<'a> {
-    fn icon(&self) -> Icon<'a> {
+impl Workflow {
+    fn icon(&self) -> Icon {
         self.icon.clone().unwrap_or(BuiltInIcon::Workflow.icon())
     }
 
@@ -71,7 +136,7 @@ impl<'a> Workflow<'a> {
     }
 }
 
-impl IntoResultItem for Workflow<'_> {
+impl IntoResultItem for Workflow {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
@@ -80,84 +145,21 @@ impl IntoResultItem for Workflow<'_> {
                     .as_ref()
                     .and_then(|description| matcher.fuzzy_match(description, query))
             })
-            .map(|score| ResultItem {
-                primary_text: self.name.as_str().into(),
-                id: self.id.as_str().into(),
-                secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
-                icon: self.icon(),
-                needs_confirmation: self.needs_confirmation,
-                score,
+            .map(|score| {
+                let workflow = self.clone();
+                let open = Action::primary(move |_| workflow.execute(false));
+
+                let workflow = self.clone();
+                let open_elevated = Action::open_elevated(move |_| workflow.execute(true));
+
+                ResultItem {
+                    primary_text: self.name.as_str().into(),
+                    id: self.id.as_str().into(),
+                    secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
+                    icon: self.icon(),
+                    actions: vec![open, open_elevated],
+                    score,
+                }
             })
-    }
-}
-
-#[derive(Debug)]
-pub struct Plugin<'a> {
-    workflows: Vec<Workflow<'a>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-struct PluginConfig<'a> {
-    #[serde(default)]
-    workflows: Vec<Workflow<'a>>,
-}
-
-impl Plugin<'_> {
-    const NAME: &'static str = "Workflows";
-
-    fn update_ids(&mut self) {
-        for (idx, workflow) in self.workflows.iter_mut().enumerate() {
-            workflow.id = if workflow.id.is_empty() {
-                format!("{}:{idx}", Self::NAME)
-            } else {
-                format!("{}:{}", Self::NAME, workflow.id)
-            };
-        }
-    }
-}
-
-impl crate::plugin::Plugin for Plugin<'_> {
-    fn new(config: &Config, _data_dir: &Path) -> anyhow::Result<Self> {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
-
-        let mut plugin = Self {
-            workflows: config.workflows,
-        };
-
-        plugin.update_ids();
-
-        Ok(plugin)
-    }
-
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
-
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(self.name());
-
-        self.workflows = config.workflows;
-        self.update_ids();
-
-        Ok(())
-    }
-
-    fn results(
-        &mut self,
-        query: &str,
-        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
-        Ok(self
-            .workflows
-            .iter()
-            .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
-            .collect_non_empty())
-    }
-
-    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(workflow) = self.workflows.iter().find(|s| s.id == id) {
-            workflow.execute(elevated)?;
-        }
-        Ok(())
     }
 }

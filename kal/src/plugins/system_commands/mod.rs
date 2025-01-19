@@ -2,13 +2,52 @@ use std::path::Path;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use strum::AsRefStr;
 
 use crate::config::Config;
 use crate::icon::{BuiltInIcon, Icon};
-use crate::result_item::{IntoResultItem, ResultItem};
+use crate::result_item::{Action, IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::IteratorExt;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
+pub struct Plugin {
+    commands: [SystemCommand; 6],
+}
+
+impl Plugin {
+    const NAME: &'static str = "SystemCommands";
+}
+
+impl crate::plugin::Plugin for Plugin {
+    fn new(_config: &Config, _: &Path) -> anyhow::Result<Self> {
+        Ok(Self {
+            commands: SystemCommand::all(),
+        })
+    }
+
+    fn name(&self) -> &'static str {
+        Self::NAME
+    }
+
+    fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn query(
+        &mut self,
+        query: &str,
+        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+    ) -> anyhow::Result<QueryReturn> {
+        Ok(self
+            .commands
+            .iter()
+            .filter_map(|c| c.fuzzy_match(query, matcher))
+            .collect_non_empty::<Vec<_>>()
+            .into())
+    }
+}
+
+#[derive(Clone, Copy, Debug, AsRefStr)]
 enum SystemCommand {
     Shutdown,
     Restart,
@@ -16,12 +55,6 @@ enum SystemCommand {
     Lock,
     Hibernate,
     Sleep,
-}
-
-impl AsRef<str> for SystemCommand {
-    fn as_ref(&self) -> &str {
-        self.str()
-    }
 }
 
 impl SystemCommand {
@@ -34,17 +67,6 @@ impl SystemCommand {
             Self::Sleep,
             Self::Lock,
         ]
-    }
-
-    const fn str(&self) -> &str {
-        match self {
-            Self::Shutdown => "Shutdown",
-            Self::Restart => "Restart",
-            Self::SignOut => "SignOut",
-            Self::Lock => "Lock",
-            Self::Hibernate => "Hibernate",
-            Self::Sleep => "Sleep",
-        }
     }
 
     const fn description(&self) -> &str {
@@ -71,15 +93,16 @@ impl SystemCommand {
 
     const fn id(&self) -> &str {
         match self {
-            Self::Shutdown => "SystemCommands:Shutdown",
-            Self::Restart => "SystemCommands:Restart",
-            Self::SignOut => "SystemCommands:SignOut",
-            Self::Lock => "SystemCommands:Lock",
-            Self::Hibernate => "SystemCommands:Hibernate",
-            Self::Sleep => "SystemCommands:Sleep",
+            Self::Shutdown => "SystemCommand:Shutdown",
+            Self::Restart => "SystemCommand:Restart",
+            Self::SignOut => "SystemCommand:SignOut",
+            Self::Lock => "SystemCommand:Lock",
+            Self::Hibernate => "SystemCommand:Hibernate",
+            Self::Sleep => "SystemCommand:Sleep",
         }
     }
 
+    #[cfg(windows)]
     const fn shutdown_bin_args(&self) -> &[&str] {
         match self {
             Self::Shutdown => &["/s", "/hybrid", "/t", "0"],
@@ -117,6 +140,11 @@ impl SystemCommand {
     }
 
     #[cfg(not(windows))]
+    const fn shutdown_bin_args(&self) -> &[&str] {
+        unimplemented!()
+    }
+
+    #[cfg(not(windows))]
     fn execute(&self) -> anyhow::Result<()> {
         unimplemented!()
     }
@@ -125,62 +153,15 @@ impl SystemCommand {
 impl IntoResultItem for SystemCommand {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
         matcher.fuzzy_match(self.as_ref(), query).map(|score| {
-            let primary_text = self.as_ref().into();
-            let icon = self.icon();
-            let id = self.id().into();
-            let secondary_text = self.description().into();
+            let system_command = *self;
             ResultItem {
-                primary_text,
-                secondary_text,
-                icon,
-                needs_confirmation: true,
-                id,
+                id: self.id().into(),
+                icon: self.icon(),
+                primary_text: self.as_ref().into(),
+                secondary_text: self.description().into(),
+                actions: vec![Action::primary(move |_| system_command.execute())],
                 score,
             }
         })
-    }
-}
-
-#[derive(Debug)]
-pub struct Plugin {
-    commands: [SystemCommand; 6],
-}
-
-impl Plugin {
-    const NAME: &'static str = "SystemCommands";
-}
-
-impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &Config, _: &Path) -> anyhow::Result<Self> {
-        Ok(Self {
-            commands: SystemCommand::all(),
-        })
-    }
-
-    fn name(&self) -> &'static str {
-        Self::NAME
-    }
-
-    fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    fn results(
-        &mut self,
-        query: &str,
-        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
-        Ok(self
-            .commands
-            .iter()
-            .filter_map(|c| c.fuzzy_match(query, matcher))
-            .collect_non_empty())
-    }
-
-    fn execute(&mut self, id: &str, _elevated: bool) -> anyhow::Result<()> {
-        if let Some(command) = self.commands.iter().find(|command| command.id() == id) {
-            command.execute()?;
-        }
-        Ok(())
     }
 }

@@ -3,7 +3,7 @@ use std::sync::mpsc::{self, Sender};
 
 use serde::Serialize;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
-use strum::{AsRefStr, EnumString};
+use strum::{AsRefStr, Display, EnumString};
 use winit::event_loop::EventLoopProxy;
 use wry::http::{Method, Request, Response};
 use wry::{WebView, WebViewId};
@@ -14,12 +14,11 @@ pub mod response;
 
 pub const INIT_SCRIPT: &str = include_str!("./ipc.js");
 
-#[derive(EnumString, AsRefStr)]
-pub enum IpcAction {
+#[derive(Display, EnumString, AsRefStr)]
+pub enum IpcCommand {
     Query,
     ClearResults,
-    Execute,
-    ShowItemInDir,
+    RunAction,
     Reload,
     HideMainWindow,
 }

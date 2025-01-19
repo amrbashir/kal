@@ -1,0 +1,128 @@
+use std::ops::{Deref, DerefMut};
+
+use fuzzy_matcher::skim::SkimMatcherV2;
+
+use crate::config::Config;
+use crate::plugin::Plugin;
+use crate::result_item::ResultItem;
+
+#[derive(Debug)]
+pub struct PluginEntry {
+    pub enabled: bool,
+    pub include_in_global_results: bool,
+    pub direct_activation_command: Option<String>,
+    plugin: Box<dyn Plugin>,
+}
+
+impl Deref for PluginEntry {
+    type Target = dyn Plugin;
+
+    fn deref(&self) -> &Self::Target {
+        self.plugin.as_ref()
+    }
+}
+impl DerefMut for PluginEntry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.plugin.as_mut()
+    }
+}
+
+impl<P: Plugin + 'static> From<P> for PluginEntry {
+    fn from(value: P) -> Self {
+        Self::new(value)
+    }
+}
+
+impl PluginEntry {
+    fn new<P: Plugin + 'static>(plugin: P) -> Self {
+        let config = plugin.default_generic_config();
+        Self {
+            enabled: config.enabled.unwrap_or(true),
+            include_in_global_results: config.include_in_global_results.unwrap_or(true),
+            direct_activation_command: config.direct_activation_command,
+            plugin: Box::new(plugin),
+        }
+    }
+
+    pub fn is_direct_invoke(&self, query: &str) -> bool {
+        self.direct_activation_command
+            .as_deref()
+            .map(|c| query.starts_with(c))
+            .unwrap_or(false)
+    }
+
+    pub fn invoke_cmd_len(&self) -> usize {
+        self.direct_activation_command
+            .as_ref()
+            .map(|c| c.len())
+            .unwrap_or_default()
+    }
+}
+
+#[derive(Debug)]
+pub struct PluginStore {
+    pub plugins: Vec<PluginEntry>,
+}
+
+impl PluginStore {
+    pub fn new(plugins: Vec<PluginEntry>) -> Self {
+        Self { plugins }
+    }
+
+    pub fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+        for plugin in self.plugins.iter_mut() {
+            // update plugin generic config
+            let default_generic_config = plugin.default_generic_config();
+            let generic_config = config
+                .generic_config(plugin.name())
+                .map(|c| c.apply_from(&default_generic_config))
+                .unwrap_or_else(|| default_generic_config);
+
+            plugin.enabled = generic_config.enabled();
+            plugin.include_in_global_results = generic_config.include_in_global_results();
+            plugin.direct_activation_command = generic_config.direct_activation_command;
+
+            // run plugin reload if enabled
+            if plugin.enabled {
+                plugin.reload(config)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn queriable_plugins(&mut self) -> impl Iterator<Item = &mut PluginEntry> {
+        self.plugins
+            .iter_mut()
+            .filter(|p| p.enabled && p.include_in_global_results)
+    }
+
+    pub fn query(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+        results: &mut Vec<ResultItem>,
+    ) -> anyhow::Result<()> {
+        // check if a plugin is being invoked directly
+        if let Some(plugin) = self.plugins.iter_mut().find(|p| p.is_direct_invoke(query)) {
+            let invoke_cmd_len = plugin.invoke_cmd_len();
+            let new_query = &query[invoke_cmd_len..];
+            if !new_query.is_empty() {
+                match plugin.query(new_query, matcher) {
+                    Ok(res) => res.extend_into(results),
+                    Err(err) => results.push(ResultItem::plugin_error(plugin.plugin.as_ref(), err)),
+                }
+            }
+        } else {
+            // otherwise get result from all queriable plugins
+            for plugin in self.queriable_plugins() {
+                match plugin.query(query, matcher) {
+                    Ok(res) => res.extend_into(results),
+                    Err(err) => results.push(ResultItem::plugin_error(plugin.plugin.as_ref(), err)),
+                }
+            }
+        }
+
+        Ok(())
+    }
+}

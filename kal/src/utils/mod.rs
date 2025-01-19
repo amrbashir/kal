@@ -15,6 +15,8 @@ pub fn system_accent_color() -> Option<String> {
 }
 
 pub trait IteratorExt: Iterator {
+    /// Same as [`Iterator::collect`] but returns [`None`] if the iterator is empty,
+    /// otherwsie returns [`Some<T>`].
     fn collect_non_empty<B: FromIterator<Self::Item>>(self) -> Option<B>;
 }
 

@@ -18,8 +18,9 @@ use winit::window::WindowId;
 use wry::http::{Request, Response};
 
 use crate::config::Config;
-use crate::ipc::{response, IpcAction, IpcEvent};
-use crate::plugin::PluginStore;
+use crate::ipc::{response, IpcCommand, IpcEvent};
+use crate::plugin_store::PluginStore;
+use crate::result_item::ResultItem;
 use crate::webview_window::WebViewWindow;
 
 pub enum AppEvent {
@@ -49,6 +50,8 @@ pub struct App {
 
     #[cfg(windows)]
     pub previously_foreground_hwnd: HWND,
+
+    results: Vec<ResultItem>,
 }
 
 impl App {
@@ -91,6 +94,8 @@ impl App {
 
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
+
+            results: Vec::new(),
         })
     }
 
@@ -112,7 +117,7 @@ impl App {
         } else {
             let count = std::cmp::min(count, self.config.appearance.max_items as usize) as u32;
             let item_height = self.config.appearance.item_height + self.config.appearance.item_gap;
-            self.config.appearance.input_items_gap + count * item_height
+            (self.config.appearance.input_items_gap * 2) + count * item_height
         };
 
         let height = self.config.appearance.input_height + items_height + Self::MAGIC_BORDERS;
@@ -121,21 +126,21 @@ impl App {
         let _ = main_window.window().request_surface_size(size.into());
     }
 
-    pub fn ipc_event<'a>(
+    pub fn ipc_event<'b>(
         &mut self,
         request: Request<Vec<u8>>,
-    ) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
-        let action: IpcAction = request.uri().path()[1..].try_into()?;
+    ) -> anyhow::Result<Response<Cow<'b, [u8]>>> {
+        let command: IpcCommand = request.uri().path()[1..].try_into()?;
 
-        match action {
-            IpcAction::Query => {
+        match command {
+            IpcCommand::Query => {
                 let body = request.body();
                 let query = std::str::from_utf8(body)?;
 
                 let mut results = Vec::new();
 
                 self.plugin_store
-                    .results(query, &self.fuzzy_matcher, &mut results)?;
+                    .query(query, &self.fuzzy_matcher, &mut results)?;
 
                 // sort results in reverse so higher scores are first
                 results.sort_by(|a, b| b.score.cmp(&a.score));
@@ -147,26 +152,34 @@ impl App {
 
                 self.resize_main_window_for_items(min);
 
+                self.results = results;
+
                 return json;
             }
 
-            IpcAction::ClearResults => self.resize_main_window_for_items(0),
+            IpcCommand::ClearResults => self.resize_main_window_for_items(0),
 
-            IpcAction::Execute => {
+            IpcCommand::RunAction => {
                 let payload = request.body();
-                let elevated: bool = payload[0] == 1;
-                let id = std::str::from_utf8(&payload[1..])?;
-                self.plugin_store.execute(id, elevated)?;
+
+                let Some((action, id)) = std::str::from_utf8(payload)?.split_once('#') else {
+                    anyhow::bail!("Invalid payload for command `{command}`: {payload:?}");
+                };
+
+                let Some(item) = self.results.iter().find(|r| r.id == id) else {
+                    anyhow::bail!("Couldn't find result item with this id: {id}");
+                };
+
+                let Some(action) = item.actions.iter().find(|a| a.id == action) else {
+                    anyhow::bail!("Couldn't find secondary action: {action}");
+                };
+
+                action.run(item)?;
+
                 self.hide_main_window(false);
             }
 
-            IpcAction::ShowItemInDir => {
-                let id = std::str::from_utf8(request.body())?;
-                self.plugin_store.show_item_in_dir(id)?;
-                self.hide_main_window(false);
-            }
-
-            IpcAction::Reload => {
+            IpcCommand::Reload => {
                 let old_hotkey = self.config.general.hotkey.clone();
                 self.config = Config::load()?;
 
@@ -183,7 +196,7 @@ impl App {
                 }
             }
 
-            IpcAction::HideMainWindow => {
+            IpcCommand::HideMainWindow => {
                 self.hide_main_window(true);
             }
         }
@@ -196,17 +209,8 @@ impl App {
         use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
         use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
         use winit::platform::windows::ActiveEventLoopExtWindows;
-        use wry::raw_window_handle::RawWindowHandle;
 
-        let Ok(handle) = event_loop.rwh_06_window_handle().window_handle() else {
-            return;
-        };
-
-        let RawWindowHandle::Win32(handle) = handle.as_raw() else {
-            return;
-        };
-
-        let hwnd = HWND(handle.hwnd.get() as _);
+        let hwnd = HWND(event_loop.target_window_hwnd() as _);
 
         let userdata = Box::new((self.sender.clone(), self.event_loop_proxy.clone()));
         let userdata = Box::into_raw(userdata);
@@ -227,7 +231,9 @@ impl App {
 
                 match sender.send(AppEvent::SystemSettingsChanged) {
                     Ok(_) => proxy.wake_up(),
-                    Err(e) => tracing::error!("{e}"),
+                    Err(e) => {
+                        tracing::error!("Failed to send `AppEvent::SystemSettingsChanged`:{e}")
+                    }
                 }
             }
 
@@ -304,7 +310,7 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 for window in self.windows.values_mut() {
                     if let Err(e) = window.clear_window_surface() {
-                        tracing::error!("{e}");
+                        tracing::error!("Failed to clear window surface: {e}");
                     }
                 }
             }

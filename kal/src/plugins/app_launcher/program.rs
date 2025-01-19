@@ -6,7 +6,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 
 use crate::icon::Icon;
-use crate::result_item::{IntoResultItem, ResultItem};
+use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, PathExt};
 
 #[derive(Debug)]
@@ -31,12 +31,24 @@ impl Program {
         }
     }
 
-    pub fn execute(&self, elevated: bool) -> anyhow::Result<()> {
-        utils::execute(&self.path, elevated)
-    }
+    fn item(&self, score: i64) -> ResultItem {
+        let path = self.path.clone();
+        let open = Action::primary(move |_| utils::execute(&path, false));
 
-    pub fn show_item_in_dir(&self) -> anyhow::Result<()> {
-        utils::reveal_in_dir(&self.path)
+        let path = self.path.clone();
+        let open_elevated = Action::open_elevated(move |_| utils::execute(&path, true));
+
+        let path = self.path.clone();
+        let open_location = Action::open_location(move |_| utils::reveal_item_in_dir(&path));
+
+        ResultItem {
+            id: self.id.as_str().into(),
+            icon: Icon::path(self.icon.to_string_lossy()),
+            primary_text: self.name.to_string_lossy().into_owned(),
+            secondary_text: "Application".into(),
+            actions: vec![open, open_elevated, open_location],
+            score,
+        }
     }
 }
 
@@ -45,14 +57,7 @@ impl IntoResultItem for Program {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
             .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
-            .map(|score| ResultItem {
-                primary_text: self.name.to_string_lossy(),
-                secondary_text: "Application".into(),
-                icon: Icon::path(self.icon.to_string_lossy()),
-                needs_confirmation: false,
-                id: self.id.as_str().into(),
-                score,
-            })
+            .map(|score| self.item(score))
     }
 }
 

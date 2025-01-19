@@ -4,64 +4,13 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::icon::{self};
-use crate::result_item::{IntoResultItem, ResultItem};
+use crate::icon;
+use crate::result_item::{IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::IteratorExt;
 
 #[cfg(windows)]
 mod packaged_app;
 mod program;
-
-#[derive(Debug)]
-enum App {
-    Program(program::Program),
-    #[cfg(windows)]
-    Packaged(packaged_app::PackagedApp),
-}
-
-impl App {
-    fn id(&self) -> &str {
-        match self {
-            App::Program(program) => &program.id,
-    #[cfg(windows)]
-    App::Packaged(packaged_app) => &packaged_app.id,
-        }
-    }
-
-    fn icon_path(&self) -> Option<(PathBuf, PathBuf)> {
-        match self {
-            App::Program(program) => Some((program.path.clone(), program.icon.clone())),
-    #[cfg(windows)]
-    App::Packaged(_) => None,
-        }
-    }
-
-    fn execute(&self, elevated: bool) -> anyhow::Result<()> {
-        match self {
-            App::Program(program) => program.execute(elevated),
-    #[cfg(windows)]
-    App::Packaged(packaged_app) => packaged_app.execute(elevated),
-        }
-    }
-
-    fn show_item_in_dir(&self) -> anyhow::Result<()> {
-        match self {
-            App::Program(program) => program.show_item_in_dir(),
-    #[cfg(windows)]
-    App::Packaged(_) => Ok(()),
-        }
-    }
-}
-
-impl IntoResultItem for App {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
-        match self {
-            App::Program(program) => program.fuzzy_match(query, matcher),
-    #[cfg(windows)]
-    App::Packaged(packaged_app) => packaged_app.fuzzy_match(query, matcher),
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Plugin {
@@ -82,32 +31,6 @@ struct PluginConfig {
     include_packaged_apps: bool,
 }
 
-fn default_paths() -> Vec<String> {
-    vec![
-        "%USERPROFILE%\\Desktop".to_string(),
-        "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
-        "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
-    ]
-}
-
-fn default_extensions() -> Vec<String> {
-    vec!["exe".to_string(), "lnk".to_string()]
-}
-
-fn default_include_packaged_apps() -> bool {
-    true
-}
-
-impl Default for PluginConfig {
-    fn default() -> Self {
-        Self {
-            paths: default_paths(),
-            extensions: default_extensions(),
-            include_packaged_apps: default_include_packaged_apps(),
-        }
-    }
-}
-
 impl Plugin {
     const NAME: &'static str = "AppLauncher";
 
@@ -123,8 +46,8 @@ impl Plugin {
             .map(App::Program)
             .collect();
 
-    #[cfg(windows)]
-    if self.include_packaged_apps {
+        #[cfg(windows)]
+        if self.include_packaged_apps {
             if let Ok(packaged_apps) = packaged_app::find_all() {
                 self.apps.extend(packaged_apps.map(App::Packaged));
             }
@@ -160,34 +83,68 @@ impl crate::plugin::Plugin for Plugin {
             .collect::<Vec<_>>();
 
         std::fs::create_dir_all(icons_dir)?;
-        icon::extract_multiple(paths)?;
+        let _ = icon::extract_multiple(paths).inspect_err(|e| tracing::error!("{e}"));
 
         Ok(())
     }
 
-    fn results(
-        &mut self,
-        query: &str,
-        matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
+    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn> {
         Ok(self
             .apps
             .iter()
             .filter_map(|app| app.fuzzy_match(query, matcher))
-            .collect_non_empty())
+            .collect_non_empty::<Vec<_>>()
+            .into())
     }
+}
 
-    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(app) = self.apps.iter().find(|app| app.id() == id) {
-            app.execute(elevated)?;
-        }
-        Ok(())
-    }
+#[derive(Debug)]
+enum App {
+    Program(program::Program),
+    #[cfg(windows)]
+    Packaged(packaged_app::PackagedApp),
+}
 
-    fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
-        if let Some(app) = self.apps.iter().find(|app| app.id() == id) {
-            app.show_item_in_dir()?;
+impl App {
+    fn icon_path(&self) -> Option<(PathBuf, PathBuf)> {
+        match self {
+            App::Program(program) => Some((program.path.clone(), program.icon.clone())),
+            #[cfg(windows)]
+            App::Packaged(_) => None,
         }
-        Ok(())
     }
+}
+
+impl IntoResultItem for App {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+        match self {
+            App::Program(program) => program.fuzzy_match(query, matcher),
+            #[cfg(windows)]
+            App::Packaged(packaged_app) => packaged_app.fuzzy_match(query, matcher),
+        }
+    }
+}
+
+impl Default for PluginConfig {
+    fn default() -> Self {
+        Self {
+            paths: default_paths(),
+            extensions: default_extensions(),
+            include_packaged_apps: default_include_packaged_apps(),
+        }
+    }
+}
+
+fn default_paths() -> Vec<String> {
+    vec![
+        "%USERPROFILE%\\Desktop".to_string(),
+        "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+        "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
+    ]
+}
+fn default_extensions() -> Vec<String> {
+    vec!["exe".to_string(), "lnk".to_string()]
+}
+fn default_include_packaged_apps() -> bool {
+    true
 }

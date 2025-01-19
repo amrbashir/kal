@@ -7,60 +7,9 @@ use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
-use crate::icon::{self, BuiltInIcon, Icon};
-use crate::result_item::{IntoResultItem, ResultItem};
+use crate::icon::{self, Icon};
+use crate::result_item::{Action, IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt, PathExt};
-
-#[derive(Debug)]
-struct DirEntry {
-    name: OsString,
-    path: PathBuf,
-    icon: Option<PathBuf>,
-    id: String,
-}
-
-impl DirEntry {
-    fn new(path: PathBuf, icons_dir: &Path) -> Self {
-        let name = path.file_stem().unwrap_or_default().to_os_string();
-        let filename = path.file_name().unwrap_or_default().to_os_string();
-        let is_file = path.is_file();
-        let icon = is_file.then(|| icons_dir.join(&filename).with_extra_extension("png"));
-        let id = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
-        Self {
-            name,
-            path,
-            icon,
-            id,
-        }
-    }
-
-    fn execute(&self, elevated: bool) -> anyhow::Result<()> {
-        utils::execute(&self.path, elevated)
-    }
-
-    fn show_item_in_dir(&self) -> anyhow::Result<()> {
-        utils::reveal_in_dir(&self.path)
-    }
-}
-
-impl IntoResultItem for DirEntry {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
-        matcher
-            .fuzzy_match(&self.name.to_string_lossy(), query)
-            .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
-            .map(|score| ResultItem {
-                primary_text: self.name.to_string_lossy(),
-                secondary_text: self.path.to_string_lossy(),
-                icon: match &self.icon {
-                    Some(path) => Icon::path(path.to_string_lossy()),
-                    None => BuiltInIcon::Directory.icon(),
-                },
-                needs_confirmation: false,
-                id: self.id.as_str().into(),
-                score,
-            })
-    }
-}
 
 #[derive(Debug)]
 pub struct Plugin {
@@ -83,7 +32,7 @@ impl Plugin {
         self.paths = config.paths;
     }
 
-    fn find_dirs(&mut self) {
+    fn read_dirs(&mut self) {
         self.entries = self
             .paths
             .iter()
@@ -112,45 +61,102 @@ impl crate::plugin::Plugin for Plugin {
 
     fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
-        self.find_dirs();
+        self.read_dirs();
 
         let icons_dir = self.icons_dir.clone();
         let paths = self
             .entries
             .iter()
-            .filter_map(|e| e.icon.as_ref().map(|icon| (e.path.clone(), icon.clone())))
+            .map(|e| (e.path.clone(), e.icon.clone()))
             .collect::<Vec<_>>();
 
         std::fs::create_dir_all(icons_dir)?;
-        icon::extract_multiple(paths)?;
+        let _ = icon::extract_multiple_cached(paths).inspect_err(|e| tracing::error!("{e}"));
 
         Ok(())
     }
 
-    fn results(
-        &mut self,
-        query: &str,
-        matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
+    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn> {
         Ok(self
             .entries
             .iter()
             .filter_map(|entry| entry.fuzzy_match(query, matcher))
-            .collect_non_empty())
+            .collect_non_empty::<Vec<_>>()
+            .into())
+    }
+}
+
+#[derive(Debug)]
+struct DirEntry {
+    name: OsString,
+    path: PathBuf,
+    is_dir: bool,
+    icon: PathBuf,
+    id: String,
+}
+
+impl DirEntry {
+    fn new(path: PathBuf, icons_dir: &Path) -> Self {
+        let name = path.file_stem().unwrap_or_default().to_os_string();
+        let filename = path.file_name().unwrap_or_default().to_os_string();
+        let is_dir = path.is_dir();
+        let icon = icons_dir.join(&filename).with_extra_extension("png");
+        let id = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
+        Self {
+            name,
+            is_dir,
+            path,
+            icon,
+            id,
+        }
     }
 
-    fn execute(&mut self, id: &str, elevated: bool) -> anyhow::Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
-            entry.execute(elevated)?;
-        }
-        Ok(())
-    }
+    fn item(&self, score: i64) -> ResultItem {
+        let actions = if self.is_dir {
+            vec![
+                {
+                    let path = self.path.clone();
+                    Action::primary(move |_| utils::open_dir(&path))
+                },
+                {
+                    let path = self.path.clone();
+                    Action::open_location(move |_| utils::reveal_item_in_dir(&path))
+                },
+            ]
+        } else {
+            vec![
+                {
+                    let path = self.path.clone();
+                    Action::primary(move |_| utils::execute(&path, false))
+                },
+                {
+                    let path = self.path.clone();
+                    Action::open_elevated(move |_| utils::execute(&path, true))
+                },
+                {
+                    let path = self.path.clone();
+                    Action::open_location(move |_| utils::reveal_item_in_dir(&path))
+                },
+            ]
+        };
 
-    fn show_item_in_dir(&self, id: &str) -> anyhow::Result<()> {
-        if let Some(entry) = self.entries.iter().find(|e| e.id == id) {
-            entry.show_item_in_dir()?;
+        ResultItem {
+            id: self.id.as_str().into(),
+            icon: Icon::path(self.icon.to_string_lossy()),
+            primary_text: self.name.to_string_lossy().into_owned(),
+            secondary_text: self.path.to_string_lossy().into_owned(),
+            actions,
+            score,
         }
-        Ok(())
+    }
+}
+
+impl IntoResultItem for DirEntry {
+    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+        matcher
+            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
+            .map(|score| self.item(score))
     }
 }
 

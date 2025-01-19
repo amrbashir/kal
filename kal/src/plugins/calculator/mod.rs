@@ -1,101 +1,56 @@
 use std::path::Path;
 
+use anyhow::Ok;
 use calculator_rs::Calculate;
 
 use crate::config::Config;
 use crate::icon::BuiltInIcon;
-use crate::result_item::ResultItem;
+use crate::result_item::{Action, QueryReturn, ResultItem};
 
-pub struct Plugin {
-    clipboard: Option<arboard::Clipboard>,
-    last_calculation: String,
-}
-
-impl std::fmt::Debug for Plugin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Plugin")
-            .field("clipboard", &"arboard::Clipboard")
-            .field("last_calculation", &self.last_calculation)
-            .finish()
-    }
-}
+#[derive(Debug)]
+pub struct Plugin;
 
 impl Plugin {
-    const NAME: &'static str = "Calculator";
-    const ID: &'static str = "Calculator-99999-item";
+    const NAME: &str = "Calculator";
+    const ID: &str = "Calculator";
+    const DESCRIPTION: &str = "Press Enter to copy to clipboard";
 
-    fn item(&self) -> ResultItem<'_> {
+    fn item(&self, result: String) -> ResultItem {
         ResultItem {
-            primary_text: self.last_calculation.as_str().into(),
-            secondary_text: "Press Enter to copy to clipboard".into(),
-            needs_confirmation: false,
             id: Self::ID.into(),
             icon: BuiltInIcon::Calculator.icon(),
-            score: 99999, // should always be the first one
+            primary_text: result,
+            secondary_text: Self::DESCRIPTION.into(),
+            actions: vec![Action::primary(|item| {
+                let mut clipboard = arboard::Clipboard::new()?;
+                clipboard.set_text(&item.primary_text).map_err(Into::into)
+            })],
+            score: 0,
         }
-    }
-
-    fn try_clipboard(&mut self) {
-        if self.clipboard.is_none() {
-            match arboard::Clipboard::new() {
-                Ok(clipboard) => self.clipboard = Some(clipboard),
-                Err(e) => {
-                    tracing::error!("[Plugin][Calculator]: Failed to initialize clipboard: {e}")
-                }
-            }
-        }
-    }
-
-    fn copy_last_calculation(&mut self) {
-        self.try_clipboard();
-
-        if self.clipboard.is_none() {
-            return;
-        }
-
-        let _ = self
-            .clipboard
-            .as_mut()
-            .unwrap()
-            .set_text(&self.last_calculation);
     }
 }
 
 impl crate::plugin::Plugin for Plugin {
     fn new(_: &Config, _: &Path) -> anyhow::Result<Self> {
-        Ok(Self {
-            last_calculation: String::new(),
-            clipboard: arboard::Clipboard::new().ok(),
-        })
+        Ok(Self)
     }
 
     fn name(&self) -> &'static str {
         Self::NAME
     }
 
-    fn results(
+    fn query(
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<Option<Vec<ResultItem<'_>>>> {
-        if query.starts_with(|c: char| c.is_ascii_digit()) {
-            query
-                .calculate()
-                .map(|res| {
-                    self.last_calculation = res.to_string();
-                    Some(vec![self.item()])
-                })
-                .map_err(Into::into)
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn execute(&mut self, id: &str, _: bool) -> anyhow::Result<()> {
-        if id == Self::ID {
-            self.copy_last_calculation()
+    ) -> anyhow::Result<QueryReturn> {
+        if !query.starts_with(|c: char| c.is_ascii_digit()) {
+            return Ok(QueryReturn::None);
         }
 
-        Ok(())
+        let result = query.calculate()?.to_string();
+        let item = self.item(result);
+
+        Ok(QueryReturn::One(item))
     }
 }

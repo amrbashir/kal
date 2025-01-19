@@ -14,52 +14,56 @@ mod extract;
 
 pub use self::extract::*;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IconType {
     Path,
     Svg,
+    #[default]
     BuiltIn,
     Url,
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct Icon<'a> {
-    pub data: Cow<'a, str>,
+#[derive(Serialize, Debug, Clone, Default)]
+pub struct Icon {
+    pub data: String,
     pub r#type: IconType,
 }
 
-impl<'a> Icon<'a> {
+impl Icon {
     #[inline]
-    pub fn new(data: Cow<'a, str>, r#type: IconType) -> Self {
-        Self { data, r#type }
+    pub fn new(data: impl Into<String>, r#type: IconType) -> Self {
+        Self {
+            data: data.into(),
+            r#type,
+        }
     }
 
     #[inline]
-    pub fn path(data: Cow<'a, str>) -> Self {
+    pub fn path(data: impl Into<String>) -> Self {
         Self::new(data, IconType::Path)
     }
 
     #[inline]
-    pub fn builtin(data: Cow<'a, str>) -> Self {
+    pub fn builtin(data: impl Into<String>) -> Self {
         Self::new(data, IconType::BuiltIn)
     }
 }
 
-impl<'de> Deserialize<'de> for Icon<'_> {
+impl<'de> Deserialize<'de> for Icon {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
-        pub struct IconDeser<'a> {
-            pub data: Cow<'a, str>,
+        pub struct IconDeser {
+            pub data: String,
             pub r#type: IconType,
         }
 
         let mut icon = IconDeser::deserialize(deserializer)?;
         if icon.r#type == IconType::BuiltIn {
             let builtin = BuiltInIcon::from_str(&icon.data).map_err(serde::de::Error::custom)?;
-            icon.data = builtin.icon().data.into_owned().into();
+            icon.data = builtin.icon().data;
         };
 
         Ok(Self {
@@ -71,7 +75,9 @@ impl<'de> Deserialize<'de> for Icon<'_> {
 
 #[derive(EnumString, AsRefStr, Clone, Copy)]
 pub enum BuiltInIcon {
-    Directory,
+    BlankFile,
+    Folder,
+    FolderOpen,
     Url,
     Shell,
     Shutdown,
@@ -82,24 +88,30 @@ pub enum BuiltInIcon {
     Lock,
     Calculator,
     Workflow,
+    Admin,
+    Error,
+    Warning,
 }
 
 impl BuiltInIcon {
-    pub fn icon(&self) -> Icon<'_> {
+    pub fn icon(&self) -> Icon {
         match self {
-            Self::Shutdown => Icon::builtin(include_str!("./built-in-icons/Shutdown.svg").into()),
-            Self::Restart => Icon::builtin(include_str!("./built-in-icons/Restart.svg").into()),
-            Self::SignOut => Icon::builtin(include_str!("./built-in-icons/Signout.svg").into()),
-            Self::Hibernate => Icon::builtin(include_str!("./built-in-icons/Hibernate.svg").into()),
-            Self::Sleep => Icon::builtin(include_str!("./built-in-icons/Sleep.svg").into()),
-            Self::Directory => Icon::builtin(include_str!("./built-in-icons/Folder.svg").into()),
-            Self::Lock => Icon::builtin(include_str!("./built-in-icons/Lock.svg").into()),
-            Self::Calculator => {
-                Icon::builtin(include_str!("./built-in-icons/Calculator.svg").into())
-            }
-            Self::Workflow => Icon::builtin(include_str!("./built-in-icons/Workflow.svg").into()),
-            Self::Shell => Icon::builtin(include_str!("./built-in-icons/Shell.svg").into()),
-            Self::Url => Icon::builtin(include_str!("./built-in-icons/Url.svg").into()),
+            Self::Folder => Icon::builtin(include_str!("./built-in-icons/Folder.svg")),
+            Self::FolderOpen => Icon::builtin(include_str!("./built-in-icons/FolderOpen.svg")),
+            Self::BlankFile => Icon::builtin(include_str!("./built-in-icons/BlankFile.svg")),
+            Self::Shutdown => Icon::builtin(include_str!("./built-in-icons/Shutdown.svg")),
+            Self::Restart => Icon::builtin(include_str!("./built-in-icons/Restart.svg")),
+            Self::SignOut => Icon::builtin(include_str!("./built-in-icons/Signout.svg")),
+            Self::Hibernate => Icon::builtin(include_str!("./built-in-icons/Hibernate.svg")),
+            Self::Sleep => Icon::builtin(include_str!("./built-in-icons/Sleep.svg")),
+            Self::Lock => Icon::builtin(include_str!("./built-in-icons/Lock.svg")),
+            Self::Calculator => Icon::builtin(include_str!("./built-in-icons/Calculator.svg")),
+            Self::Workflow => Icon::builtin(include_str!("./built-in-icons/Workflow.svg")),
+            Self::Shell => Icon::builtin(include_str!("./built-in-icons/Shell.svg")),
+            Self::Url => Icon::builtin(include_str!("./built-in-icons/Url.svg")),
+            Self::Admin => Icon::builtin(include_str!("./built-in-icons/Admin.svg")),
+            Self::Error => Icon::builtin(include_str!("./built-in-icons/Error.svg")),
+            Self::Warning => Icon::builtin(include_str!("./built-in-icons/Warning.svg")),
         }
     }
 }
@@ -121,7 +133,7 @@ pub fn protocol<'a>(
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") => "image/jpeg",
         Some("svg") => "image/svg+xml",
-        _ => return ipc::response::error("Only png,jpg and svg icons are supported"),
+        _ => anyhow::bail!("Only png, jpg and svg icons are supported"),
     };
 
     ipc::response::base()

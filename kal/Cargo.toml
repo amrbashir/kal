@@ -11,7 +11,7 @@ edition = "2021"
 embed-manifest = "1.4"
 
 [dependencies]
-wry = { git = "https://github.com/tauri-apps/wry", branch = "dev" }
+wry = { git = "https://github.com/tauri-apps/wry", rev = "46db839b9ebcc36e3b44455f0e8fb861a07e1447" }
 winit = { path = "../../winit" }
 serde = "1"
 serde_json = "1"

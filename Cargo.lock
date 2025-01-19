@@ -3993,7 +3993,7 @@ checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
 [[package]]
 name = "wry"
 version = "0.48.1"
-source = "git+https://github.com/tauri-apps/wry?branch=dev#0185644040184c43084814cb8692acb4e1004d86"
+source = "git+https://github.com/tauri-apps/wry?rev=46db839b9ebcc36e3b44455f0e8fb861a07e1447#46db839b9ebcc36e3b44455f0e8fb861a07e1447"
 dependencies = [
  "base64",
  "block2",

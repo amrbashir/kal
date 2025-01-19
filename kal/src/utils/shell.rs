@@ -22,8 +22,8 @@ pub fn open_dir(path: impl AsRef<Path>) -> anyhow::Result<()> {
     imp::open_dir(path)
 }
 
-pub fn reveal_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
-    imp::reveal_in_dir(path)
+pub fn reveal_item_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+    imp::reveal_item_in_dir(path)
 }
 
 pub fn execute_in_shell<S, P>(
@@ -129,7 +129,7 @@ mod imp {
         }
     }
 
-    pub fn reveal_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+    pub fn reveal_item_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
         let _ = unsafe { CoInitialize(None) };
 
         let path = path.as_ref();
@@ -267,7 +267,7 @@ mod imp {
         unimplemented!()
     }
 
-    pub fn reveal_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+    pub fn reveal_item_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
         unimplemented!()
     }
 

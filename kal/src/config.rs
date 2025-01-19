@@ -31,7 +31,7 @@ pub struct AppearanceConfig {
 }
 
 fn default_window_width() -> u32 {
-    600
+    650
 }
 fn default_input_height() -> u32 {
     65
