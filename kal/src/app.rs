@@ -325,7 +325,7 @@ impl ApplicationHandler for App {
             WindowEvent::Focused(focus) => {
                 let main_window = self.main_window().window();
                 // hide main window when it loses focus
-                if *window_id == main_window.id() && !focus {
+                if window_id == main_window.id() && !focus {
                     main_window.set_visible(false);
                 }
             }
