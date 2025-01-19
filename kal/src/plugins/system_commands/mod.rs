@@ -71,12 +71,23 @@ impl SystemCommand {
 
     const fn description(&self) -> &str {
         match self {
-            Self::Shutdown => "Shut down computer",
+            Self::Shutdown => "Shutdown computer",
             Self::Restart => "Restart computer",
-            Self::SignOut => "Sign out current user",
-            Self::Lock => "Lock current user profile",
-            Self::Hibernate => "Put computer to hibernation",
+            Self::SignOut => "Sign out of computer",
+            Self::Lock => "Lock computer",
+            Self::Hibernate => "Hibernate computer",
             Self::Sleep => "Put computer to sleep",
+        }
+    }
+
+    const fn confirm_message(&self) -> &str {
+        match self {
+            Self::Shutdown => "shut down this computer",
+            Self::Restart => "restart this computer",
+            Self::SignOut => "sign out of this computer",
+            Self::Lock => "lock this computer",
+            Self::Hibernate => "put this computer into hibernation",
+            Self::Sleep => "put this computer to sleep",
         }
     }
 
@@ -119,6 +130,22 @@ impl SystemCommand {
 
         use windows::Win32::System::Power::SetSuspendState;
         use windows::Win32::System::Shutdown::LockWorkStation;
+
+        let res = rfd::MessageDialog::new()
+            .set_title("Please confirm")
+            .set_description(format!(
+                "You are about to {}, are you sure?",
+                self.confirm_message()
+            ))
+            .set_level(rfd::MessageLevel::Warning)
+            .set_buttons(rfd::MessageButtons::YesNo)
+            .show();
+
+        let confirm = res == rfd::MessageDialogResult::Yes;
+
+        if !confirm {
+            return Ok(());
+        }
 
         match self {
             SystemCommand::Sleep => unsafe {
