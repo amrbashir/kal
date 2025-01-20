@@ -36,11 +36,11 @@ const currentSelectedAction = ref(0);
 
 watchDebounced(currentQuery, (query) => runQuery(query), {
   debounce: 200,
-  maxWait: 1000,
 });
 
 async function runQuery(query: string) {
   if (query) {
+    console.log(query);
     const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
     resetSelection();
     results.value = response;
