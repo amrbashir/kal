@@ -15,7 +15,7 @@ use wry::http::{Request, Response};
 use wry::WebViewBuilderExtWindows;
 use wry::{WebView, WebViewBuilder, WebViewId};
 
-use crate::app::AppEvent;
+use crate::app::{App, AppEvent};
 use crate::{icon, ipc};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -26,10 +26,13 @@ pub enum Vibrancy {
     Blur,
 }
 
+type IpcHandler = fn(&mut App, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>>;
+
 pub struct WebViewWindowBuilder<'a> {
     window_attrs: WindowAttributes,
     webview_builder: WebViewBuilder<'a>,
     center: bool,
+    ipc_handler: Option<IpcHandler>,
 }
 
 impl WebViewWindowBuilder<'_> {
@@ -60,6 +63,7 @@ impl WebViewWindowBuilder<'_> {
             window_attrs,
             webview_builder,
             center: false,
+            ipc_handler: None,
         }
     }
 
@@ -146,8 +150,18 @@ impl WebViewWindowBuilder<'_> {
         self
     }
 
-    pub fn ipc(mut self, sender: Sender<AppEvent>, proxy: EventLoopProxy) -> Self {
-        self = self.protocol(ipc::PROTOCOL_NAME, ipc::make_ipc_protocol(sender, proxy));
+    pub fn ipc(
+        mut self,
+        label: &'static str,
+        sender: Sender<AppEvent>,
+        proxy: EventLoopProxy,
+        handler: IpcHandler,
+    ) -> Self {
+        self = self.protocol(
+            ipc::PROTOCOL_NAME,
+            ipc::make_ipc_protocol(label, sender, proxy),
+        );
+        self.ipc_handler = Some(handler);
         self
     }
 
@@ -201,6 +215,7 @@ impl WebViewWindowBuilder<'_> {
         let mut webview_window = WebViewWindow {
             window: window.clone(),
             webview,
+            ipc_handler: self.ipc_handler,
             #[cfg(windows)]
             softbuffer_ctx: {
                 let context = softbuffer::Context::new(window.clone()).unwrap();
@@ -228,6 +243,7 @@ pub struct WebViewWindow {
     webview: WebView,
     #[cfg(windows)]
     softbuffer_ctx: SoftBufferContext,
+    pub ipc_handler: Option<IpcHandler>,
 }
 
 impl Debug for WebViewWindow {

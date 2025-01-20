@@ -67,6 +67,7 @@ pub const PROTOCOL_NAME: &str = "kalipc";
 type ProtocolReturn = anyhow::Result<Response<Cow<'static, [u8]>>>;
 
 pub fn make_ipc_protocol(
+    label: &'static str,
     sender: Sender<AppEvent>,
     proxy: EventLoopProxy,
 ) -> impl Fn(WebViewId, Request<Vec<u8>>) -> ProtocolReturn + 'static {
@@ -74,7 +75,14 @@ pub fn make_ipc_protocol(
         Method::OPTIONS => self::response::empty(),
         Method::POST => {
             let (tx, rx) = mpsc::sync_channel(1);
-            match sender.send(AppEvent::Ipc { request, tx }) {
+
+            let event = AppEvent::Ipc {
+                label: label.to_string(),
+                request,
+                tx,
+            };
+
+            match sender.send(event) {
                 Ok(_) => {
                     proxy.wake_up();
 

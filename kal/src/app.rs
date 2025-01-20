@@ -11,14 +11,12 @@ use windows::Win32::Foundation::HWND;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
-use wry::http::{Request, Response};
 
 use crate::config::Config;
-use crate::ipc::{response, IpcCommand, IpcEvent};
+use crate::ipc::{self, IpcEvent};
 use crate::plugin_store::PluginStore;
 use crate::result_item::ResultItem;
 use crate::webview_window::WebViewWindow;
@@ -26,6 +24,7 @@ use crate::webview_window::WebViewWindow;
 pub enum AppEvent {
     HotKey(global_hotkey::GlobalHotKeyEvent),
     Ipc {
+        label: String,
         request: wry::http::Request<Vec<u8>>,
         tx: mpsc::SyncSender<anyhow::Result<wry::http::Response<Cow<'static, [u8]>>>>,
     },
@@ -51,7 +50,7 @@ pub struct App {
     #[cfg(windows)]
     pub previously_foreground_hwnd: HWND,
 
-    results: Vec<ResultItem>,
+    pub results: Vec<ResultItem>,
 }
 
 impl App {
@@ -109,101 +108,6 @@ impl App {
         let _ = unsafe { SetForegroundWindow(self.previously_foreground_hwnd) };
     }
 
-    fn resize_main_window_for_items(&self, count: usize) {
-        let main_window = self.main_window();
-
-        let items_height = if count == 0 {
-            0
-        } else {
-            let count = std::cmp::min(count, self.config.appearance.max_items as usize) as u32;
-            let item_height = self.config.appearance.item_height + self.config.appearance.item_gap;
-            (self.config.appearance.input_items_gap * 2) + count * item_height
-        };
-
-        let height = self.config.appearance.input_height + items_height + Self::MAGIC_BORDERS;
-
-        let size = LogicalSize::new(self.config.appearance.window_width, height);
-        let _ = main_window.window().request_surface_size(size.into());
-    }
-
-    pub fn ipc_event<'b>(
-        &mut self,
-        request: Request<Vec<u8>>,
-    ) -> anyhow::Result<Response<Cow<'b, [u8]>>> {
-        let command: IpcCommand = request.uri().path()[1..].try_into()?;
-
-        match command {
-            IpcCommand::Query => {
-                let body = request.body();
-                let query = std::str::from_utf8(body)?;
-
-                let mut results = Vec::new();
-
-                self.plugin_store
-                    .query(query, &self.fuzzy_matcher, &mut results)?;
-
-                // sort results in reverse so higher scores are first
-                results.sort_by(|a, b| b.score.cmp(&a.score));
-
-                let min = std::cmp::min(self.config.general.max_results, results.len());
-                let final_results = &results[..min];
-
-                let json = response::json(&final_results);
-
-                self.resize_main_window_for_items(min);
-
-                self.results = results;
-
-                return json;
-            }
-
-            IpcCommand::ClearResults => self.resize_main_window_for_items(0),
-
-            IpcCommand::RunAction => {
-                let payload = request.body();
-
-                let Some((action, id)) = std::str::from_utf8(payload)?.split_once('#') else {
-                    anyhow::bail!("Invalid payload for command `{command}`: {payload:?}");
-                };
-
-                let Some(item) = self.results.iter().find(|r| r.id == id) else {
-                    anyhow::bail!("Couldn't find result item with this id: {id}");
-                };
-
-                let Some(action) = item.actions.iter().find(|a| a.id == action) else {
-                    anyhow::bail!("Couldn't find secondary action: {action}");
-                };
-
-                action.run(item)?;
-
-                self.hide_main_window(false);
-            }
-
-            IpcCommand::Reload => {
-                let old_hotkey = self.config.general.hotkey.clone();
-                self.config = Config::load()?;
-
-                self.plugin_store.reload(&self.config)?;
-
-                let main_window = self.main_window();
-                main_window.emit(IpcEvent::UpdateConfig, &self.config)?;
-
-                let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
-                let new_hotkey = HotKey::try_from(self.config.general.hotkey.as_str())?;
-                if old_hotkey != new_hotkey {
-                    self.global_hotkey_manager.unregister(old_hotkey)?;
-                    self.global_hotkey_manager.register(new_hotkey)?;
-                }
-            }
-
-            IpcCommand::HideMainWindow => {
-                self.hide_main_window(true);
-            }
-        }
-
-        response::empty()
-    }
-
     #[cfg(windows)]
     fn listen_for_settings_change(&self, event_loop: &dyn ActiveEventLoop) {
         use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
@@ -257,8 +161,19 @@ impl App {
 
             AppEvent::HotKey(_) => {}
 
-            AppEvent::Ipc { request, tx } => {
-                let res = self.ipc_event(request);
+            AppEvent::Ipc { label, request, tx } => {
+                let res = if let Some(window) = self.windows.get(label.as_str()) {
+                    if let Some(handler) = window.ipc_handler {
+                        handler(self, request)
+                    } else {
+                        ipc::response::error_owned(format!(
+                            "window with label {label} doesn't have an IPC handler"
+                        ))
+                    }
+                } else {
+                    ipc::response::error_owned(format!("Couldn't find window with label: {label}"))
+                };
+
                 if let Err(e) = tx.send(res) {
                     tracing::error!("Failed to send ipc response: {e}");
                 }
