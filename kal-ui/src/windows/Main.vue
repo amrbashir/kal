@@ -9,6 +9,9 @@ import { IpcCommand, IpcEvent } from "../ipc";
 import { useConfig } from "../composables/config";
 import { useSystemAccentColor } from "../composables/systemAccentColor";
 
+const config = useConfig();
+const systemAccentColor = useSystemAccentColor();
+
 const inputRef = useTemplateRef<HTMLElement>("input-ref");
 onMounted(() =>
   window.KAL.ipc.on(IpcEvent.FocusInput, () => {
@@ -29,6 +32,7 @@ const reloading = ref(false);
 const currentQuery = ref("");
 const currentSelection = ref(0);
 const currentSelectedItem = computed(() => results.value[currentSelection.value]);
+const currentSelectedAction = ref(0);
 
 watchDebounced(currentQuery, (query) => runQuery(query), {
   debounce: 200,
@@ -38,7 +42,7 @@ watchDebounced(currentQuery, (query) => runQuery(query), {
 async function runQuery(query: string) {
   if (query) {
     const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
-    currentSelection.value = 0;
+    resetSelection();
     results.value = response;
   } else {
     results.value = [];
@@ -46,9 +50,14 @@ async function runQuery(query: string) {
   }
 }
 
+function resetSelection() {
+  currentSelection.value = 0;
+  currentSelectedAction.value = 0;
+}
+
 function resetQuery() {
   currentQuery.value = "";
-  currentSelection.value = 0;
+  resetSelection();
 }
 
 async function hideMainWindow() {
@@ -60,12 +69,46 @@ async function runAction(action: Action) {
   await window.KAL.ipc.invoke(IpcCommand.RunAction, payload);
 }
 
-function updateSelection(e: KeyboardEvent) {
+function selectNextItem() {
   const current = currentSelection.value;
-  if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) {
-    currentSelection.value = current === 0 ? results.value.length - 1 : current - 1;
-  } else {
-    currentSelection.value = current === results.value.length - 1 ? 0 : current + 1;
+  currentSelection.value = current === results.value.length - 1 ? 0 : current + 1;
+  currentSelectedAction.value = 0;
+}
+
+function selectPrevItem() {
+  const current = currentSelection.value;
+  currentSelection.value = current === 0 ? results.value.length - 1 : current - 1;
+  currentSelectedAction.value = 0;
+}
+
+function updateSelection(e: KeyboardEvent) {
+  if (e.key === "ArrowDown") {
+    selectNextItem();
+  }
+
+  if (e.key === "ArrowUp") {
+    selectPrevItem();
+  }
+
+  if (e.key === "Tab" && !e.shiftKey) {
+    if (!config.value.general.tab_through_context_buttons) {
+      selectNextItem();
+    } else if (currentSelectedAction.value == currentSelectedItem.value.actions.length - 1) {
+      selectNextItem();
+    } else {
+      currentSelectedAction.value = currentSelectedAction.value + 1;
+    }
+  }
+
+  if (e.key === "Tab" && e.shiftKey) {
+    if (!config.value.general.tab_through_context_buttons) {
+      selectPrevItem();
+    } else if (currentSelectedAction.value == 0) {
+      selectPrevItem();
+      currentSelectedAction.value = currentSelectedItem.value.actions.length - 1;
+    } else {
+      currentSelectedAction.value = currentSelectedAction.value - 1;
+    }
   }
 }
 
@@ -76,7 +119,7 @@ function scrollSelected() {
   const current = currentSelection.value;
   const block = current === 0 ? "end" : current === results.value.length - 1 ? "start" : "nearest";
   resultItemRefs.value?.[current]?.$el.scrollIntoView({
-    behavior: "smooth",
+    behavior: "instant",
     block,
   });
 }
@@ -95,13 +138,18 @@ function onInputChange(e: InputEvent) {
 }
 
 async function onInputKeyDown(e: KeyboardEvent) {
-  if (currentSelectedItem.value?.actions) {
-    for (const action of currentSelectedItem.value.actions) {
-      if (action.accelerator && isEventForAccelerator(e, action.accelerator)) {
-        e.preventDefault();
-        await runAction(action);
-        return;
-      }
+  if (e.key === "Enter" && currentSelectedAction.value > 0) {
+    e.preventDefault();
+    const action = currentSelectedItem.value.actions[currentSelectedAction.value];
+    await runAction(action);
+    return;
+  }
+
+  for (const action of currentSelectedItem.value.actions) {
+    if (action.accelerator && isEventForAccelerator(e, action.accelerator)) {
+      e.preventDefault();
+      await runAction(action);
+      return;
     }
   }
 
@@ -121,9 +169,6 @@ async function onInputKeyDown(e: KeyboardEvent) {
     await reload();
   }
 }
-
-const config = useConfig();
-const systemAccentColor = useSystemAccentColor();
 
 const isTransparent = computed(() => config.value.appearance.transparent);
 const bgPrimaryColor = computed(() =>
@@ -171,6 +216,7 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
         ref="result-item-refs"
         :item
         :selected="index === currentSelection"
+        :selectedAction="currentSelectedAction"
       />
     </ul>
   </main>

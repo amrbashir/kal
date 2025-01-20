@@ -8,6 +8,7 @@ const props = defineProps<{
   item: ResultItem;
   selected: boolean;
   itemHeight: string;
+  selectedAction: number;
 }>();
 
 async function runAction(action: Action) {
@@ -48,10 +49,11 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
       :class="{ flex: selected }"
     >
       <button
-        class="py-2 px-2 bg-transparent outline-none b-solid b-1px b-transparent hover:bg-white/10 hover:b-white/20 rounded"
-        v-for="action in item.actions.slice(1)"
+        class="py-2 px-2 bg-transparent outline-none rounded b-solid b-1px b-transparent hover:bg-white/10 hover:b-white/20"
+        v-for="(action, index) in item.actions.slice(1)"
         :title="`${action.description} (${action.accelerator})`"
         @click.stop="runAction(action)"
+        :class="{ 'bg-white/10 b-white/20': selected && selectedAction == index + 1 }"
       >
         <div v-if="action.icon" class="h-4 w-4" v-html="makeIconHTML(action.icon)"></div>
       </button>

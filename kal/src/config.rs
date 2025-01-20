@@ -77,6 +77,8 @@ pub struct GeneralConfig {
     /// A string of hotkey
     #[serde(default = "default_hotkey")]
     pub hotkey: String,
+    #[serde(default = "default_tab_through_context_buttons")]
+    pub tab_through_context_buttons: bool,
     #[serde(default = "default_max_results")]
     pub max_results: usize,
 }
@@ -84,7 +86,9 @@ pub struct GeneralConfig {
 fn default_hotkey() -> String {
     "Alt+Space".to_string()
 }
-
+fn default_tab_through_context_buttons() -> bool {
+    true
+}
 fn default_max_results() -> usize {
     24
 }
@@ -93,6 +97,7 @@ impl Default for GeneralConfig {
     fn default() -> Self {
         Self {
             hotkey: default_hotkey(),
+            tab_through_context_buttons: default_tab_through_context_buttons(),
             max_results: default_max_results(),
         }
     }
