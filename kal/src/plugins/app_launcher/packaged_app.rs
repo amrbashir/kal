@@ -40,7 +40,7 @@ impl PackagedApp {
         }
     }
 
-    fn item(&self, score: i64) -> ResultItem {
+    fn item(&self, args: &str, score: i64) -> ResultItem {
         let icon = self
             .icon
             .as_ref()
@@ -48,15 +48,17 @@ impl PackagedApp {
             .unwrap_or_else(|| BuiltInIcon::BlankFile.icon());
 
         let appid = self.appid.clone();
+        let args_ = args.to_string();
         let open = Action::primary(move |_| {
             let path = format!("shell:AppsFolder\\{}", appid);
-            utils::execute(path, false)
+            utils::execute_with_args(path, &args_, false)
         });
 
         let appid = self.appid.clone();
+        let args_ = args.to_string();
         let open_elevated = Action::open_elevated(move |_| {
             let path = format!("shell:AppsFolder\\{}", appid);
-            utils::execute(path, true)
+            utils::execute_with_args(path, &args_, true)
         });
 
         let location = self.location.clone();
@@ -82,9 +84,11 @@ impl PackagedApp {
 
 impl IntoResultItem for PackagedApp {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+        let (query, args) = query.split_once(" -- ").unwrap_or((query, ""));
+
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
-            .map(|score| self.item(score))
+            .map(|score| self.item(args, score))
     }
 }
 

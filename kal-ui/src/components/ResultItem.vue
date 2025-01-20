@@ -23,7 +23,7 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
 <template>
   <fluent-option
     :style="{ height: itemHeight }"
-    class="w-full part:content:flex part:content:w-full last:children:hover:flex bg-transparent before:left-0"
+    class="bg-transparent before:left-0 w-full part:content:flex part:content:w-full last:children:hover:flex"
     :selected
     @click="runAction(item.actions[0])"
     :title="item.tooltip"

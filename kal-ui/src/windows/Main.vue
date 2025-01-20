@@ -138,6 +138,18 @@ function onInputChange(e: InputEvent) {
 }
 
 async function onInputKeyDown(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    e.preventDefault();
+    await hideMainWindow();
+  }
+
+  if (e.ctrlKey && e.key === "r") {
+    e.preventDefault();
+    await reload();
+  }
+
+  if (results.value.length === 0) return;
+
   if (e.key === "Enter" && currentSelectedAction.value > 0) {
     e.preventDefault();
     const action = currentSelectedItem.value.actions[currentSelectedAction.value];
@@ -153,20 +165,10 @@ async function onInputKeyDown(e: KeyboardEvent) {
     }
   }
 
-  if (e.key === "Escape") {
-    e.preventDefault();
-    await hideMainWindow();
-  }
-
   if (["ArrowDown", "Tab", "ArrowUp"].includes(e.key)) {
     e.preventDefault();
     updateSelection(e);
     scrollSelected();
-  }
-
-  if (e.ctrlKey && e.key === "r") {
-    e.preventDefault();
-    await reload();
   }
 }
 

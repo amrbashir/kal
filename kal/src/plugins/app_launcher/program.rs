@@ -31,12 +31,15 @@ impl Program {
         }
     }
 
-    fn item(&self, score: i64) -> ResultItem {
+    fn item(&self, args: &str, score: i64) -> ResultItem {
         let path = self.path.clone();
-        let open = Action::primary(move |_| utils::execute(&path, false));
+        let args_ = args.to_string();
+        let open = Action::primary(move |_| utils::execute_with_args(&path, &args_, false));
 
         let path = self.path.clone();
-        let open_elevated = Action::open_elevated(move |_| utils::execute(&path, true));
+        let args_ = args.to_string();
+        let open_elevated =
+            Action::open_elevated(move |_| utils::execute_with_args(&path, &args_, true));
 
         let path = self.path.clone();
         let open_location = Action::open_location(move |_| utils::reveal_item_in_dir(&path));
@@ -57,10 +60,12 @@ impl Program {
 
 impl IntoResultItem for Program {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+        let (query, args) = query.split_once(" -- ").unwrap_or((query, ""));
+
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
             .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))
-            .map(|score| self.item(score))
+            .map(|score| self.item(args, score))
     }
 }
 
