@@ -15,7 +15,7 @@ use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
 use crate::icon::{BuiltInIcon, Icon};
 use crate::result_item::{Action, IntoResultItem, ResultItem};
-use crate::utils;
+use crate::utils::{self, StringExt};
 
 const MS_RESOURCE: &str = "ms-resource:";
 
@@ -84,7 +84,7 @@ impl PackagedApp {
 
 impl IntoResultItem for PackagedApp {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
-        let (query, args) = query.split_once(" -- ").unwrap_or((query, ""));
+        let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)

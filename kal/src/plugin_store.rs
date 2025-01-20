@@ -106,7 +106,7 @@ impl PluginStore {
         // check if a plugin is being invoked directly
         if let Some(plugin) = self.plugins.iter_mut().find(|p| p.is_direct_invoke(query)) {
             let invoke_cmd_len = plugin.invoke_cmd_len();
-            let new_query = &query[invoke_cmd_len..];
+            let new_query = &query[invoke_cmd_len..].trim_end();
             if !new_query.is_empty() {
                 match plugin.query(new_query, matcher) {
                     Ok(res) => res.extend_into(results),
@@ -114,9 +114,11 @@ impl PluginStore {
                 }
             }
         } else {
+            let trimmed_query = query.trim_end();
+
             // otherwise get result from all queriable plugins
             for plugin in self.queriable_plugins() {
-                match plugin.query(query, matcher) {
+                match plugin.query(trimmed_query, matcher) {
                     Ok(res) => res.extend_into(results),
                     Err(err) => results.push(ResultItem::plugin_error(plugin.plugin.as_ref(), err)),
                 }

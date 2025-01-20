@@ -7,7 +7,7 @@ use fuzzy_matcher::FuzzyMatcher;
 
 use crate::icon::Icon;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
-use crate::utils::{self, ExpandEnvVars, PathExt};
+use crate::utils::{self, ExpandEnvVars, PathExt, StringExt};
 
 #[derive(Debug)]
 pub struct Program {
@@ -60,7 +60,7 @@ impl Program {
 
 impl IntoResultItem for Program {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
-        let (query, args) = query.split_once(" -- ").unwrap_or((query, ""));
+        let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
