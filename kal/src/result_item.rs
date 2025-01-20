@@ -35,48 +35,48 @@ pub trait IntoResultItem {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem>;
 }
 
-pub enum QueryReturn {
+pub enum PluginQueryOutput {
     None,
     One(ResultItem),
     Multiple(Vec<ResultItem>),
 }
 
-impl QueryReturn {
+impl PluginQueryOutput {
     pub fn extend_into(self, results: &mut Vec<ResultItem>) {
         match self {
-            QueryReturn::None => {}
-            QueryReturn::One(one) => results.push(one),
-            QueryReturn::Multiple(multiple) => results.extend(multiple),
+            PluginQueryOutput::None => {}
+            PluginQueryOutput::One(one) => results.push(one),
+            PluginQueryOutput::Multiple(multiple) => results.extend(multiple),
         }
     }
 }
 
-impl From<ResultItem> for QueryReturn {
+impl From<ResultItem> for PluginQueryOutput {
     fn from(value: ResultItem) -> Self {
-        QueryReturn::One(value)
+        PluginQueryOutput::One(value)
     }
 }
 
-impl From<Vec<ResultItem>> for QueryReturn {
+impl From<Vec<ResultItem>> for PluginQueryOutput {
     fn from(value: Vec<ResultItem>) -> Self {
-        QueryReturn::Multiple(value)
+        PluginQueryOutput::Multiple(value)
     }
 }
 
-impl From<Option<ResultItem>> for QueryReturn {
+impl From<Option<ResultItem>> for PluginQueryOutput {
     fn from(value: Option<ResultItem>) -> Self {
         match value {
-            Some(value) => QueryReturn::One(value),
-            None => QueryReturn::None,
+            Some(value) => PluginQueryOutput::One(value),
+            None => PluginQueryOutput::None,
         }
     }
 }
 
-impl From<Option<Vec<ResultItem>>> for QueryReturn {
+impl From<Option<Vec<ResultItem>>> for PluginQueryOutput {
     fn from(value: Option<Vec<ResultItem>>) -> Self {
         match value {
-            Some(value) => QueryReturn::Multiple(value),
-            None => QueryReturn::None,
+            Some(value) => PluginQueryOutput::Multiple(value),
+            None => PluginQueryOutput::None,
         }
     }
 }
@@ -136,7 +136,9 @@ impl Action {
     pub fn run(&self, item: &ResultItem) -> anyhow::Result<()> {
         (self.action)(item)
     }
+}
 
+impl Action {
     pub fn primary<F>(action: F) -> Self
     where
         F: Fn(&ResultItem) -> anyhow::Result<()> + 'static,

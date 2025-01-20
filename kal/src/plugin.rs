@@ -4,7 +4,7 @@ use std::path::Path;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::result_item::QueryReturn;
+use crate::result_item::PluginQueryOutput;
 
 #[allow(unused_variables)]
 pub trait Plugin: Debug {
@@ -24,14 +24,14 @@ pub trait Plugin: Debug {
     }
 
     /// Gets [ResultItem]s for this query from the plugin.
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn>;
+    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput>;
 
     /// Gets [ResultItem]s for this query from the plugin when being directly invoked.
     fn query_direct(
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<QueryReturn> {
+    ) -> anyhow::Result<PluginQueryOutput> {
         self.query(query, matcher)
     }
 

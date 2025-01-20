@@ -5,7 +5,7 @@ use calculator_rs::Calculate;
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltInIcon;
-use crate::result_item::{Action, QueryReturn, ResultItem};
+use crate::result_item::{Action, PluginQueryOutput, ResultItem};
 
 #[derive(Debug)]
 pub struct Plugin;
@@ -52,14 +52,14 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<QueryReturn> {
+    ) -> anyhow::Result<PluginQueryOutput> {
         if !query.starts_with(|c: char| c.is_ascii_digit()) {
-            return Ok(QueryReturn::None);
+            return Ok(PluginQueryOutput::None);
         }
 
         let result = query.calculate()?.to_string();
         let item = self.item(result);
 
-        Ok(QueryReturn::One(item))
+        Ok(PluginQueryOutput::One(item))
     }
 }

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon;
-use crate::result_item::{IntoResultItem, QueryReturn, ResultItem};
+use crate::result_item::{IntoResultItem, PluginQueryOutput, ResultItem};
 use crate::utils::IteratorExt;
 
 #[cfg(windows)]
@@ -96,9 +96,9 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn> {
+    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
-            return Ok(QueryReturn::None);
+            return Ok(PluginQueryOutput::None);
         }
 
         Ok(self

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltInIcon;
-use crate::result_item::{Action, QueryReturn, ResultItem};
+use crate::result_item::{Action, PluginQueryOutput, ResultItem};
 use crate::utils;
 
 #[derive(Debug)]
@@ -58,7 +58,7 @@ impl crate::plugin::Plugin for Plugin {
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
-    ) -> anyhow::Result<QueryReturn> {
+    ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self.shell.item(query.to_string(), self.no_exit).into())
     }
 }

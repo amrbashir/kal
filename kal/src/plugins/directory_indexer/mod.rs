@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
 use crate::icon::{self, Icon};
-use crate::result_item::{Action, IntoResultItem, QueryReturn, ResultItem};
+use crate::result_item::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt, PathExt};
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn> {
+    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput> {
         Ok(self
             .entries
             .iter()
