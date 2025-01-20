@@ -12,7 +12,18 @@ declare type KalConfig = {
 
 interface Window {
   KAL: {
-    systemAccentColor?: string;
+    systemAccentColors: {
+      background?: string;
+      foreground?: string;
+      accent_dark1?: string;
+      accent_dark2?: string;
+      accent_dark3?: string;
+      accent?: string;
+      accent_light1?: string;
+      accent_light2?: string;
+      accent_light3?: string;
+      complement?: string;
+    };
 
     config: KalConfig;
 

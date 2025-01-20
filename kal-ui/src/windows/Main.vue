@@ -7,10 +7,14 @@ import ReloadIcon from "../components/ReloadIcon.vue";
 import ResultItemComponent from "../components/ResultItem.vue";
 import { IpcCommand, IpcEvent } from "../ipc";
 import { useConfig } from "../composables/config";
-import { useSystemAccentColor } from "../composables/systemAccentColor";
+import { useSystemAccentColors } from "../composables/systemAccentColor";
+import { accentFillRest } from "@fluentui/web-components";
 
 const config = useConfig();
-const systemAccentColor = useSystemAccentColor();
+
+const systemAccentColors = useSystemAccentColors();
+const accentFillRestStr = accentFillRest.getValueFor(document.documentElement).toColorString();
+const accentColor = computed(() => systemAccentColors.value.accent_light2 ?? accentFillRestStr);
 
 const inputRef = useTemplateRef<HTMLElement>("input-ref");
 onMounted(() =>
@@ -226,6 +230,6 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
 
 <style>
 * {
-  --accent-fill-rest: v-bind(systemAccentColor);
+  --accent-fill-rest: v-bind(accentColor);
 }
 </style>

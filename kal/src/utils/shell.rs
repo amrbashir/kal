@@ -2,10 +2,12 @@ use std::path::Path;
 
 use url::Url;
 
+#[inline]
 pub fn execute(app: impl AsRef<std::ffi::OsStr>, elevated: bool) -> anyhow::Result<()> {
     imp::execute(app, elevated)
 }
 
+#[inline]
 pub fn execute_with_args(
     app: impl AsRef<std::ffi::OsStr>,
     args: impl AsRef<std::ffi::OsStr>,
@@ -14,18 +16,22 @@ pub fn execute_with_args(
     imp::execute_with_args(app, args, elevated)
 }
 
+#[inline]
 pub fn open_url(url: &Url) -> anyhow::Result<()> {
     imp::open_url(url)
 }
 
+#[inline]
 pub fn open_dir(path: impl AsRef<Path>) -> anyhow::Result<()> {
     imp::open_dir(path)
 }
 
+#[inline]
 pub fn reveal_item_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     imp::reveal_item_in_dir(path)
 }
 
+#[inline]
 pub fn execute_in_shell<S, P>(
     shell: Option<S>,
     script: S,

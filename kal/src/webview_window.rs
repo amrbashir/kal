@@ -49,13 +49,11 @@ impl WebViewWindowBuilder<'_> {
                 .with_class_name("KalWindowClass")
                 .with_undecorated_shadow(true)
                 .with_clip_children(false);
-            let system_accent_color = crate::utils::system_accent_color();
-            let system_accent_script = format!(
-                r#"(function () {{ window.KAL.systemAccentColor = '{}'; }})()"#,
-                system_accent_color.unwrap_or_default()
-            );
+
+            let colors = crate::utils::SystemAccentColors::load().unwrap_or_default();
+
             webview_builder = webview_builder
-                .with_initialization_script(&system_accent_script)
+                .with_initialization_script(&colors.init_script())
                 .with_scroll_bar_style(wry::ScrollBarStyle::FluentOverlay);
         }
 

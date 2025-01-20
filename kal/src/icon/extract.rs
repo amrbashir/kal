@@ -49,6 +49,8 @@ where
     extract(file, out)
 }
 
+/// Extract icon as png from path.
+#[inline]
 pub fn extract<P, P2>(file: P, out: P2) -> anyhow::Result<()>
 where
     P: AsRef<Path>,
@@ -74,7 +76,6 @@ mod imp {
 
     use super::*;
 
-    /// Extract icon as png from path.
     pub fn extract<P, P2>(file: P, out: P2) -> anyhow::Result<()>
     where
         P: AsRef<Path>,

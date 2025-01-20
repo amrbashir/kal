@@ -49,7 +49,7 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
       :class="{ flex: selected }"
     >
       <button
-        class="py-2 px-2 bg-transparent outline-none rounded b-solid b-1px b-transparent hover:bg-white/10 hover:b-white/20"
+        class="py-2 px-2 bg-transparent outline-none rounded b-solid b-0.1rem b-transparent hover:bg-white/10 hover:b-white/20"
         v-for="(action, index) in item.actions.slice(1)"
         :title="`${action.description} (${action.accelerator})`"
         @click.stop="runAction(action)"

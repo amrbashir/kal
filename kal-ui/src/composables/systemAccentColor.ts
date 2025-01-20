@@ -1,16 +1,17 @@
-import { accentFillRest } from "@fluentui/web-components";
 import { onMounted, ref } from "vue";
 import { IpcEvent } from "../ipc";
 
-export function useSystemAccentColor() {
-  const accentColor = accentFillRest.getValueFor(document.documentElement).toColorString();
-  const systemAccentColor = ref<string>(window.KAL.systemAccentColor ?? accentColor);
+export function useSystemAccentColors() {
+  const systemAccentColors = ref(window.KAL.systemAccentColors);
 
   onMounted(() =>
-    window.KAL.ipc.on<string>(IpcEvent.UpdateSystemAccentColor, (newColor) => {
-      systemAccentColor.value = newColor;
-    }),
+    window.KAL.ipc.on<typeof window.KAL.systemAccentColors>(
+      IpcEvent.UpdateSystemAccentColor,
+      (newColor) => {
+        systemAccentColors.value = newColor;
+      },
+    ),
   );
 
-  return systemAccentColor;
+  return systemAccentColors;
 }

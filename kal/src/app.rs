@@ -181,9 +181,9 @@ impl App {
 
             #[cfg(windows)]
             AppEvent::SystemSettingsChanged => {
-                if let Some(system_accent_color) = crate::utils::system_accent_color() {
+                if let Ok(colors) = crate::utils::SystemAccentColors::load() {
                     for window in self.windows.values() {
-                        window.emit(IpcEvent::UpdateSystemAccentColor, &system_accent_color)?;
+                        window.emit(IpcEvent::UpdateSystemAccentColor, colors)?;
                     }
                 }
             }
