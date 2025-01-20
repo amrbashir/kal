@@ -59,6 +59,7 @@ where
 
 #[cfg(windows)]
 mod imp {
+    use std::ffi::OsStr;
     use std::fs::File;
     use std::io::BufWriter;
     use std::ops::Deref;
@@ -66,6 +67,8 @@ mod imp {
     use anyhow::Context;
     use windows::core::*;
     use windows::Win32::Graphics::Gdi::*;
+    use windows::Win32::Storage::FileSystem::WIN32_FIND_DATAW;
+    use windows::Win32::System::Com::*;
     use windows::Win32::UI::Shell::*;
     use windows::Win32::UI::WindowsAndMessaging::*;
 
@@ -78,35 +81,47 @@ mod imp {
         P2: AsRef<Path>,
     {
         let file = file.as_ref();
+        let out = out.as_ref();
 
-        let file = HSTRING::from(file);
-        let file = file.deref();
-
-        let len = file.len().min(128);
-        let mut path = [0_u16; 128];
-        path[..len].copy_from_slice(&file[..len]);
-
-        let mut index = 0;
-
-        // TODO: fix icons failing to be extracted
-        let hicon = unsafe { ExtractAssociatedIconW(None, &mut path, &mut index) };
-        let hicon = unsafe { Owned::new(hicon) };
+        let hicon = unsafe { extract_hicon(file) }?;
 
         let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
 
-        let file = File::options()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(out)?;
-        let file = BufWriter::new(file);
+        save_rgba_as_png_to_disk(out, rgba, width, height)
+    }
 
-        let mut encoder = png::Encoder::new(file, width, height);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
+    unsafe fn extract_hicon(file: &Path) -> anyhow::Result<Owned<HICON>> {
+        let file_hstr = HSTRING::from(file);
+        let file_wide = file_hstr.deref();
 
-        let mut writer = encoder.write_header()?;
-        writer.write_image_data(&rgba).map_err(Into::into)
+        let len = file_wide.len().min(128);
+        let mut file_wide_arr = [0_u16; 128];
+        file_wide_arr[..len].copy_from_slice(&file_wide[..len]);
+
+        let mut index = 0;
+
+        let mut hicon = unsafe { ExtractAssociatedIconW(None, &mut file_wide_arr, &mut index) };
+
+        // if failed and it is a shortcut, then try to resolve it
+        if hicon.is_invalid() && file.extension() == Some(OsStr::new("lnk")) {
+            let sl: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_ALL) }?;
+            let pf = sl.cast::<IPersistFile>()?;
+
+            unsafe { pf.Load(&file_hstr, STGM_READ) }?;
+
+            let mut target_path = [0_u16; 128];
+            let mut find_data = WIN32_FIND_DATAW::default();
+            unsafe { sl.GetPath(&mut target_path, &mut find_data, 0) }?;
+
+            let mut index = 0;
+            hicon = unsafe { ExtractAssociatedIconW(None, &mut target_path, &mut index) };
+        }
+
+        if hicon.is_invalid() {
+            anyhow::bail!("Failed to get HICON from {}", file.display());
+        }
+
+        Ok(Owned::new(hicon))
     }
 
     unsafe fn hicon_to_rgba8(hicon: HICON) -> anyhow::Result<(Vec<u8>, u32, u32)> {
@@ -167,7 +182,7 @@ mod imp {
 
         let result = ReleaseDC(None, dc);
         assert!(result == 1);
-        DeleteObject(info.hbmColor.into()).unwrap();
+        DeleteObject(info.hbmColor.into()).ok()?;
 
         for chunk in buf.chunks_exact_mut(4) {
             let [b, _, r, _] = chunk else { unreachable!() };
@@ -175,6 +190,37 @@ mod imp {
         }
 
         Ok((buf, width_u32, height_u32))
+    }
+
+    fn encode_png_into_writer<W: std::io::Write>(
+        buf: W,
+        rgba: Vec<u8>,
+        width: u32,
+        height: u32,
+    ) -> anyhow::Result<()> {
+        let file = BufWriter::new(buf);
+
+        let mut encoder = png::Encoder::new(file, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+
+        let mut writer = encoder.write_header()?;
+        writer.write_image_data(&rgba).map_err(Into::into)
+    }
+
+    fn save_rgba_as_png_to_disk(
+        out: &Path,
+        rgba: Vec<u8>,
+        width: u32,
+        height: u32,
+    ) -> anyhow::Result<()> {
+        let out = File::options()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(out)?;
+
+        encode_png_into_writer(out, rgba, width, height)
     }
 }
 
