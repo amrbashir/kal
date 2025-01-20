@@ -131,82 +131,90 @@ impl App {
         let size = LogicalSize::new(self.config.appearance.window_width, height);
         let _ = main_window.window().request_surface_size(size.into());
     }
-}
 
-pub fn ipc_handler<'b>(
-    app: &mut App,
-    request: Request<Vec<u8>>,
-) -> anyhow::Result<Response<Cow<'b, [u8]>>> {
-    let command: IpcCommand = request.uri().path()[1..].try_into()?;
+    fn main_window_ipc_handler<'a>(
+        &mut self,
+        request: Request<Vec<u8>>,
+    ) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
+        let command: IpcCommand = request.uri().path()[1..].try_into()?;
 
-    match command {
-        IpcCommand::Query => {
-            let body = request.body();
-            let query = std::str::from_utf8(body)?;
+        match command {
+            IpcCommand::Query => {
+                let body = request.body();
+                let query = std::str::from_utf8(body)?;
 
-            let mut results = Vec::new();
+                let mut results = Vec::new();
 
-            app.plugin_store
-                .query(query, &app.fuzzy_matcher, &mut results)?;
+                self.plugin_store
+                    .query(query, &self.fuzzy_matcher, &mut results)?;
 
-            // sort results in reverse so higher scores are first
-            results.sort_by(|a, b| b.score.cmp(&a.score));
+                // sort results in reverse so higher scores are first
+                results.sort_by(|a, b| b.score.cmp(&a.score));
 
-            let min = std::cmp::min(app.config.general.max_results, results.len());
-            let final_results = &results[..min];
+                let min = std::cmp::min(self.config.general.max_results, results.len());
+                let final_results = &results[..min];
 
-            let json = response::json(&final_results);
+                let json = response::json(&final_results);
 
-            app.resize_main_window_for_items(min);
+                self.resize_main_window_for_items(min);
 
-            app.results = results;
+                self.results = results;
 
-            return json;
-        }
+                return json;
+            }
 
-        IpcCommand::ClearResults => app.resize_main_window_for_items(0),
+            IpcCommand::ClearResults => self.resize_main_window_for_items(0),
 
-        IpcCommand::RunAction => {
-            let payload = request.body();
+            IpcCommand::RunAction => {
+                let payload = request.body();
 
-            let Some((action, id)) = std::str::from_utf8(payload)?.split_once('#') else {
-                anyhow::bail!("Invalid payload for command `{command}`: {payload:?}");
-            };
+                let Some((action, id)) = std::str::from_utf8(payload)?.split_once('#') else {
+                    anyhow::bail!("Invalid payload for command `{command}`: {payload:?}");
+                };
 
-            let Some(item) = app.results.iter().find(|r| r.id == id) else {
-                anyhow::bail!("Couldn't find result item with this id: {id}");
-            };
+                let Some(item) = self.results.iter().find(|r| r.id == id) else {
+                    anyhow::bail!("Couldn't find result item with this id: {id}");
+                };
 
-            let Some(action) = item.actions.iter().find(|a| a.id == action) else {
-                anyhow::bail!("Couldn't find secondary action: {action}");
-            };
+                let Some(action) = item.actions.iter().find(|a| a.id == action) else {
+                    anyhow::bail!("Couldn't find secondary action: {action}");
+                };
 
-            action.run(item)?;
+                action.run(item)?;
 
-            app.hide_main_window(false);
-        }
+                self.hide_main_window(false);
+            }
 
-        IpcCommand::Reload => {
-            let old_hotkey = app.config.general.hotkey.clone();
-            app.config = Config::load()?;
+            IpcCommand::Reload => {
+                let old_hotkey = self.config.general.hotkey.clone();
+                self.config = Config::load()?;
 
-            app.plugin_store.reload(&app.config)?;
+                self.plugin_store.reload(&self.config)?;
 
-            let main_window = app.main_window();
-            main_window.emit(IpcEvent::UpdateConfig, &app.config)?;
+                let main_window = self.main_window();
+                main_window.emit(IpcEvent::UpdateConfig, &self.config)?;
 
-            let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
-            let new_hotkey = HotKey::try_from(app.config.general.hotkey.as_str())?;
-            if old_hotkey != new_hotkey {
-                app.global_hotkey_manager.unregister(old_hotkey)?;
-                app.global_hotkey_manager.register(new_hotkey)?;
+                let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
+                let new_hotkey = HotKey::try_from(self.config.general.hotkey.as_str())?;
+                if old_hotkey != new_hotkey {
+                    self.global_hotkey_manager.unregister(old_hotkey)?;
+                    self.global_hotkey_manager.register(new_hotkey)?;
+                }
+            }
+
+            IpcCommand::HideMainWindow => {
+                self.hide_main_window(true);
             }
         }
 
-        IpcCommand::HideMainWindow => {
-            app.hide_main_window(true);
-        }
+        response::empty()
     }
+}
 
-    response::empty()
+#[inline]
+pub fn ipc_handler<'a>(
+    app: &mut App,
+    request: Request<Vec<u8>>,
+) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
+    app.main_window_ipc_handler(request)
 }
