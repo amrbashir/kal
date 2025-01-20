@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
 
-use crate::config::Config;
+use crate::config::{Config, GenericPluginConfig};
 use crate::icon;
 use crate::result_item::{IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::IteratorExt;
@@ -71,6 +71,14 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
+    fn default_generic_config(&self) -> GenericPluginConfig {
+        GenericPluginConfig {
+            enabled: Some(true),
+            include_in_global_results: Some(true),
+            direct_activation_command: Some(".".into()),
+        }
+    }
+
     fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
         self.find_apps();
@@ -89,6 +97,10 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn> {
+        if query.is_empty() {
+            return Ok(QueryReturn::None);
+        }
+
         Ok(self
             .apps
             .iter()

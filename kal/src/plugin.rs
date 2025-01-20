@@ -23,8 +23,17 @@ pub trait Plugin: Debug {
         Ok(())
     }
 
-    /// Gets [ResultItem]s for this query
+    /// Gets [ResultItem]s for this query from the plugin.
     fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn>;
+
+    /// Gets [ResultItem]s for this query from the plugin when being directly invoked.
+    fn query_direct(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<QueryReturn> {
+        self.query(query, matcher)
+    }
 
     /// Default generic config
     fn default_generic_config(&self) -> GenericPluginConfig {

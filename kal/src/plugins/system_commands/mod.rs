@@ -4,7 +4,7 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use strum::AsRefStr;
 
-use crate::config::Config;
+use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{BuiltInIcon, Icon};
 use crate::result_item::{Action, IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::IteratorExt;
@@ -16,6 +16,22 @@ pub struct Plugin {
 
 impl Plugin {
     const NAME: &'static str = "SystemCommands";
+
+    fn all(&self) -> QueryReturn {
+        self.commands
+            .iter()
+            .map(|workflow| workflow.item(0))
+            .collect_non_empty::<Vec<_>>()
+            .into()
+    }
+
+    fn all_for_query(&self, query: &str, matcher: &SkimMatcherV2) -> QueryReturn {
+        self.commands
+            .iter()
+            .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
+            .collect_non_empty::<Vec<_>>()
+            .into()
+    }
 }
 
 impl crate::plugin::Plugin for Plugin {
@@ -29,6 +45,14 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
+    fn default_generic_config(&self) -> GenericPluginConfig {
+        GenericPluginConfig {
+            enabled: Some(true),
+            include_in_global_results: Some(true),
+            direct_activation_command: Some("!".into()),
+        }
+    }
+
     fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
@@ -38,12 +62,19 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
     ) -> anyhow::Result<QueryReturn> {
-        Ok(self
-            .commands
-            .iter()
-            .filter_map(|c| c.fuzzy_match(query, matcher))
-            .collect_non_empty::<Vec<_>>()
-            .into())
+        Ok(self.all_for_query(query, matcher))
+    }
+
+    fn query_direct(
+        &mut self,
+        query: &str,
+        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+    ) -> anyhow::Result<QueryReturn> {
+        if query.is_empty() {
+            Ok(self.all())
+        } else {
+            Ok(self.all_for_query(query, matcher))
+        }
     }
 }
 
@@ -175,21 +206,25 @@ impl SystemCommand {
     fn execute(&self) -> anyhow::Result<()> {
         unimplemented!()
     }
+
+    fn item(&self, score: i64) -> ResultItem {
+        let system_command = *self;
+        ResultItem {
+            id: self.id().into(),
+            icon: self.icon(),
+            primary_text: self.as_ref().into(),
+            secondary_text: self.description().into(),
+            tooltip: None,
+            actions: vec![Action::primary(move |_| system_command.execute())],
+            score,
+        }
+    }
 }
 
 impl IntoResultItem for SystemCommand {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
-        matcher.fuzzy_match(self.as_ref(), query).map(|score| {
-            let system_command = *self;
-            ResultItem {
-                id: self.id().into(),
-                icon: self.icon(),
-                primary_text: self.as_ref().into(),
-                secondary_text: self.description().into(),
-                tooltip: None,
-                actions: vec![Action::primary(move |_| system_command.execute())],
-                score,
-            }
-        })
+        matcher
+            .fuzzy_match(self.as_ref(), query)
+            .map(|score| self.item(score))
     }
 }

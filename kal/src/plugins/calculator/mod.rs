@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Ok;
 use calculator_rs::Calculate;
 
-use crate::config::Config;
+use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltInIcon;
 use crate::result_item::{Action, QueryReturn, ResultItem};
 
@@ -38,6 +38,14 @@ impl crate::plugin::Plugin for Plugin {
 
     fn name(&self) -> &'static str {
         Self::NAME
+    }
+
+    fn default_generic_config(&self) -> GenericPluginConfig {
+        GenericPluginConfig {
+            enabled: Some(true),
+            include_in_global_results: Some(true),
+            direct_activation_command: Some("=".into()),
+        }
     }
 
     fn query(

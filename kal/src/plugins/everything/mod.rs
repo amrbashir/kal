@@ -52,6 +52,10 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<QueryReturn> {
+        if query.is_empty() {
+            return Ok(QueryReturn::None);
+        }
+
         let output = std::process::Command::new(&self.es)
             .arg(query)
             .args(["-n", "24"]) // TODO: pull from config

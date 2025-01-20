@@ -5,7 +5,7 @@ use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::config::Config;
+use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{BuiltInIcon, Icon};
 use crate::result_item::{Action, IntoResultItem, QueryReturn, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt};
@@ -33,6 +33,22 @@ impl Plugin {
             };
         }
     }
+
+    fn all(&self) -> QueryReturn {
+        self.workflows
+            .iter()
+            .map(|workflow| workflow.item(0))
+            .collect_non_empty::<Vec<_>>()
+            .into()
+    }
+
+    fn all_for_query(&self, query: &str, matcher: &SkimMatcherV2) -> QueryReturn {
+        self.workflows
+            .iter()
+            .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
+            .collect_non_empty::<Vec<_>>()
+            .into()
+    }
 }
 
 impl crate::plugin::Plugin for Plugin {
@@ -52,6 +68,14 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
+    fn default_generic_config(&self) -> GenericPluginConfig {
+        GenericPluginConfig {
+            enabled: Some(true),
+            include_in_global_results: Some(true),
+            direct_activation_command: Some("@".into()),
+        }
+    }
+
     fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         let config = config.plugin_config::<PluginConfig>(self.name());
 
@@ -66,12 +90,19 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
     ) -> anyhow::Result<QueryReturn> {
-        Ok(self
-            .workflows
-            .iter()
-            .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
-            .collect_non_empty::<Vec<_>>()
-            .into())
+        Ok(self.all_for_query(query, matcher))
+    }
+
+    fn query_direct(
+        &mut self,
+        query: &str,
+        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+    ) -> anyhow::Result<QueryReturn> {
+        if query.is_empty() {
+            Ok(self.all())
+        } else {
+            Ok(self.all_for_query(query, matcher))
+        }
     }
 }
 
@@ -134,6 +165,24 @@ impl Workflow {
 
         Ok(())
     }
+
+    fn item(&self, score: i64) -> ResultItem {
+        let workflow = self.clone();
+        let open = Action::primary(move |_| workflow.execute(false));
+
+        let workflow = self.clone();
+        let open_elevated = Action::open_elevated(move |_| workflow.execute(true));
+
+        ResultItem {
+            id: self.id.as_str().into(),
+            icon: self.icon(),
+            primary_text: self.name.as_str().into(),
+            secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
+            tooltip: None,
+            actions: vec![open, open_elevated],
+            score,
+        }
+    }
 }
 
 impl IntoResultItem for Workflow {
@@ -145,22 +194,6 @@ impl IntoResultItem for Workflow {
                     .as_ref()
                     .and_then(|description| matcher.fuzzy_match(description, query))
             })
-            .map(|score| {
-                let workflow = self.clone();
-                let open = Action::primary(move |_| workflow.execute(false));
-
-                let workflow = self.clone();
-                let open_elevated = Action::open_elevated(move |_| workflow.execute(true));
-
-                ResultItem {
-                    id: self.id.as_str().into(),
-                    icon: self.icon(),
-                    primary_text: self.name.as_str().into(),
-                    secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
-                    tooltip: None,
-                    actions: vec![open, open_elevated],
-                    score,
-                }
-            })
+            .map(|score| self.item(score))
     }
 }
