@@ -12,6 +12,7 @@ pub struct ResultItem {
     pub icon: Icon,
     pub primary_text: String,
     pub secondary_text: String,
+    pub tooltip: Option<String>,
     pub actions: Vec<Action>,
     pub score: i64,
 }
@@ -23,6 +24,7 @@ impl ResultItem {
             icon: BuiltInIcon::Error.icon(),
             primary_text: plugin.name().to_owned(),
             secondary_text: error.to_string(),
+            tooltip: Some(error.to_string()),
             actions: vec![],
             score: 0,
         }

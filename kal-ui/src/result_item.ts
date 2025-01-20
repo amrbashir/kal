@@ -22,5 +22,6 @@ export interface ResultItem {
   icon: Icon;
   primary_text: string;
   secondary_text: string;
+  tooltip?: string;
   actions: Action[];
 }

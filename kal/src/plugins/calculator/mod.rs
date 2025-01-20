@@ -21,6 +21,7 @@ impl Plugin {
             icon: BuiltInIcon::Calculator.icon(),
             primary_text: result,
             secondary_text: Self::DESCRIPTION.into(),
+            tooltip: None,
             actions: vec![Action::primary(|item| {
                 let mut clipboard = arboard::Clipboard::new()?;
                 clipboard.set_text(&item.primary_text).map_err(Into::into)

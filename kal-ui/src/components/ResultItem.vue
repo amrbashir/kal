@@ -21,10 +21,11 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
 
 <template>
   <fluent-option
-    class="w-full part:content:flex part:content:w-full last:children:hover:flex bg-transparent before:left-0"
-    :class="{ 'selected before:bg-[var(--accent-fill-rest)]': selected }"
     :style="{ height: itemHeight }"
+    class="w-full part:content:flex part:content:w-full last:children:hover:flex bg-transparent before:left-0"
+    :selected
     @click="runAction(item.actions[0])"
+    :title="item.tooltip"
   >
     <div
       :style="{ width: itemHeight }"
@@ -59,16 +60,16 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
 </template>
 
 <style scoped>
-* {
-  --base-height-multiplier: 12;
-}
-
 ul fluent-option::part(content) {
   height: v-bind(itemHeight);
 }
 
 ul fluent-option:hover,
-ul fluent-option.selected {
+ul fluent-option[aria-selected="true"] {
   background-color: v-bind(hoverBgColor10Percent);
+}
+
+ul fluent-option::before {
+  --base-height-multiplier: 12;
 }
 </style>

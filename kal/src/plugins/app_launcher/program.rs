@@ -41,11 +41,14 @@ impl Program {
         let path = self.path.clone();
         let open_location = Action::open_location(move |_| utils::reveal_item_in_dir(&path));
 
+        let tooltip = format!("{}\n{}", self.name.to_string_lossy(), self.path.display());
+
         ResultItem {
             id: self.id.as_str().into(),
             icon: Icon::path(self.icon.to_string_lossy()),
             primary_text: self.name.to_string_lossy().into_owned(),
             secondary_text: "Application".into(),
+            tooltip: Some(tooltip),
             actions: vec![open, open_elevated, open_location],
             score,
         }

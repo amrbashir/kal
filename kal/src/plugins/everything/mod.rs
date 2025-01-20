@@ -137,11 +137,14 @@ impl IntoResultItem for EverythingEntry {
             ]
         };
 
+        let tooltip = format!("{}\n{}", self.name.to_string_lossy(), self.path.display());
+
         Some(ResultItem {
             id: self.id.as_str().into(),
+            icon: Icon::path(self.icon.to_string_lossy()),
             primary_text: self.name.to_string_lossy().into_owned(),
             secondary_text: self.path.to_string_lossy().into_owned(),
-            icon: Icon::path(self.icon.to_string_lossy()),
+            tooltip: Some(tooltip),
             actions,
             score: 0,
         })

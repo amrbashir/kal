@@ -153,10 +153,11 @@ impl IntoResultItem for Workflow {
                 let open_elevated = Action::open_elevated(move |_| workflow.execute(true));
 
                 ResultItem {
-                    primary_text: self.name.as_str().into(),
                     id: self.id.as_str().into(),
-                    secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
                     icon: self.icon(),
+                    primary_text: self.name.as_str().into(),
+                    secondary_text: self.description.as_deref().unwrap_or("Workflow").into(),
+                    tooltip: None,
                     actions: vec![open, open_elevated],
                     score,
                 }

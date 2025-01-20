@@ -100,7 +100,7 @@ impl Shell {
             icon: BuiltInIcon::Shell.icon(),
             primary_text: command,
             secondary_text: Plugin::DESCRIPTION.into(),
-
+            tooltip: None,
             actions: vec![
                 Action::primary(move |item| {
                     let exe = shell.exe();

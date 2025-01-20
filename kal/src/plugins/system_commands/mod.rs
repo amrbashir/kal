@@ -186,6 +186,7 @@ impl IntoResultItem for SystemCommand {
                 icon: self.icon(),
                 primary_text: self.as_ref().into(),
                 secondary_text: self.description().into(),
+                tooltip: None,
                 actions: vec![Action::primary(move |_| system_command.execute())],
                 score,
             }

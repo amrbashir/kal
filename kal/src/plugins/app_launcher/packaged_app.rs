@@ -62,11 +62,18 @@ impl PackagedApp {
         let location = self.location.clone();
         let open_location = Action::open_location(move |_| utils::open_dir(&location));
 
+        let tooltip = format!(
+            "{}\n{}",
+            self.name.to_string_lossy(),
+            self.location.display()
+        );
+
         ResultItem {
             id: self.id.clone(),
             icon,
             primary_text: self.name.to_string_lossy().into_owned(),
             secondary_text: "Packaged Application".into(),
+            tooltip: Some(tooltip),
             actions: vec![open, open_elevated, open_location],
             score,
         }
