@@ -14,6 +14,7 @@ use crate::utils::{self, PathExt};
 pub struct Plugin {
     es: PathBuf,
     icons_dir: PathBuf,
+    max_results: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -27,10 +28,12 @@ impl Plugin {
 
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
+        let max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         Ok(Self {
             es: config.es.unwrap_or_else(|| PathBuf::from("es")),
             icons_dir: data_dir.join("icons"),
+            max_results,
         })
     }
 
@@ -47,6 +50,7 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+        self.max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.es = config.es.unwrap_or_else(|| PathBuf::from("es"));
         Ok(())
@@ -59,7 +63,8 @@ impl crate::plugin::Plugin for Plugin {
 
         let output = std::process::Command::new(&self.es)
             .arg(query)
-            .args(["-n", "24"]) // TODO: pull from config
+            .arg("-n")
+            .arg(self.max_results.to_string())
             .output()?;
 
         match output.status.success() {
