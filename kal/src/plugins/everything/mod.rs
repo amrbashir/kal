@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{self, Icon};
-use crate::result_item::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
+use crate::plugin::PluginQueryOutput;
+use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, PathExt};
 
 #[derive(Debug)]

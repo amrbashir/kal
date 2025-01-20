@@ -5,7 +5,8 @@ use calculator_rs::Calculate;
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltInIcon;
-use crate::result_item::{Action, PluginQueryOutput, ResultItem};
+use crate::plugin::PluginQueryOutput;
+use crate::result_item::{Action, ResultItem};
 
 #[derive(Debug)]
 pub struct Plugin;

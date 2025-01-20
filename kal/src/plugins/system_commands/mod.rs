@@ -6,7 +6,8 @@ use strum::AsRefStr;
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{BuiltInIcon, Icon};
-use crate::result_item::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
+use crate::plugin::PluginQueryOutput;
+use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
 
 #[derive(Debug)]
@@ -17,20 +18,18 @@ pub struct Plugin {
 impl Plugin {
     const NAME: &'static str = "SystemCommands";
 
-    fn all(&self) -> PluginQueryOutput {
+    fn all(&self) -> Option<Vec<ResultItem>> {
         self.commands
             .iter()
             .map(|workflow| workflow.item(0))
-            .collect_non_empty::<Vec<_>>()
-            .into()
+            .collect_non_empty()
     }
 
-    fn all_for_query(&self, query: &str, matcher: &SkimMatcherV2) -> PluginQueryOutput {
+    fn all_for_query(&self, query: &str, matcher: &SkimMatcherV2) -> Option<Vec<ResultItem>> {
         self.commands
             .iter()
             .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
-            .collect_non_empty::<Vec<_>>()
-            .into()
+            .collect_non_empty()
     }
 }
 
@@ -62,7 +61,7 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
     ) -> anyhow::Result<PluginQueryOutput> {
-        Ok(self.all_for_query(query, matcher))
+        Ok(self.all_for_query(query, matcher).into())
     }
 
     fn query_direct(
@@ -71,9 +70,9 @@ impl crate::plugin::Plugin for Plugin {
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
-            Ok(self.all())
+            Ok(self.all().into())
         } else {
-            Ok(self.all_for_query(query, matcher))
+            Ok(self.all_for_query(query, matcher).into())
         }
     }
 }

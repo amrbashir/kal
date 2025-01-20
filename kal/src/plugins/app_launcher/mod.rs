@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon;
-use crate::result_item::{IntoResultItem, PluginQueryOutput, ResultItem};
+use crate::plugin::PluginQueryOutput;
+use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
 
 #[cfg(windows)]
