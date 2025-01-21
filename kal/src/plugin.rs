@@ -8,6 +8,7 @@ use crate::result_item::ResultItem;
 
 #[allow(unused_variables)]
 pub trait Plugin: Debug {
+    /// Constructor for plugin.
     fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self>
     where
         Self: Sized;
@@ -23,10 +24,10 @@ pub trait Plugin: Debug {
         Ok(())
     }
 
-    /// Gets [ResultItem]s for this query from the plugin.
+    /// Query the plugin for [`ResultItem`]s.
     fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput>;
 
-    /// Gets [ResultItem]s for this query from the plugin when being directly invoked.
+    /// Query the plugin for [`ResultItem`]s when directly invoked.
     fn query_direct(
         &mut self,
         query: &str,
@@ -45,6 +46,7 @@ pub trait Plugin: Debug {
     }
 }
 
+/// Possible output from querying a plugin.
 pub enum PluginQueryOutput {
     None,
     One(ResultItem),
