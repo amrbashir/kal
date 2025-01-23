@@ -189,19 +189,16 @@ mod imp {
             s.split_once(' ').unwrap_or((s, ""))
         };
 
-        let script_path = std::env::temp_dir().join("kal_temp_script.ps1");
-        std::fs::write(&script_path, script.as_ref())?;
+        let args = format!("{args} {}", script.as_ref());
 
-        let args = format!("{args} {}", script_path.display());
+        let shell = HSTRING::from(shell);
+        let args = HSTRING::from(args);
+        let cwd = cwd
+            .as_ref()
+            .map(|cwd| HSTRING::from(cwd.as_ref()))
+            .unwrap_or_default();
 
         unsafe {
-            let shell = HSTRING::from(shell);
-            let args = HSTRING::from(args);
-            let cwd = cwd
-                .as_ref()
-                .map(|cwd| HSTRING::from(cwd.as_ref()))
-                .unwrap_or_default();
-
             ffi::ShellExecuteW(
                 None,
                 if elevated {
