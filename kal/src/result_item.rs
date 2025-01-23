@@ -1,10 +1,7 @@
-use std::fmt::Display;
-
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::Serialize;
 
 use crate::icon::{BuiltInIcon, Icon};
-use crate::plugin::Plugin;
 
 #[derive(Serialize, Debug)]
 pub struct ResultItem {
@@ -17,25 +14,11 @@ pub struct ResultItem {
     pub score: i64,
 }
 
-impl ResultItem {
-    pub fn plugin_error<S: Display>(plugin: &dyn Plugin, error: S) -> Self {
-        Self {
-            id: String::new(),
-            icon: BuiltInIcon::Error.icon(),
-            primary_text: plugin.name().to_owned(),
-            secondary_text: error.to_string(),
-            tooltip: Some(error.to_string()),
-            actions: vec![],
-            score: 0,
-        }
-    }
-}
-
 pub trait IntoResultItem {
     fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem>;
 }
 
-type ActionFn = dyn Fn(&ResultItem) -> anyhow::Result<()>;
+type ActionFn = dyn Fn(&ResultItem) -> anyhow::Result<()> + Send + Sync;
 
 #[derive(Serialize)]
 pub struct Action {
@@ -61,7 +44,7 @@ impl std::fmt::Debug for Action {
 impl Action {
     pub fn new<F>(id: &'static str, action: F) -> Self
     where
-        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static,
+        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self {
             id,
@@ -95,7 +78,7 @@ impl Action {
 impl Action {
     pub fn primary<F>(action: F) -> Self
     where
-        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static,
+        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self {
             id: "RunPrimary",
@@ -108,7 +91,7 @@ impl Action {
 
     pub fn open_elevated<F>(action: F) -> Self
     where
-        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static,
+        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self::new("RunElevated", action)
             .with_icon(BuiltInIcon::Admin.icon())
@@ -118,7 +101,7 @@ impl Action {
 
     pub fn open_location<F>(action: F) -> Self
     where
-        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static,
+        F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self::new("OpenLocation", action)
             .with_icon(BuiltInIcon::FolderOpen.icon())

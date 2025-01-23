@@ -1,22 +1,25 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
+use std::future::Future;
 use std::rc::Rc;
-use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use winit::dpi::{LogicalPosition, Position, Size};
-use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
+use winit::event_loop::ActiveEventLoop;
 #[cfg(windows)]
 use winit::platform::windows::*;
 use winit::window::{Window, WindowAttributes, WindowId};
 use wry::http::{Request, Response};
 #[cfg(windows)]
 use wry::WebViewBuilderExtWindows;
-use wry::{WebView, WebViewBuilder, WebViewId};
+use wry::{WebView, WebViewBuilder};
 
-use crate::app::{App, AppEvent};
+use crate::ipc::AsyncIpcMessage;
 use crate::{icon, ipc};
+
+pub type ProtocolResult = anyhow::Result<Response<Cow<'static, [u8]>>>;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum Vibrancy {
@@ -26,13 +29,10 @@ pub enum Vibrancy {
     Blur,
 }
 
-type IpcHandler = fn(&mut App, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>>;
-
 pub struct WebViewWindowBuilder<'a> {
     window_attrs: WindowAttributes,
     webview_builder: WebViewBuilder<'a>,
     center: bool,
-    ipc_handler: Option<IpcHandler>,
 }
 
 impl WebViewWindowBuilder<'_> {
@@ -61,7 +61,6 @@ impl WebViewWindowBuilder<'_> {
             window_attrs,
             webview_builder,
             center: false,
-            ipc_handler: None,
         }
     }
 
@@ -132,34 +131,43 @@ impl WebViewWindowBuilder<'_> {
         self
     }
 
-    pub fn protocol<F>(mut self, name: &str, handler: F) -> Self
+    pub fn async_protocol<F, FR>(mut self, name: &str, handler: F) -> Self
     where
-        F: Fn(WebViewId, Request<Vec<u8>>) -> anyhow::Result<Response<Cow<'static, [u8]>>>
-            + 'static,
+        F: Fn(&str, Request<Vec<u8>>) -> FR + 'static + Send + Sync,
+        FR: Future<Output = ProtocolResult> + 'static + Send + Sync,
     {
-        self.webview_builder =
-            self.webview_builder
-                .with_custom_protocol(name.to_string(), move |webview_id, req| {
-                    match handler(webview_id, req) {
+        let handler = Arc::new(handler);
+
+        self.webview_builder = self.webview_builder.with_asynchronous_custom_protocol(
+            name.to_string(),
+            move |webview_id, req, responder| {
+                let webview_id = webview_id.to_string();
+                let handler = handler.clone();
+
+                let fut = async move {
+                    let res = match handler(&webview_id, req).await {
                         Ok(res) => res,
                         Err(e) => ipc::response::error_owned(format!("{e:?}")).unwrap(),
-                    }
-                });
+                    };
+
+                    responder.respond(res);
+                };
+
+                smol::spawn(fut).detach();
+            },
+        );
         self
     }
 
-    pub fn ipc(
-        mut self,
-        label: &'static str,
-        sender: Sender<AppEvent>,
-        proxy: EventLoopProxy,
-        handler: IpcHandler,
-    ) -> Self {
-        self = self.protocol(
+    pub fn async_ipc<T>(mut self, async_ipc_sender: smol::channel::Sender<T>) -> Self
+    where
+        T: From<AsyncIpcMessage> + Send + Sync + 'static,
+    {
+        self = self.async_protocol(
             ipc::PROTOCOL_NAME,
-            ipc::make_ipc_protocol(label, sender, proxy),
+            ipc::make_async_ipc_protocol!(T, async_ipc_sender),
         );
-        self.ipc_handler = Some(handler);
+
         self
     }
 
@@ -169,7 +177,8 @@ impl WebViewWindowBuilder<'_> {
     }
 
     pub fn build(mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<WebViewWindow> {
-        self = self.protocol(icon::PROTOCOL_NAME, icon::protocol);
+        self = self.async_protocol(icon::PROTOCOL_NAME, icon::protocol);
+
         #[cfg(not(debug_assertions))]
         {
             self = self.protocol(
@@ -213,7 +222,6 @@ impl WebViewWindowBuilder<'_> {
         let mut webview_window = WebViewWindow {
             window: window.clone(),
             webview,
-            ipc_handler: self.ipc_handler,
             #[cfg(windows)]
             softbuffer_ctx: {
                 let context = softbuffer::Context::new(window.clone()).unwrap();
@@ -241,7 +249,6 @@ pub struct WebViewWindow {
     webview: WebView,
     #[cfg(windows)]
     softbuffer_ctx: SoftBufferContext,
-    pub ipc_handler: Option<IpcHandler>,
 }
 
 impl Debug for WebViewWindow {
@@ -253,6 +260,10 @@ impl Debug for WebViewWindow {
 }
 
 impl WebViewWindow {
+    /// Magic number accounting for top and bottom border
+    /// for undecorated window with shadows
+    pub const MAGIC_BORDERS: u32 = 2;
+
     #[inline(always)]
     pub fn id(&self) -> WindowId {
         self.window.id()
@@ -291,7 +302,7 @@ impl WebViewWindow {
         let flag = DWMWA_TRANSITIONS_FORCEDISABLED;
         let size = std::mem::size_of::<BOOL>() as u32;
         if let Err(e) = unsafe { DwmSetWindowAttribute(hwnd, flag, disable, size) } {
-            tracing::error!("Failed to change DWMWA_TRANSITIONS_FORCEDISABLED {e}");
+            tracing::error!("Failed to change DWMWA_TRANSITIONS_FORCEDISABLED: {e}");
         }
     }
 

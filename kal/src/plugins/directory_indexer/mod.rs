@@ -1,10 +1,10 @@
 use std::ffi::OsString;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use serde::{Deserialize, Serialize};
+use smol::stream::*;
 
 use crate::config::Config;
 use crate::icon::{self, Icon};
@@ -33,36 +33,41 @@ impl Plugin {
         self.paths = config.paths;
     }
 
-    fn read_dirs(&mut self) {
-        self.entries = self
-            .paths
-            .iter()
-            .map(ExpandEnvVars::expand_vars)
-            .filter_map(|path| read_dir(path).ok())
-            .flatten()
-            .map(|e| DirEntry::new(e.path(), &self.icons_dir))
-            .collect::<Vec<DirEntry>>();
+    async fn index_dirs(&mut self) {
+        self.entries.clear();
+
+        let expanded_paths = self.paths.iter().map(ExpandEnvVars::expand_vars);
+        let mut entries = smol::stream::iter(expanded_paths).map(read_dir);
+
+        while let Some(e) = entries.next().await {
+            if let Ok(e) = e.await {
+                let e = e.iter().map(|e| DirEntry::new(e.path(), &self.icons_dir));
+                self.entries.extend(e);
+            }
+        }
     }
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
-        Ok(Self {
+        Self {
             paths: config.paths,
             icons_dir: data_dir.join("icons"),
             entries: Vec::new(),
-        })
+        }
     }
 
     fn name(&self) -> &'static str {
         Self::NAME
     }
 
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
-        self.read_dirs();
+
+        self.index_dirs().await;
 
         let icons_dir = self.icons_dir.clone();
         let paths = self
@@ -71,13 +76,17 @@ impl crate::plugin::Plugin for Plugin {
             .map(|e| (e.path.clone(), e.icon.clone()))
             .collect::<Vec<_>>();
 
-        std::fs::create_dir_all(icons_dir)?;
+        smol::fs::create_dir_all(icons_dir).await?;
         let _ = icon::extract_multiple_cached(paths).inspect_err(|e| tracing::error!("{e}"));
 
         Ok(())
     }
 
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput> {
+    async fn query(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self
             .entries
             .iter()
@@ -164,28 +173,29 @@ impl IntoResultItem for DirEntry {
     }
 }
 
-fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<fs::DirEntry>> {
-    let entries = fs::read_dir(path)?;
-    let entries = entries
-        .flatten()
-        .filter_map(|e| {
-            // skip hidden files and directories on Windows
-            #[cfg(windows)]
+async fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<smol::fs::DirEntry>> {
+    let mut entries = smol::fs::read_dir(path).await?;
+    let mut out = Vec::with_capacity(entries.size_hint().0);
+
+    while let Some(entry) = entries.try_next().await? {
+        // skip hidden files and directories on Windows
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+
+            use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
+            if entry
+                .metadata()
+                .await
+                .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN.0) != 0)
+                .unwrap_or(false)
             {
-                use std::os::windows::fs::MetadataExt;
-
-                use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
-                if e.metadata()
-                    .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN.0) != 0)
-                    .unwrap_or(false)
-                {
-                    return None;
-                }
+                continue;
             }
+        }
 
-            Some(e)
-        })
-        .collect();
+        out.push(entry);
+    }
 
-    Ok(entries)
+    Ok(out)
 }

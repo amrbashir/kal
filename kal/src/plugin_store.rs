@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
+use smol::prelude::*;
 
 use crate::config::Config;
 use crate::plugin::Plugin;
@@ -69,7 +70,7 @@ impl PluginStore {
         Self { plugins }
     }
 
-    pub fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    pub async fn reload(&mut self, config: &Config) {
         for plugin in self.plugins.iter_mut() {
             // update plugin generic config
             let default_generic_config = plugin.default_generic_config();
@@ -84,11 +85,11 @@ impl PluginStore {
 
             // run plugin reload if enabled
             if plugin.enabled {
-                plugin.reload(config)?;
+                if let Err(e) = plugin.reload(config).await {
+                    tracing::error!("Failed to reload `{}`: {e}", plugin.name());
+                }
             }
         }
-
-        Ok(())
     }
 
     pub fn queriable_plugins(&mut self) -> impl Iterator<Item = &mut PluginEntry> {
@@ -97,7 +98,7 @@ impl PluginStore {
             .filter(|p| p.enabled && p.include_in_global_results)
     }
 
-    pub fn query(
+    pub async fn query(
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
@@ -107,18 +108,25 @@ impl PluginStore {
         if let Some(plugin) = self.plugins.iter_mut().find(|p| p.is_direct_invoke(query)) {
             let invoke_cmd_len = plugin.invoke_cmd_len();
             let new_query = &query[invoke_cmd_len..].trim();
-            match plugin.query_direct(new_query, matcher) {
+
+            match plugin.query_direct(new_query, matcher).await {
                 Ok(res) => res.extend_into(results),
-                Err(err) => results.push(ResultItem::plugin_error(plugin.plugin.as_ref(), err)),
+                Err(err) => results.push(plugin.error_item(err.to_string())),
             }
         } else {
             let trimmed_query = query.trim();
 
             // otherwise get result from all queriable plugins
-            for plugin in self.queriable_plugins() {
-                match plugin.query(trimmed_query, matcher) {
-                    Ok(res) => res.extend_into(results),
-                    Err(err) => results.push(ResultItem::plugin_error(plugin.plugin.as_ref(), err)),
+            let mut results_iter = smol::stream::iter(self.queriable_plugins()).map(|p| async {
+                p.query(trimmed_query, matcher)
+                    .await
+                    .map_err(|e| p.error_item(e.to_string()))
+            });
+
+            while let Some(r) = results_iter.next().await {
+                match r.await {
+                    Ok(r) => r.extend_into(results),
+                    Err(r) => results.push(r),
                 }
             }
         }

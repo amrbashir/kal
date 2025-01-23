@@ -32,9 +32,10 @@ impl Plugin {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(_: &Config, _: &Path) -> anyhow::Result<Self> {
-        Ok(Self)
+    fn new(_: &Config, _: &Path) -> Self {
+        Self
     }
 
     fn name(&self) -> &'static str {
@@ -49,7 +50,7 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn query(
+    async fn query(
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,

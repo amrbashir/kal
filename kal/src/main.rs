@@ -7,6 +7,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 
 mod app;
 mod config;
+#[cfg(not(debug_assertions))]
 mod embedded_assets;
 mod icon;
 mod ipc;
@@ -41,7 +42,7 @@ fn main() -> anyhow::Result<()> {
         .with_writer(non_blocking)
         .with_ansi(false);
     let subscriber = tracing_subscriber::fmt::Subscriber::builder()
-        .with_max_level(LevelFilter::TRACE)
+        .with_max_level(LevelFilter::DEBUG)
         .finish()
         .with(layer);
     tracing::subscriber::set_global_default(subscriber)?;

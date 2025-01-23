@@ -1,5 +1,4 @@
 use std::ffi::OsString;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -85,13 +84,13 @@ pub fn find_all_in_paths<'a>(
 fn filter_path_entries_by_extensions<P>(
     path: P,
     extensions: &[String],
-) -> anyhow::Result<Vec<fs::DirEntry>>
+) -> anyhow::Result<Vec<std::fs::DirEntry>>
 where
     P: AsRef<Path>,
 {
     let mut filtered = Vec::new();
 
-    let entries = fs::read_dir(path)?;
+    let entries = std::fs::read_dir(path)?;
     for entry in entries.flatten() {
         if let Ok(metadata) = entry.metadata() {
             if metadata.is_dir() {

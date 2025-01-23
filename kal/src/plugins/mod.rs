@@ -12,15 +12,14 @@ mod shell;
 mod system_commands;
 mod workflows;
 
-pub fn all(config: &Config, data_dir: &Path) -> anyhow::Result<PluginStore> {
-    let store = PluginStore::new(vec![
-        app_launcher::Plugin::new(config, data_dir)?.into(),
-        calculator::Plugin::new(config, data_dir)?.into(),
-        directory_indexer::Plugin::new(config, data_dir)?.into(),
-        everything::Plugin::new(config, data_dir)?.into(),
-        shell::Plugin::new(config, data_dir)?.into(),
-        system_commands::Plugin::new(config, data_dir)?.into(),
-        workflows::Plugin::new(config, data_dir)?.into(),
-    ]);
-    Ok(store)
+pub fn all(config: &Config, data_dir: &Path) -> PluginStore {
+    PluginStore::new(vec![
+        app_launcher::Plugin::new(config, data_dir).into(),
+        calculator::Plugin::new(config, data_dir).into(),
+        directory_indexer::Plugin::new(config, data_dir).into(),
+        everything::Plugin::new(config, data_dir).into(),
+        shell::Plugin::new(config, data_dir).into(),
+        system_commands::Plugin::new(config, data_dir).into(),
+        workflows::Plugin::new(config, data_dir).into(),
+    ])
 }

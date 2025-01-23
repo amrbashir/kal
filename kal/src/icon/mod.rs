@@ -1,14 +1,15 @@
-use std::borrow::Cow;
+use std::future::Future;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
 use wry::http::header::CONTENT_TYPE;
-use wry::http::{Request, Response};
+use wry::http::Request;
 use wry::WebViewId;
 
 use crate::ipc;
+use crate::webview_window::ProtocolResult;
 
 mod extract;
 
@@ -119,25 +120,26 @@ impl BuiltInIcon {
 pub const PROTOCOL_NAME: &str = "kalicon";
 
 /// `kalicon://` protocol
-#[tracing::instrument]
-pub fn protocol<'a>(
-    _webview_id: WebViewId,
+pub fn protocol(
+    _webview_id: WebViewId<'_>,
     request: Request<Vec<u8>>,
-) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
-    let path = &request.uri().path()[1..];
-    let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
+) -> impl Future<Output = ProtocolResult> {
+    async move {
+        let path = &request.uri().path()[1..];
+        let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 
-    let path = dunce::canonicalize(PathBuf::from(&*path))?;
+        let path = dunce::canonicalize(PathBuf::from(&*path))?;
 
-    let mimetype = match path.extension().unwrap_or_default().to_str() {
-        Some("png") => "image/png",
-        Some("jpg") | Some("jpeg") => "image/jpeg",
-        Some("svg") => "image/svg+xml",
-        _ => anyhow::bail!("Only png, jpg and svg icons are supported"),
-    };
+        let mimetype = match path.extension().unwrap_or_default().to_str() {
+            Some("png") => "image/png",
+            Some("jpg") | Some("jpeg") => "image/jpeg",
+            Some("svg") => "image/svg+xml",
+            _ => anyhow::bail!("Only png, jpg and svg icons are supported"),
+        };
 
-    ipc::response::base()
-        .header(CONTENT_TYPE, mimetype)
-        .body(std::fs::read(path)?.into())
-        .map_err(Into::into)
+        ipc::response::base()
+            .header(CONTENT_TYPE, mimetype)
+            .body(smol::fs::read(path).await?.into())
+            .map_err(Into::into)
+    }
 }

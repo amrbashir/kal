@@ -1,20 +1,21 @@
-use std::borrow::Cow;
-use std::sync::mpsc::{self, Sender};
-
 use serde::Serialize;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use strum::{AsRefStr, Display, EnumString};
-use winit::event_loop::EventLoopProxy;
-use wry::http::{Method, Request, Response};
-use wry::{WebView, WebViewId};
+use wry::http::Request;
+use wry::WebView;
 
-use crate::app::AppEvent;
+use crate::webview_window::ProtocolResult;
 
 pub mod response;
 
+pub type IpcResult = ProtocolResult;
+
+pub type AsyncIpcSender = smol::channel::Sender<IpcResult>;
+pub type AsyncIpcMessage = (Request<Vec<u8>>, AsyncIpcSender);
+
 pub const INIT_SCRIPT: &str = include_str!("./ipc.js");
 
-#[derive(Display, EnumString, AsRefStr)]
+#[derive(Display, EnumString, AsRefStr, Debug)]
 pub enum IpcCommand {
     Query,
     ClearResults,
@@ -23,7 +24,7 @@ pub enum IpcCommand {
     HideMainWindow,
 }
 
-#[derive(EnumString, AsRefStr)]
+#[derive(EnumString, AsRefStr, Debug)]
 pub enum IpcEvent {
     FocusInput,
     UpdateConfig,
@@ -64,37 +65,25 @@ pub fn emit(
 
 pub const PROTOCOL_NAME: &str = "kalipc";
 
-type ProtocolReturn = anyhow::Result<Response<Cow<'static, [u8]>>>;
+macro_rules! make_async_ipc_protocol {
+    ($T:ident, $async_ipc_sender:ident) => {
+        move |_webview_id: &str, request: ::wry::http::Request<::std::vec::Vec<u8>>| {
+            let async_ipc_sender = $async_ipc_sender.clone();
 
-pub fn make_ipc_protocol(
-    label: &'static str,
-    sender: Sender<AppEvent>,
-    proxy: EventLoopProxy,
-) -> impl Fn(WebViewId, Request<Vec<u8>>) -> ProtocolReturn + 'static {
-    move |_, request| match *request.method() {
-        Method::OPTIONS => self::response::empty(),
-        Method::POST => {
-            let (tx, rx) = mpsc::sync_channel(1);
-
-            let event = AppEvent::Ipc {
-                label: label.to_string(),
-                request,
-                tx,
-            };
-
-            match sender.send(event) {
-                Ok(_) => {
-                    proxy.wake_up();
-
-                    #[cfg(not(windows))]
-                    unimplemented!();
-
-                    #[cfg(windows)]
-                    webview2_com::wait_with_pump(rx).unwrap()
+            async move {
+                match *request.method() {
+                    ::wry::http::Method::OPTIONS => $crate::ipc::response::empty(),
+                    ::wry::http::Method::POST => {
+                        let (tx, rx) = ::smol::channel::bounded(1);
+                        let task = $T::from((request, tx));
+                        async_ipc_sender.send(task).await?;
+                        rx.recv().await?
+                    }
+                    _ => $crate::ipc::response::error("Only POST or OPTIONS method are supported"),
                 }
-                Err(e) => anyhow::bail!("Failed to send `AppEvent::Ipc`: {e}"),
             }
         }
-        _ => self::response::error("Only POST or OPTIONS method are supported"),
-    }
+    };
 }
+
+pub(crate) use make_async_ipc_protocol;

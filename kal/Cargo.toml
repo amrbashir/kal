@@ -11,7 +11,7 @@ edition = "2021"
 embed-manifest = "1.4"
 
 [dependencies]
-wry = { git = "https://github.com/tauri-apps/wry", rev = "46db839b9ebcc36e3b44455f0e8fb861a07e1447" }
+wry = { git = "https://github.com/tauri-apps/wry", rev = "b3926d01db1628e521ca22861e7efbe6f30a538f" }
 winit = { path = "../../winit" }
 serde = "1"
 serde_json = "1"
@@ -33,6 +33,8 @@ arboard = "3.4"
 png = "0.17"
 strum = { version = "0.26", features = ["derive"] }
 rfd = { version = "0.15", default-features = false }
+smol = "2.0"
+async-trait = "0.1.85"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"

@@ -1,15 +1,16 @@
-use std::fmt::Debug;
 use std::path::Path;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::{Config, GenericPluginConfig};
+use crate::icon::BuiltInIcon;
 use crate::result_item::ResultItem;
 
 #[allow(unused_variables)]
-pub trait Plugin: Debug {
+#[async_trait::async_trait]
+pub trait Plugin: std::fmt::Debug + Send + Sync {
     /// Constructor for plugin.
-    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self>
+    fn new(config: &Config, data_dir: &Path) -> Self
     where
         Self: Sized;
 
@@ -19,23 +20,6 @@ pub trait Plugin: Debug {
     /// and the plugin to exceute it.
     fn name(&self) -> &'static str;
 
-    /// Reloads the cache and configuration of the plugin
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    /// Query the plugin for [`ResultItem`]s.
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput>;
-
-    /// Query the plugin for [`ResultItem`]s when directly invoked.
-    fn query_direct(
-        &mut self,
-        query: &str,
-        matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<PluginQueryOutput> {
-        self.query(query, matcher)
-    }
-
     /// Default generic config
     fn default_generic_config(&self) -> GenericPluginConfig {
         GenericPluginConfig {
@@ -43,6 +27,40 @@ pub trait Plugin: Debug {
             include_in_global_results: Some(true),
             direct_activation_command: None,
         }
+    }
+
+    /// Convenient method to construct an error [ResultItem] for this plugin.
+    fn error_item(&self, error: String) -> ResultItem {
+        ResultItem {
+            id: String::new(),
+            icon: BuiltInIcon::Error.icon(),
+            primary_text: self.name().to_owned(),
+            secondary_text: error.clone(),
+            tooltip: Some(error),
+            actions: vec![],
+            score: 0,
+        }
+    }
+
+    /// Reloads the cache and configuration of the plugin
+    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    /// Query the plugin for [`ResultItem`]s.
+    async fn query(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<PluginQueryOutput>;
+
+    /// Query the plugin for [`ResultItem`]s when directly invoked.
+    async fn query_direct(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<PluginQueryOutput> {
+        self.query(query, matcher).await
     }
 }
 

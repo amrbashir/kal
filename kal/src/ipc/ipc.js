@@ -54,7 +54,6 @@ Object.defineProperty(window, "KAL", {
         else if (contentType.includes("text/")) return res.text();
         else return res.arrayBuffer();
       },
-
       __handler_store: {},
       on: function (event, handler) {
         if (typeof this.__handler_store[event] == "undefined") this.__handler_store[event] = [];

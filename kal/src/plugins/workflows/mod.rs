@@ -50,8 +50,9 @@ impl Plugin {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, _data_dir: &Path) -> anyhow::Result<Self> {
+    fn new(config: &Config, _data_dir: &Path) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         let mut plugin = Self {
@@ -60,7 +61,7 @@ impl crate::plugin::Plugin for Plugin {
 
         plugin.update_ids();
 
-        Ok(plugin)
+        plugin
     }
 
     fn name(&self) -> &'static str {
@@ -75,7 +76,7 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         let config = config.plugin_config::<PluginConfig>(self.name());
 
         self.workflows = config.workflows;
@@ -84,7 +85,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    fn query(
+    async fn query(
         &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
@@ -92,7 +93,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(self.all_for_query(query, matcher).into())
     }
 
-    fn query_direct(
+    async fn query_direct(
         &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,

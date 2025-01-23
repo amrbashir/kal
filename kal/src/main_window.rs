@@ -1,14 +1,18 @@
-use std::borrow::Cow;
+use std::path::PathBuf;
+use std::sync::mpsc;
 
+use fuzzy_matcher::skim::SkimMatcherV2;
 use global_hotkey::hotkey::HotKey;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use winit::dpi::LogicalSize;
-use winit::event_loop::ActiveEventLoop;
-use wry::http::{Request, Response};
+use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
+use wry::http::Request;
 
-use crate::app::App;
+use crate::app::{App, AppMessage};
 use crate::config::Config;
-use crate::ipc::{response, IpcCommand, IpcEvent};
+use crate::ipc::{response, AsyncIpcMessage, IpcCommand, IpcEvent, IpcResult};
+use crate::plugin_store::PluginStore;
+use crate::result_item::ResultItem;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 const INIT_TEMPLATE: &str = r#"(function () {
@@ -33,19 +37,8 @@ struct InitScript<'a> {
 }
 
 impl App {
-    const MAIN_WINDOW_LABEL: &str = "main";
-
-    /// Magic number accounting for top and bottom border
-    /// for undecorated window with shadows
-    pub const MAGIC_BORDERS: u32 = 2;
-
-    #[cfg(debug_assertions)]
-    const MAIN_WINDOW_URL: &str = "http://localhost:9010/";
-    #[cfg(not(debug_assertions))]
-    const MAIN_WINDOW_URL: &str = "kal://localhost/";
-
     pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
-        let config = serde_json::value::to_raw_value(&self.config)?;
+        let config_json = serde_json::value::to_raw_value(&self.config)?;
 
         let custom_css = self
             .config
@@ -57,22 +50,26 @@ impl App {
 
         let js_ser_opts = JsSerializeOptions::default();
         let init_script = InitScript {
-            config: &config,
+            config: &config_json,
             custom_css: custom_css.as_deref(),
         }
         .render(INIT_TEMPLATE, &js_ser_opts)?;
 
-        let sender = self.sender.clone();
-        let proxy = self.event_loop_proxy.clone();
+        let async_ipc_sender = MainWindowState::spawn(
+            self.config.clone(),
+            self.data_dir.clone(),
+            self.sender.clone(),
+            self.event_loop_proxy.clone(),
+        );
 
         let builder = WebViewWindowBuilder::new()
-            .url(Self::MAIN_WINDOW_URL)
+            .url(MainWindowState::URL)
             .init_script(&init_script.into_string())
-            .ipc(Self::MAIN_WINDOW_LABEL, sender, proxy, ipc_handler)
             .inner_size(LogicalSize::new(
                 self.config.appearance.window_width,
-                self.config.appearance.input_height + Self::MAGIC_BORDERS,
+                self.config.appearance.input_height + WebViewWindow::MAGIC_BORDERS,
             ))
+            .async_ipc(async_ipc_sender)
             .center(true)
             .decorations(false)
             .resizable(false)
@@ -87,37 +84,99 @@ impl App {
         #[cfg(windows)]
         window.set_dwmwa_transitions(false);
 
-        self.windows.insert(Self::MAIN_WINDOW_LABEL, window);
+        self.windows.insert(MainWindowState::LABEL, window);
 
         Ok(())
     }
+}
 
-    pub fn main_window(&self) -> &WebViewWindow {
-        self.windows.get(Self::MAIN_WINDOW_LABEL).as_ref().unwrap()
-    }
+#[derive(Debug)]
+pub enum MainWindowMessage {
+    Ipc {
+        request: wry::http::Request<Vec<u8>>,
+        tx: smol::channel::Sender<IpcResult>,
+    },
+}
 
-    pub fn show_main_window(&mut self) -> anyhow::Result<()> {
-        #[cfg(windows)]
-        self.store_foreground_hwnd();
-
-        let main_window = self.main_window();
-        main_window.window().set_visible(true);
-        main_window.window().focus_window();
-        main_window.emit(IpcEvent::FocusInput, ())
-    }
-
-    pub fn hide_main_window(&self, #[allow(unused)] restore_focus: bool) {
-        self.main_window().window().set_visible(false);
-
-        #[cfg(windows)]
-        if restore_focus {
-            self.restore_prev_foreground_hwnd();
+impl From<AsyncIpcMessage> for MainWindowMessage {
+    fn from(value: AsyncIpcMessage) -> Self {
+        Self::Ipc {
+            request: value.0,
+            tx: value.1,
         }
     }
+}
 
-    fn resize_main_window_for_items(&self, count: usize) {
-        let main_window = self.main_window();
+pub struct MainWindowState {
+    main_thread_sender: mpsc::Sender<AppMessage>,
+    event_loop_proxy: EventLoopProxy,
 
+    pub fuzzy_matcher: SkimMatcherV2,
+
+    pub config: Config,
+    pub plugin_store: PluginStore,
+    pub results: Vec<ResultItem>,
+}
+
+impl MainWindowState {
+    pub fn spawn(
+        config: Config,
+        data_dir: PathBuf,
+        main_thread_sender: mpsc::Sender<AppMessage>,
+        event_loop_proxy: EventLoopProxy,
+    ) -> smol::channel::Sender<MainWindowMessage> {
+        let (sender, receiver) = smol::channel::unbounded();
+
+        smol::spawn(async move {
+            let mut plugin_store = crate::plugins::all(&config, &data_dir);
+            plugin_store.reload(&config).await;
+
+            let mut state = MainWindowState {
+                config,
+                plugin_store,
+                fuzzy_matcher: SkimMatcherV2::default(),
+                results: Vec::new(),
+                main_thread_sender,
+                event_loop_proxy,
+            };
+
+            loop {
+                if let Ok(task) = receiver.recv().await {
+                    match task {
+                        MainWindowMessage::Ipc { request, tx } => {
+                            tracing::debug!("Handling ipc request...");
+                            tracing::trace!("{request:?}");
+                            let res = state.ipc_handler(request).await;
+                            tracing::debug!("Finished handling ipc request");
+                            tracing::trace!("{res:?}");
+
+                            if let Err(e) = tx.send(res).await {
+                                tracing::error!("Failed to send async ipc response: {e}");
+                            }
+                        }
+                    }
+                }
+            }
+        })
+        .detach();
+
+        sender
+    }
+
+    pub const LABEL: &str = "main";
+
+    #[cfg(debug_assertions)]
+    pub const URL: &str = "http://localhost:9010/";
+    #[cfg(not(debug_assertions))]
+    pub const URL: &str = "kal://localhost/";
+
+    fn send_event(&self, event: AppMessage) -> anyhow::Result<()> {
+        self.main_thread_sender.send(event)?;
+        self.event_loop_proxy.wake_up();
+        Ok(())
+    }
+
+    fn resize_main_window_for_items(&self, count: usize) -> anyhow::Result<()> {
         let items_height = if count == 0 {
             0
         } else {
@@ -126,16 +185,15 @@ impl App {
             (self.config.appearance.input_items_gap * 2) + count * item_height
         };
 
-        let height = self.config.appearance.input_height + items_height + Self::MAGIC_BORDERS;
+        let size = LogicalSize::new(
+            self.config.appearance.window_width,
+            self.config.appearance.input_height + items_height + WebViewWindow::MAGIC_BORDERS,
+        );
 
-        let size = LogicalSize::new(self.config.appearance.window_width, height);
-        let _ = main_window.window().request_surface_size(size.into());
+        self.send_event(AppMessage::RequestSufaceSize(size.into()))
     }
 
-    fn main_window_ipc_handler<'a>(
-        &mut self,
-        request: Request<Vec<u8>>,
-    ) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
+    pub async fn ipc_handler(&mut self, request: Request<Vec<u8>>) -> IpcResult {
         let command: IpcCommand = request.uri().path()[1..].try_into()?;
 
         match command {
@@ -146,7 +204,8 @@ impl App {
                 let mut results = Vec::new();
 
                 self.plugin_store
-                    .query(query, &self.fuzzy_matcher, &mut results)?;
+                    .query(query, &self.fuzzy_matcher, &mut results)
+                    .await?;
 
                 // sort results in reverse so higher scores are first
                 results.sort_by(|a, b| b.score.cmp(&a.score));
@@ -156,14 +215,14 @@ impl App {
 
                 let json = response::json(&final_results);
 
-                self.resize_main_window_for_items(min);
+                self.resize_main_window_for_items(min)?;
 
                 self.results = results;
 
                 return json;
             }
 
-            IpcCommand::ClearResults => self.resize_main_window_for_items(0),
+            IpcCommand::ClearResults => self.resize_main_window_for_items(0)?,
 
             IpcCommand::RunAction => {
                 let payload = request.body();
@@ -182,39 +241,29 @@ impl App {
 
                 action.run(item)?;
 
-                self.hide_main_window(false);
+                self.send_event(AppMessage::HideMainWindow(false))?;
             }
 
             IpcCommand::Reload => {
                 let old_hotkey = self.config.general.hotkey.clone();
                 self.config = Config::load()?;
 
-                self.plugin_store.reload(&self.config)?;
-
-                let main_window = self.main_window();
-                main_window.emit(IpcEvent::UpdateConfig, &self.config)?;
+                self.plugin_store.reload(&self.config).await;
 
                 let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
                 let new_hotkey = HotKey::try_from(self.config.general.hotkey.as_str())?;
                 if old_hotkey != new_hotkey {
-                    self.global_hotkey_manager.unregister(old_hotkey)?;
-                    self.global_hotkey_manager.register(new_hotkey)?;
+                    self.send_event(AppMessage::ReRegisterHotKey(old_hotkey, new_hotkey))?;
                 }
+
+                let json_config = serde_json::to_value(&self.config)?;
+                let event = AppMessage::MainWindowEmit(IpcEvent::UpdateConfig, json_config);
+                self.send_event(event)?;
             }
 
-            IpcCommand::HideMainWindow => {
-                self.hide_main_window(true);
-            }
+            IpcCommand::HideMainWindow => self.send_event(AppMessage::HideMainWindow(false))?,
         }
 
         response::empty()
     }
-}
-
-#[inline]
-pub fn ipc_handler<'a>(
-    app: &mut App,
-    request: Request<Vec<u8>>,
-) -> anyhow::Result<Response<Cow<'a, [u8]>>> {
-    app.main_window_ipc_handler(request)
 }

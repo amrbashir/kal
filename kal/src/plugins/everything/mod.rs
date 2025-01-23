@@ -26,15 +26,17 @@ impl Plugin {
     const NAME: &'static str = "Everything";
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> Self {
         let max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
-        Ok(Self {
+
+        Self {
             es: config.es.unwrap_or_else(|| PathBuf::from("es")),
             icons_dir: data_dir.join("icons"),
             max_results,
-        })
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -49,14 +51,18 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.es = config.es.unwrap_or_else(|| PathBuf::from("es"));
         Ok(())
     }
 
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput> {
+    async fn query(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             return Ok(PluginQueryOutput::None);
         }

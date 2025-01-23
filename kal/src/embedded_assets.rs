@@ -1,10 +1,11 @@
-#![cfg(not(debug_assertions))]
 use std::borrow::Cow;
 use std::path::PathBuf;
 
 use wry::http::header::CONTENT_TYPE;
 use wry::http::{Request, Response};
 use wry::WebViewId;
+
+use crate::webview_window::ProtocolResult;
 
 #[derive(rust_embed::RustEmbed)]
 #[folder = "../kal-ui/dist"]
@@ -13,10 +14,7 @@ pub(crate) struct EmbededAssets;
 pub const PROTOCOL_NAME: &str = "kal";
 
 /// `kal://` protocol
-pub fn protocol<'a>(
-    _webview_id: WebViewId,
-    request: Request<Vec<u8>>,
-) -> Result<Response<Cow<'a, [u8]>>, anyhow::Error> {
+pub fn protocol(_webview_id: WebViewId, request: Request<Vec<u8>>) -> ProtocolResult {
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 

@@ -56,16 +56,18 @@ impl Plugin {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, data_dir: &Path) -> anyhow::Result<Self> {
+    fn new(config: &Config, data_dir: &Path) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
-        Ok(Self {
+
+        Self {
             paths: config.paths,
             extensions: config.extensions,
             include_packaged_apps: config.include_packaged_apps,
             icons_dir: data_dir.join("icons"),
             apps: Vec::new(),
-        })
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -80,7 +82,7 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
         self.find_apps();
 
@@ -91,13 +93,17 @@ impl crate::plugin::Plugin for Plugin {
             .filter_map(App::icon_path)
             .collect::<Vec<_>>();
 
-        std::fs::create_dir_all(icons_dir)?;
+        smol::fs::create_dir_all(icons_dir).await?;
         let _ = icon::extract_multiple(paths).inspect_err(|e| tracing::error!("{e}"));
 
         Ok(())
     }
 
-    fn query(&mut self, query: &str, matcher: &SkimMatcherV2) -> anyhow::Result<PluginQueryOutput> {
+    async fn query(
+        &mut self,
+        query: &str,
+        matcher: &SkimMatcherV2,
+    ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             return Ok(PluginQueryOutput::None);
         }

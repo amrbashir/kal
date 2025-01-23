@@ -33,11 +33,12 @@ impl Plugin {
     }
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &Config, _: &Path) -> anyhow::Result<Self> {
-        Ok(Self {
+    fn new(_config: &Config, _: &Path) -> Self {
+        Self {
             commands: SystemCommand::all(),
-        })
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -52,11 +53,11 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
+    async fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn query(
+    async fn query(
         &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,
@@ -64,7 +65,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(self.all_for_query(query, matcher).into())
     }
 
-    fn query_direct(
+    async fn query_direct(
         &mut self,
         query: &str,
         matcher: &fuzzy_matcher::skim::SkimMatcherV2,

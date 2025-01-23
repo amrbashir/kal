@@ -11,7 +11,7 @@ Keyboard-driven app launcher and productivity tool.
 
 ### Prerequisites:
 
-1. [Deno](https://deno.com)
+1. [Node.js](https://nodejs.org)
 2. [Rust and Cargo](https://rustup.rs/)
 3. [WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/?form=MA13LH)
 

@@ -24,16 +24,14 @@ impl Plugin {
     const DESCRIPTION: &str = "Shell: execute command through command shell";
 }
 
+#[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &crate::config::Config, _data_dir: &std::path::Path) -> anyhow::Result<Self>
-    where
-        Self: Sized,
-    {
+    fn new(config: &crate::config::Config, _data_dir: &std::path::Path) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
-        Ok(Self {
+        Self {
             shell: config.shell.unwrap_or_default(),
             no_exit: config.no_exit.unwrap_or_default(),
-        })
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -48,14 +46,14 @@ impl crate::plugin::Plugin for Plugin {
         }
     }
 
-    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.shell = config.shell.unwrap_or_default();
         self.no_exit = config.no_exit.unwrap_or_default();
         Ok(())
     }
 
-    fn query(
+    async fn query(
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,

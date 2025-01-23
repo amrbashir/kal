@@ -1,9 +1,7 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
 use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 #[cfg(windows)]
@@ -11,46 +9,43 @@ use windows::Win32::Foundation::HWND;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
 use winit::application::ApplicationHandler;
+use winit::dpi::Size;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
 use crate::config::Config;
-use crate::ipc::{self, IpcEvent};
-use crate::plugin_store::PluginStore;
-use crate::result_item::ResultItem;
+use crate::ipc::IpcEvent;
+use crate::main_window::MainWindowState;
 use crate::webview_window::WebViewWindow;
 
-pub enum AppEvent {
+#[derive(Debug)]
+pub enum AppMessage {
     HotKey(global_hotkey::GlobalHotKeyEvent),
-    Ipc {
-        label: String,
-        request: wry::http::Request<Vec<u8>>,
-        tx: mpsc::SyncSender<anyhow::Result<wry::http::Response<Cow<'static, [u8]>>>>,
-    },
     #[cfg(windows)]
     SystemSettingsChanged,
+    RequestSufaceSize(Size),
+    HideMainWindow(bool),
+    MainWindowEmit(IpcEvent, serde_json::Value),
+    ReRegisterHotKey(HotKey, HotKey),
 }
 
 pub struct App {
     pub event_loop_proxy: EventLoopProxy,
-    pub sender: mpsc::Sender<AppEvent>,
-    pub receiver: mpsc::Receiver<AppEvent>,
+    pub sender: mpsc::Sender<AppMessage>,
+    pub receiver: mpsc::Receiver<AppMessage>,
+
+    pub config: Config,
 
     #[allow(unused)]
     pub global_hotkey_manager: GlobalHotKeyManager,
 
-    pub config: Config,
-
     pub windows: HashMap<&'static str, WebViewWindow>,
-
-    pub plugin_store: PluginStore,
-    pub fuzzy_matcher: SkimMatcherV2,
 
     #[cfg(windows)]
     pub previously_foreground_hwnd: HWND,
 
-    pub results: Vec<ResultItem>,
+    pub data_dir: PathBuf,
 }
 
 impl App {
@@ -59,42 +54,28 @@ impl App {
 
         let config = Config::load()?;
 
-        let mut plugin_store = crate::plugins::all(&config, &data_dir)?;
-        if let Err(e) = plugin_store.reload(&config) {
-            tracing::error!("{e}");
-        }
-
         let global_hotkey_manager = GlobalHotKeyManager::new()?;
         global_hotkey_manager.register(HotKey::try_from(config.general.hotkey.as_str())?)?;
-        {
-            let event_loop_proxy = event_loop_proxy.clone();
-            let sender = sender.clone();
-            GlobalHotKeyEvent::set_event_handler(Some(move |e| {
-                event_loop_proxy.wake_up();
-                if let Err(e) = sender.send(AppEvent::HotKey(e)) {
-                    tracing::error!("Failed to send `AppEvent::HotKey`: {e}");
-                }
-            }));
-        }
+
+        let event_loop_proxy_ = event_loop_proxy.clone();
+        let sender_ = sender.clone();
+        GlobalHotKeyEvent::set_event_handler(Some(move |e| {
+            event_loop_proxy_.wake_up();
+            if let Err(e) = sender_.send(AppMessage::HotKey(e)) {
+                tracing::error!("Failed to send `AppMessage::HotKey`: {e}");
+            }
+        }));
 
         Ok(Self {
             event_loop_proxy,
             sender,
             receiver,
-
-            global_hotkey_manager,
-
             config,
-
+            global_hotkey_manager,
             windows: HashMap::default(),
-
-            plugin_store,
-            fuzzy_matcher: SkimMatcherV2::default(),
-
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
-
-            results: Vec::new(),
+            data_dir,
         })
     }
 
@@ -108,11 +89,36 @@ impl App {
         let _ = unsafe { SetForegroundWindow(self.previously_foreground_hwnd) };
     }
 
+    fn main_window(&self) -> &WebViewWindow {
+        self.windows.get(MainWindowState::LABEL).unwrap()
+    }
+
+    pub fn show_main_window(&mut self) -> anyhow::Result<()> {
+        #[cfg(windows)]
+        self.store_foreground_hwnd();
+
+        let main_window = self.main_window();
+        main_window.window().set_visible(true);
+        main_window.window().focus_window();
+        main_window.emit(IpcEvent::FocusInput, ())
+    }
+
+    pub fn hide_main_window(&self, #[allow(unused)] restore_focus: bool) {
+        self.main_window().window().set_visible(false);
+
+        #[cfg(windows)]
+        if restore_focus {
+            self.restore_prev_foreground_hwnd();
+        }
+    }
+
     #[cfg(windows)]
     fn listen_for_settings_change(&self, event_loop: &dyn ActiveEventLoop) {
         use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
         use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
         use winit::platform::windows::ActiveEventLoopExtWindows;
+
+        tracing::debug!("Listening for system settings change...");
 
         let hwnd = HWND(event_loop.target_window_hwnd() as _);
 
@@ -130,13 +136,13 @@ impl App {
             userdata: usize,
         ) -> LRESULT {
             if umsg == WM_SETTINGCHANGE {
-                let userdata = userdata as *const (mpsc::Sender<AppEvent>, EventLoopProxy);
+                let userdata = userdata as *const (mpsc::Sender<AppMessage>, EventLoopProxy);
                 let (sender, proxy) = &*userdata;
 
-                match sender.send(AppEvent::SystemSettingsChanged) {
+                match sender.send(AppMessage::SystemSettingsChanged) {
                     Ok(_) => proxy.wake_up(),
                     Err(e) => {
-                        tracing::error!("Failed to send `AppEvent::SystemSettingsChanged`:{e}")
+                        tracing::error!("Failed to send `AppMessage::SystemSettingsChanged`: {e}")
                     }
                 }
             }
@@ -145,13 +151,15 @@ impl App {
         }
     }
 
-    fn app_event(
+    fn app_message(
         &mut self,
         _event_loop: &dyn ActiveEventLoop,
-        event: AppEvent,
+        message: AppMessage,
     ) -> anyhow::Result<()> {
-        match event {
-            AppEvent::HotKey(e) if e.state == HotKeyState::Pressed => {
+        tracing::debug!("Handling app message: {message:?}");
+
+        match message {
+            AppMessage::HotKey(e) if e.state == HotKeyState::Pressed => {
                 if self.main_window().window().is_visible().unwrap_or_default() {
                     self.hide_main_window(true);
                 } else {
@@ -159,35 +167,34 @@ impl App {
                 }
             }
 
-            AppEvent::HotKey(_) => {}
-
-            AppEvent::Ipc { label, request, tx } => {
-                let res = if let Some(window) = self.windows.get(label.as_str()) {
-                    if let Some(handler) = window.ipc_handler {
-                        handler(self, request)
-                    } else {
-                        ipc::response::error_owned(format!(
-                            "window with label {label} doesn't have an IPC handler"
-                        ))
-                    }
-                } else {
-                    ipc::response::error_owned(format!("Couldn't find window with label: {label}"))
-                };
-
-                if let Err(e) = tx.send(res) {
-                    tracing::error!("Failed to send ipc response: {e}");
-                }
-            }
+            AppMessage::HotKey(_) => {}
 
             #[cfg(windows)]
-            AppEvent::SystemSettingsChanged => {
+            AppMessage::SystemSettingsChanged => {
                 if let Ok(colors) = crate::utils::SystemAccentColors::load() {
                     for window in self.windows.values() {
                         window.emit(IpcEvent::UpdateSystemAccentColor, colors)?;
                     }
                 }
             }
+
+            AppMessage::RequestSufaceSize(size) => {
+                let _ = self.main_window().window().request_surface_size(size);
+            }
+
+            AppMessage::HideMainWindow(restore_focus) => self.hide_main_window(restore_focus),
+
+            AppMessage::MainWindowEmit(event, payload) => {
+                self.main_window().emit(event, payload)?
+            }
+
+            AppMessage::ReRegisterHotKey(old_hotkey, new_hotkey) => {
+                self.global_hotkey_manager.unregister(old_hotkey)?;
+                self.global_hotkey_manager.register(new_hotkey)?;
+            }
         }
+
+        tracing::debug!("Finished handling app message");
 
         Ok(())
     }
@@ -208,8 +215,8 @@ impl ApplicationHandler for App {
 
     fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
         while let Ok(action) = self.receiver.try_recv() {
-            if let Err(e) = self.app_event(event_loop, action) {
-                tracing::error!("Error while processing `AppEvent`: {e}");
+            if let Err(e) = self.app_message(event_loop, action) {
+                tracing::error!("Error while handling app message: {e}");
             }
         }
     }
