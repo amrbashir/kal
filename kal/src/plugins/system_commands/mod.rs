@@ -172,9 +172,7 @@ impl SystemCommand {
             .set_buttons(rfd::MessageButtons::YesNo)
             .show();
 
-        let confirm = res == rfd::MessageDialogResult::Yes;
-
-        if !confirm {
+        if res != rfd::MessageDialogResult::Yes {
             return Ok(());
         }
 

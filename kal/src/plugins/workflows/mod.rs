@@ -140,7 +140,26 @@ impl Workflow {
         self.icon.clone().unwrap_or(BuiltInIcon::Workflow.icon())
     }
 
+    fn confirmed(&self) -> bool {
+        if !self.needs_confirmation {
+            return true;
+        }
+
+        let res = rfd::MessageDialog::new()
+            .set_title("Please confirm")
+            .set_description(format!("You are about to run {}, are you sure?", self.name))
+            .set_level(rfd::MessageLevel::Warning)
+            .set_buttons(rfd::MessageButtons::YesNo)
+            .show();
+
+        res == rfd::MessageDialogResult::Yes
+    }
+
     fn execute(&self, elevated: bool) -> anyhow::Result<()> {
+        if !self.confirmed() {
+            return Ok(());
+        }
+
         for step in &self.steps {
             match step {
                 WorkflowStep::Path { path, .. } => {
