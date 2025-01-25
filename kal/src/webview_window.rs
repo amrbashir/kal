@@ -131,6 +131,22 @@ impl WebViewWindowBuilder<'_> {
         self
     }
 
+    #[cfg(not(debug_assertions))]
+    pub fn protocol<F>(mut self, name: &str, handler: F) -> Self
+    where
+        F: Fn(&str, Request<Vec<u8>>) -> ProtocolResult + 'static,
+    {
+        self.webview_builder =
+            self.webview_builder
+                .with_custom_protocol(name.to_string(), move |webview_id, req| {
+                    match handler(&webview_id, req) {
+                        Ok(res) => res,
+                        Err(e) => ipc::response::error_owned(format!("{e:?}")).unwrap(),
+                    }
+                });
+        self
+    }
+
     pub fn async_protocol<F, FR>(mut self, name: &str, handler: F) -> Self
     where
         F: Fn(&str, Request<Vec<u8>>) -> FR + 'static + Send + Sync,

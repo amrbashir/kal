@@ -37,7 +37,6 @@ pub struct App {
 
     pub config: Config,
 
-    #[allow(unused)]
     pub global_hotkey_manager: GlobalHotKeyManager,
 
     pub windows: HashMap<&'static str, WebViewWindow>,
