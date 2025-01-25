@@ -124,12 +124,12 @@ impl SystemCommand {
 
     fn icon(&self) -> Icon {
         match self {
-            Self::Shutdown => BuiltInIcon::Shutdown.icon(),
-            Self::Restart => BuiltInIcon::Restart.icon(),
-            Self::SignOut => BuiltInIcon::SignOut.icon(),
-            Self::Lock => BuiltInIcon::Lock.icon(),
-            Self::Hibernate => BuiltInIcon::Hibernate.icon(),
-            Self::Sleep => BuiltInIcon::Sleep.icon(),
+            Self::Shutdown => BuiltInIcon::Shutdown.into(),
+            Self::Restart => BuiltInIcon::Restart.into(),
+            Self::SignOut => BuiltInIcon::SignOut.into(),
+            Self::Lock => BuiltInIcon::Lock.into(),
+            Self::Hibernate => BuiltInIcon::Hibernate.into(),
+            Self::Sleep => BuiltInIcon::Sleep.into(),
         }
     }
 

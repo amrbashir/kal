@@ -58,7 +58,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    async fn query(
+    async fn query_direct(
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,

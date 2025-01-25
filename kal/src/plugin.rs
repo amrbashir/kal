@@ -33,7 +33,7 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
     fn error_item(&self, error: String) -> ResultItem {
         ResultItem {
             id: String::new(),
-            icon: BuiltInIcon::Error.icon(),
+            icon: BuiltInIcon::Error.into(),
             primary_text: self.name().to_owned(),
             secondary_text: error.clone(),
             tooltip: Some(error),
@@ -52,7 +52,9 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
         &mut self,
         query: &str,
         matcher: &SkimMatcherV2,
-    ) -> anyhow::Result<PluginQueryOutput>;
+    ) -> anyhow::Result<PluginQueryOutput> {
+        Ok(PluginQueryOutput::None)
+    }
 
     /// Query the plugin for [`ResultItem`]s when directly invoked.
     async fn query_direct(

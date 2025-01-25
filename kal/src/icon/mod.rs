@@ -77,7 +77,6 @@ impl<'de> Deserialize<'de> for Icon {
 #[derive(EnumString, AsRefStr, Clone, Copy)]
 pub enum BuiltInIcon {
     BlankFile,
-    Folder,
     FolderOpen,
     Url,
     Shell,
@@ -92,12 +91,12 @@ pub enum BuiltInIcon {
     Admin,
     Error,
     Warning,
+    Code,
 }
 
 impl BuiltInIcon {
     pub fn icon(&self) -> Icon {
         match self {
-            Self::Folder => Icon::builtin(include_str!("./built-in-icons/Folder.svg")),
             Self::FolderOpen => Icon::builtin(include_str!("./built-in-icons/FolderOpen.svg")),
             Self::BlankFile => Icon::builtin(include_str!("./built-in-icons/BlankFile.svg")),
             Self::Shutdown => Icon::builtin(include_str!("./built-in-icons/Shutdown.svg")),
@@ -113,7 +112,14 @@ impl BuiltInIcon {
             Self::Admin => Icon::builtin(include_str!("./built-in-icons/Admin.svg")),
             Self::Error => Icon::builtin(include_str!("./built-in-icons/Error.svg")),
             Self::Warning => Icon::builtin(include_str!("./built-in-icons/Warning.svg")),
+            Self::Code => Icon::builtin(include_str!("./built-in-icons/Code.svg")),
         }
+    }
+}
+
+impl From<BuiltInIcon> for Icon {
+    fn from(value: BuiltInIcon) -> Self {
+        value.icon()
     }
 }
 

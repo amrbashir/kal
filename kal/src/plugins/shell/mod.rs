@@ -53,7 +53,7 @@ impl crate::plugin::Plugin for Plugin {
         Ok(())
     }
 
-    async fn query(
+    async fn query_direct(
         &mut self,
         query: &str,
         _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
@@ -96,7 +96,7 @@ impl Shell {
 
         ResultItem {
             id: Plugin::ID.into(),
-            icon: BuiltInIcon::Shell.icon(),
+            icon: BuiltInIcon::Shell.into(),
             primary_text: command,
             secondary_text: Plugin::DESCRIPTION.into(),
             tooltip: None,
@@ -105,13 +105,13 @@ impl Shell {
                     let exe = shell.exe();
                     let args = shell.args(no_exit);
                     let args = format!("{args} {}", item.primary_text);
-                    utils::execute_with_args(exe, args, false)
+                    utils::execute_with_args(exe, args, false, false)
                 }),
                 Action::open_elevated(move |item| {
                     let exe = shell.exe();
                     let args = shell.args(no_exit);
                     let args = format!("{args} {}", item.primary_text);
-                    utils::execute_with_args(exe, args, true)
+                    utils::execute_with_args(exe, args, true, false)
                 }),
             ],
             score: 0,

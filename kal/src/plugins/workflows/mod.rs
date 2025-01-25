@@ -137,7 +137,7 @@ struct Workflow {
 
 impl Workflow {
     fn icon(&self) -> Icon {
-        self.icon.clone().unwrap_or(BuiltInIcon::Workflow.icon())
+        self.icon.clone().unwrap_or(BuiltInIcon::Workflow.into())
     }
 
     fn confirmed(&self) -> bool {

@@ -19,7 +19,7 @@ impl Plugin {
     fn item(&self, result: String) -> ResultItem {
         ResultItem {
             id: Self::ID.into(),
-            icon: BuiltInIcon::Calculator.icon(),
+            icon: BuiltInIcon::Calculator.into(),
             primary_text: result,
             secondary_text: Self::DESCRIPTION.into(),
             tooltip: None,

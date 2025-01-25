@@ -34,12 +34,12 @@ impl Program {
     fn item(&self, args: &str, score: i64) -> ResultItem {
         let path = self.path.clone();
         let args_ = args.to_string();
-        let open = Action::primary(move |_| utils::execute_with_args(&path, &args_, false));
+        let open = Action::primary(move |_| utils::execute_with_args(&path, &args_, false, false));
 
         let path = self.path.clone();
         let args_ = args.to_string();
         let open_elevated =
-            Action::open_elevated(move |_| utils::execute_with_args(&path, &args_, true));
+            Action::open_elevated(move |_| utils::execute_with_args(&path, &args_, true, false));
 
         let path = self.path.clone();
         let open_location = Action::open_location(move |_| utils::reveal_item_in_dir(&path));

@@ -94,7 +94,7 @@ impl Action {
         F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self::new("RunElevated", action)
-            .with_icon(BuiltInIcon::Admin.icon())
+            .with_icon(BuiltInIcon::Admin.into())
             .with_description("Run as adminstrator")
             .with_accelerator("Shift+Enter")
     }
@@ -104,7 +104,7 @@ impl Action {
         F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self::new("OpenLocation", action)
-            .with_icon(BuiltInIcon::FolderOpen.icon())
+            .with_icon(BuiltInIcon::FolderOpen.into())
             .with_description("Open containing folder")
             .with_accelerator("Ctrl+O")
     }

@@ -12,8 +12,9 @@ pub fn execute_with_args(
     app: impl AsRef<std::ffi::OsStr>,
     args: impl AsRef<std::ffi::OsStr>,
     elevated: bool,
+    hidden: bool,
 ) -> anyhow::Result<()> {
-    imp::execute_with_args(app, args, elevated)
+    imp::execute_with_args(app, args, elevated, hidden)
 }
 
 #[inline]
@@ -79,6 +80,7 @@ mod imp {
         app: impl AsRef<std::ffi::OsStr>,
         args: impl AsRef<std::ffi::OsStr>,
         elevated: bool,
+        hidden: bool,
     ) -> anyhow::Result<()> {
         let app = HSTRING::from(app.as_ref());
         let args = HSTRING::from(args.as_ref());
@@ -93,7 +95,7 @@ mod imp {
                 &app,
                 &args,
                 PCWSTR::null(),
-                SW_SHOWNORMAL,
+                if hidden { SW_HIDE } else { SW_SHOWNORMAL },
             )
             .map(|_| ())
         }

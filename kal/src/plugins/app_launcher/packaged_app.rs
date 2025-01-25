@@ -45,20 +45,20 @@ impl PackagedApp {
             .icon
             .as_ref()
             .map(|i| Icon::path(i.to_string_lossy()))
-            .unwrap_or_else(|| BuiltInIcon::BlankFile.icon());
+            .unwrap_or_else(|| BuiltInIcon::BlankFile.into());
 
         let appid = self.appid.clone();
         let args_ = args.to_string();
         let open = Action::primary(move |_| {
             let path = format!("shell:AppsFolder\\{}", appid);
-            utils::execute_with_args(path, &args_, false)
+            utils::execute_with_args(path, &args_, false, false)
         });
 
         let appid = self.appid.clone();
         let args_ = args.to_string();
         let open_elevated = Action::open_elevated(move |_| {
             let path = format!("shell:AppsFolder\\{}", appid);
-            utils::execute_with_args(path, &args_, true)
+            utils::execute_with_args(path, &args_, true, false)
         });
 
         let location = self.location.clone();
