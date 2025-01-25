@@ -212,7 +212,7 @@ impl MainWindowState {
             config.appearance.input_height + items_height + WebViewWindow::MAGIC_BORDERS,
         );
 
-        self.batch_event(AppMessage::RequestSufaceSize(size.into()))
+        self.send_event(AppMessage::RequestSufaceSize(size.into()))
     }
 
     pub async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
