@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -162,12 +161,27 @@ impl Config {
             .unwrap_or_default()
     }
 
-    /// Loads config from a path
-    pub fn load_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {
-        let path = path.as_ref();
+    /// Default config path:
+    /// - `debug`: `$CWD/kal.toml`
+    /// - `release`: `$HOME/.config/kal.toml`
+    pub fn path() -> anyhow::Result<PathBuf> {
+        #[cfg(debug_assertions)]
+        return std::env::current_dir()
+            .context("Failed to get current directory path")
+            .map(|p| p.join("kal.toml"));
+
+        #[cfg(not(debug_assertions))]
+        dirs::home_dir()
+            .context("Failed to get $HOME dir path")
+            .map(|p| p.join(".config").join("kal.toml"))
+    }
+
+    /// Asyncly loads config from a canonical path
+    pub async fn load_async() -> anyhow::Result<Self> {
+        let path = Self::path()?;
         let config = match path.exists() {
             true => {
-                let toml = fs::read_to_string(path)?;
+                let toml = smol::fs::read_to_string(path).await?;
                 Self::from_toml(&toml)
             }
             false => {
@@ -181,18 +195,19 @@ impl Config {
 
     /// Loads config from a canonical path
     pub fn load() -> anyhow::Result<Self> {
-        #[cfg(debug_assertions)]
-        let path = std::env::current_dir()
-            .context("Failed to get current directory path")?
-            .join("kal.toml");
-
-        #[cfg(not(debug_assertions))]
-        let path = dirs::home_dir()
-            .context("Failed to get $HOME dir path")?
-            .join(".config")
-            .join("kal.toml");
-
-        Self::load_from_path(path)
+        let path = Self::path()?;
+        let config = match path.exists() {
+            true => {
+                let toml = std::fs::read_to_string(path)?;
+                Self::from_toml(&toml)
+            }
+            false => {
+                tracing::warn!("Config file wasn't found, falling back to default");
+                Config::default()
+            }
+        };
+        tracing::info!("Config loaded: {config:?}");
+        Ok(config)
     }
 
     /// Gets the specified plugin config
@@ -216,7 +231,7 @@ impl Config {
             .unwrap_or_default()
     }
 
-    pub fn generic_config(&self, name: &str) -> Option<GenericPluginConfig> {
+    pub fn generic_config_for_plugin(&self, name: &str) -> Option<GenericPluginConfig> {
         self.plugins.get(name).map(|c| c.generic.clone())
     }
 }

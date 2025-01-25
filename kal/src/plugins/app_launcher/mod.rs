@@ -42,8 +42,10 @@ impl Plugin {
         self.include_packaged_apps = config.include_packaged_apps;
     }
 
-    fn find_apps(&mut self) {
+    async fn find_apps(&mut self) {
         self.apps = program::find_all_in_paths(&self.paths, &self.extensions, &self.icons_dir)
+            .await
+            .into_iter()
             .map(App::Program)
             .collect();
 
@@ -84,7 +86,7 @@ impl crate::plugin::Plugin for Plugin {
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
-        self.find_apps();
+        self.find_apps().await;
 
         let icons_dir = self.icons_dir.clone();
         let paths = self

@@ -75,7 +75,7 @@ impl PluginStore {
             // update plugin generic config
             let default_generic_config = plugin.default_generic_config();
             let generic_config = config
-                .generic_config(plugin.name())
+                .generic_config_for_plugin(plugin.name())
                 .map(|c| c.apply_from(&default_generic_config))
                 .unwrap_or_else(|| default_generic_config);
 

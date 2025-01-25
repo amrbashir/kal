@@ -277,10 +277,10 @@ impl MainWindowState {
 
                 let old_hotkey = config.general.hotkey.clone();
 
-                *config = Config::load()?;
+                *config = Config::load_async().await?;
 
                 let mut plugin_store = self.plugin_store.write().await;
-                plugin_store.reload(&*config).await;
+                plugin_store.reload(&config).await;
 
                 let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
                 let new_hotkey = HotKey::try_from(config.general.hotkey.as_str())?;
