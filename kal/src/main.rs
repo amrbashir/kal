@@ -52,7 +52,6 @@ fn main() -> anyhow::Result<()> {
     let env_filter = tracing_subscriber::EnvFilter::from_env("KAL_LOG");
 
     let subscriber = tracing_subscriber::fmt()
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::ACTIVE)
         .compact()
         .with_max_level(tracing::Level::TRACE)
         .finish()
@@ -63,7 +62,7 @@ fn main() -> anyhow::Result<()> {
 
     tracing::subscriber::set_global_default(subscriber)?;
 
-    tracing::info!("Logger initialized");
+    tracing::debug!("Logger initialized");
 
     run(data_dir).inspect_err(|e| tracing::error!("{e}"))
 }

@@ -78,6 +78,8 @@ impl App {
 
         let window = builder.build(event_loop)?;
 
+        tracing::info!("Created main window");
+
         #[cfg(windows)]
         window.set_dwmwa_transitions(false);
 
