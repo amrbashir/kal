@@ -1,9 +1,10 @@
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use global_hotkey::hotkey::HotKey;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
+use smol::lock::RwLock;
 use winit::dpi::LogicalSize;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use wry::http::Request;
@@ -113,12 +114,33 @@ pub struct MainWindowState {
 
     pub fuzzy_matcher: SkimMatcherV2,
 
-    pub config: Config,
-    pub plugin_store: PluginStore,
-    pub results: Vec<ResultItem>,
+    pub config: RwLock<Config>,
+    pub plugin_store: RwLock<PluginStore>,
+    pub results: RwLock<Vec<ResultItem>>,
 }
 
 impl MainWindowState {
+    async fn new(
+        config: Config,
+        data_dir: PathBuf,
+        main_thread_sender: mpsc::Sender<AppMessage>,
+        event_loop_proxy: EventLoopProxy,
+    ) -> Self {
+        let max_results = config.general.max_results;
+
+        let mut plugin_store = crate::plugins::all(&config, &data_dir);
+        plugin_store.reload(&config).await;
+
+        Self {
+            main_thread_sender,
+            event_loop_proxy,
+            fuzzy_matcher: SkimMatcherV2::default(),
+            config: RwLock::new(config),
+            plugin_store: RwLock::new(plugin_store),
+            results: RwLock::new(Vec::with_capacity(max_results)),
+        }
+    }
+
     pub fn spawn(
         config: Config,
         data_dir: PathBuf,
@@ -127,32 +149,29 @@ impl MainWindowState {
     ) -> smol::channel::Sender<MainWindowMessage> {
         let (sender, receiver) = smol::channel::unbounded();
 
-        smol::spawn(async move {
-            let mut plugin_store = crate::plugins::all(&config, &data_dir);
-            plugin_store.reload(&config).await;
+        let state = MainWindowState::new(config, data_dir, main_thread_sender, event_loop_proxy);
 
-            let mut state = MainWindowState {
-                config,
-                plugin_store,
-                fuzzy_matcher: SkimMatcherV2::default(),
-                results: Vec::new(),
-                main_thread_sender,
-                event_loop_proxy,
-            };
+        smol::spawn(async move {
+            let state = Arc::new(state.await);
 
             loop {
                 if let Ok(task) = receiver.recv().await {
                     match task {
                         MainWindowMessage::Ipc { request, tx } => {
-                            tracing::debug!("Handling ipc request...");
-                            tracing::trace!("{request:?}");
-                            let res = state.ipc_handler(request).await;
-                            tracing::debug!("Finished handling ipc request");
-                            tracing::trace!("{res:?}");
+                            let state = state.clone();
 
-                            if let Err(e) = tx.send(res).await {
-                                tracing::error!("Failed to send async ipc response: {e}");
-                            }
+                            smol::spawn(async move {
+                                tracing::debug!("Handling ipc request...");
+                                tracing::trace!("{request:?}");
+                                let res = state.ipc_handler(request).await;
+                                tracing::debug!("Finished handling ipc request");
+                                tracing::trace!("{res:?}");
+
+                                if let Err(e) = tx.send(res).await {
+                                    tracing::error!("Failed to send async ipc response: {e}");
+                                }
+                            })
+                            .detach();
                         }
                     }
                 }
@@ -176,25 +195,26 @@ impl MainWindowState {
         Ok(())
     }
 
-    fn resize_main_window_for_items(&self, count: usize) -> anyhow::Result<()> {
+    fn resize_main_window_for_items(&self, config: &Config, count: usize) -> anyhow::Result<()> {
         let items_height = if count == 0 {
             0
         } else {
-            let count = std::cmp::min(count, self.config.appearance.max_items as usize) as u32;
-            let item_height = self.config.appearance.item_height + self.config.appearance.item_gap;
-            (self.config.appearance.input_items_gap * 2) + count * item_height
+            let count = std::cmp::min(count, config.appearance.max_items as usize) as u32;
+            let item_height = config.appearance.item_height + config.appearance.item_gap;
+            (config.appearance.input_items_gap * 2) + count * item_height
         };
 
         let size = LogicalSize::new(
-            self.config.appearance.window_width,
-            self.config.appearance.input_height + items_height + WebViewWindow::MAGIC_BORDERS,
+            config.appearance.window_width,
+            config.appearance.input_height + items_height + WebViewWindow::MAGIC_BORDERS,
         );
 
         self.send_event(AppMessage::RequestSufaceSize(size.into()))
     }
 
-    pub async fn ipc_handler(&mut self, request: Request<Vec<u8>>) -> IpcResult {
+    pub async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
         let command: IpcCommand = request.uri().path()[1..].try_into()?;
+        tracing::debug!("Handling `IpcCommand::{command}`");
 
         match command {
             IpcCommand::Query => {
@@ -203,26 +223,32 @@ impl MainWindowState {
 
                 let mut results = Vec::new();
 
-                self.plugin_store
+                let mut plugins_store = self.plugin_store.write().await;
+                plugins_store
                     .query(query, &self.fuzzy_matcher, &mut results)
                     .await?;
 
                 // sort results in reverse so higher scores are first
                 results.sort_by(|a, b| b.score.cmp(&a.score));
 
-                let min = std::cmp::min(self.config.general.max_results, results.len());
+                let config = self.config.read().await;
+
+                let min = std::cmp::min(config.general.max_results, results.len());
                 let final_results = &results[..min];
 
                 let json = response::json(&final_results);
 
-                self.resize_main_window_for_items(min)?;
+                self.resize_main_window_for_items(&config, min)?;
 
-                self.results = results;
+                *self.results.write().await = results;
 
                 return json;
             }
 
-            IpcCommand::ClearResults => self.resize_main_window_for_items(0)?,
+            IpcCommand::ClearResults => {
+                let config = self.config.read().await;
+                self.resize_main_window_for_items(&config, 0)?
+            }
 
             IpcCommand::RunAction => {
                 let payload = request.body();
@@ -231,7 +257,9 @@ impl MainWindowState {
                     anyhow::bail!("Invalid payload for command `{command}`: {payload:?}");
                 };
 
-                let Some(item) = self.results.iter().find(|r| r.id == id) else {
+                let results = self.results.read().await;
+
+                let Some(item) = results.iter().find(|r| r.id == id) else {
                     anyhow::bail!("Couldn't find result item with this id: {id}");
                 };
 
@@ -245,18 +273,22 @@ impl MainWindowState {
             }
 
             IpcCommand::Reload => {
-                let old_hotkey = self.config.general.hotkey.clone();
-                self.config = Config::load()?;
+                let mut config = self.config.write().await;
 
-                self.plugin_store.reload(&self.config).await;
+                let old_hotkey = config.general.hotkey.clone();
+
+                *config = Config::load()?;
+
+                let mut plugin_store = self.plugin_store.write().await;
+                plugin_store.reload(&*config).await;
 
                 let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
-                let new_hotkey = HotKey::try_from(self.config.general.hotkey.as_str())?;
+                let new_hotkey = HotKey::try_from(config.general.hotkey.as_str())?;
                 if old_hotkey != new_hotkey {
                     self.send_event(AppMessage::ReRegisterHotKey(old_hotkey, new_hotkey))?;
                 }
 
-                let json_config = serde_json::to_value(&self.config)?;
+                let json_config = serde_json::to_value(&*config)?;
                 let event = AppMessage::MainWindowEmit(IpcEvent::UpdateConfig, json_config);
                 self.send_event(event)?;
             }

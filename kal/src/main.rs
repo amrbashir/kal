@@ -31,6 +31,9 @@ fn run(data_dir: PathBuf) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
+    // Use two threads for async
+    std::env::set_var("SMOL_THREADS", "2");
+
     let data_dir = dirs::data_local_dir()
         .context("Failed to get $data_local_dir path")?
         .join("kal");
