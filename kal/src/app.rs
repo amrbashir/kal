@@ -214,9 +214,8 @@ impl ApplicationHandler for App {
     }
 
     fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
-        dbg!("wake up");
+        tracing::trace!("Event loop has been awakend");
         while let Ok(message) = self.receiver.try_recv() {
-            dbg!(1);
             if let Err(e) = self.app_message(event_loop, message) {
                 tracing::error!("Error while handling app message: {e}");
             }
