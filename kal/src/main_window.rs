@@ -112,6 +112,13 @@ pub struct MainWindowState {
 }
 
 impl MainWindowState {
+    pub const LABEL: &str = "main";
+
+    #[cfg(debug_assertions)]
+    pub const URL: &str = "http://localhost:9010/";
+    #[cfg(not(debug_assertions))]
+    pub const URL: &str = "kal://localhost/";
+
     async fn new(
         config: Config,
         data_dir: PathBuf,
@@ -174,16 +181,20 @@ impl MainWindowState {
         sender
     }
 
-    pub const LABEL: &str = "main";
+    /// Batches an event to main thread but doesn't wake the event loop.
+    fn batch_event(&self, event: AppMessage) -> anyhow::Result<()> {
+        self.main_thread_sender.send(event).map_err(Into::into)
+    }
 
-    #[cfg(debug_assertions)]
-    pub const URL: &str = "http://localhost:9010/";
-    #[cfg(not(debug_assertions))]
-    pub const URL: &str = "kal://localhost/";
+    /// Wakes the event loop.
+    fn wake_event_loop(&self) {
+        self.event_loop_proxy.wake_up()
+    }
 
+    /// Batches an event to main thread and immediately wakes up the event loop.
     fn send_event(&self, event: AppMessage) -> anyhow::Result<()> {
-        self.main_thread_sender.send(event)?;
-        self.event_loop_proxy.wake_up();
+        self.batch_event(event)?;
+        self.wake_event_loop();
         Ok(())
     }
 
@@ -201,7 +212,7 @@ impl MainWindowState {
             config.appearance.input_height + items_height + WebViewWindow::MAGIC_BORDERS,
         );
 
-        self.send_event(AppMessage::RequestSufaceSize(size.into()))
+        self.batch_event(AppMessage::RequestSufaceSize(size.into()))
     }
 
     pub async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
@@ -277,12 +288,12 @@ impl MainWindowState {
                 let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
                 let new_hotkey = HotKey::try_from(config.general.hotkey.as_str())?;
                 if old_hotkey != new_hotkey {
-                    self.send_event(AppMessage::ReRegisterHotKey(old_hotkey, new_hotkey))?;
+                    self.batch_event(AppMessage::ReRegisterHotKey(old_hotkey, new_hotkey))?;
                 }
 
                 let json_config = serde_json::to_value(&*config)?;
                 let event = AppMessage::MainWindowEmit(IpcEvent::UpdateConfig, json_config);
-                self.send_event(event)?;
+                self.batch_event(event)?;
 
                 let custom_css = match config.appearance.custom_css_file.as_ref() {
                     Some(path) => smol::fs::read_to_string(path)
@@ -293,10 +304,11 @@ impl MainWindowState {
                     None => serde_json::Value::Null,
                 };
                 let event = AppMessage::MainWindowEmit(IpcEvent::UpdateCustomCSS, custom_css);
-                self.send_event(event)?;
+                self.batch_event(event)?;
+                self.wake_event_loop();
             }
 
-            IpcCommand::HideMainWindow => self.send_event(AppMessage::HideMainWindow(false))?,
+            IpcCommand::HideMainWindow => self.batch_event(AppMessage::HideMainWindow(false))?,
         }
 
         response::empty()
