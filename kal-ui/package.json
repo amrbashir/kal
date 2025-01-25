@@ -9,16 +9,17 @@
     "ts:check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "vue": "^3.4",
-    "vue-router": "^4.3",
+    "@fluentui/web-components": "^2.6",
+    "@unhead/vue": "^1.11.18",
     "@vueuse/core": "^12.3.0",
-    "@fluentui/web-components": "^2.6"
+    "vue": "^3.4",
+    "vue-router": "^4.3"
   },
   "devDependencies": {
-    "unocss": "^0.65.3",
-    "vue-tsc": "^2.2.0",
-    "vite": "^6.0.7",
     "@vitejs/plugin-vue": "^5.0",
-    "typescript": "^5.4"
+    "typescript": "^5.4",
+    "unocss": "^0.65.3",
+    "vite": "^6.0.7",
+    "vue-tsc": "^2.2.0"
   }
 }

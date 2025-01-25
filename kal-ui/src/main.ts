@@ -8,8 +8,9 @@ import {
 } from "@fluentui/web-components";
 import App from "./App.vue";
 import "uno.css";
+import { createHead } from "@unhead/vue";
 
 provideFluentDesignSystem().register(allComponents);
 baseLayerLuminance.setValueFor(document.documentElement, StandardLuminance.DarkMode);
 
-createApp(App).use(router).mount("body");
+createApp(App).use(createHead()).use(router).mount("body");

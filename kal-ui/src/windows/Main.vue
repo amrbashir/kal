@@ -9,8 +9,19 @@ import { IpcCommand, IpcEvent } from "../ipc";
 import { useConfig } from "../composables/config";
 import { useSystemAccentColors } from "../composables/systemAccentColor";
 import { accentFillRest } from "@fluentui/web-components";
+import { useCustomCSS } from "../composables/customCss";
+import { useHead } from "@unhead/vue";
 
 const config = useConfig();
+
+const customCSS = useCustomCSS();
+useHead({
+  style: () => [
+    {
+      innerHTML: customCSS.value,
+    },
+  ],
+});
 
 const systemAccentColors = useSystemAccentColors();
 const accentFillRestStr = accentFillRest.getValueFor(document.documentElement).toColorString();

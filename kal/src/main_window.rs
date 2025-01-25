@@ -18,16 +18,7 @@ use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 const INIT_TEMPLATE: &str = r#"(function () {
   window.KAL.config = __RAW_config__;
-
-  let custom_css = __TEMPLATE_custom_css__;
-  if (custom_css) {
-    window.addEventListener("DOMContentLoaded", () => {
-      const style = document.createElement("style");
-      style.textContent = custom_css;
-      const head = document.head ?? document.querySelector("head") ?? document.body;
-      head.appendChild(style);
-    });
-  }
+  window.KAL.customCSS = __TEMPLATE_custom_css__;
 })();"#;
 
 #[derive(JsTemplate)]
@@ -47,7 +38,8 @@ impl App {
             .custom_css_file
             .as_ref()
             .map(std::fs::read_to_string)
-            .transpose()?;
+            .transpose()
+            .unwrap_or_default();
 
         let js_ser_opts = JsSerializeOptions::default();
         let init_script = InitScript {
@@ -290,6 +282,17 @@ impl MainWindowState {
 
                 let json_config = serde_json::to_value(&*config)?;
                 let event = AppMessage::MainWindowEmit(IpcEvent::UpdateConfig, json_config);
+                self.send_event(event)?;
+
+                let custom_css = match config.appearance.custom_css_file.as_ref() {
+                    Some(path) => smol::fs::read_to_string(path)
+                        .await
+                        .map(serde_json::Value::String)
+                        .unwrap_or(serde_json::Value::Null),
+
+                    None => serde_json::Value::Null,
+                };
+                let event = AppMessage::MainWindowEmit(IpcEvent::UpdateCustomCSS, custom_css);
                 self.send_event(event)?;
             }
 

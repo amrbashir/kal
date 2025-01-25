@@ -12,6 +12,8 @@ declare type KalConfig = {
 
 interface Window {
   KAL: {
+    customCSS?: string;
+
     systemAccentColors: {
       background?: string;
       foreground?: string;

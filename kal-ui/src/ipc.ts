@@ -10,4 +10,5 @@ export enum IpcEvent {
   FocusInput = "FocusInput",
   UpdateConfig = "UpdateConfig",
   UpdateSystemAccentColor = "UpdateSystemAccentColor",
+  UpdateCustomCSS = "UpdateCustomCSS",
 }
