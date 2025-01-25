@@ -64,6 +64,11 @@ impl WebViewWindowBuilder<'_> {
         }
     }
 
+    pub fn with_webview_id(mut self, id: &'static str) -> Self {
+        self.webview_builder = self.webview_builder.with_id(id);
+        self
+    }
+
     pub fn inner_size<S: Into<Size>>(mut self, size: S) -> Self {
         self.window_attrs = self.window_attrs.with_surface_size(size);
         self

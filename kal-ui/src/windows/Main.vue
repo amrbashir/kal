@@ -53,7 +53,9 @@ watchDebounced(currentQuery, (query) => runQuery(query), { debounce: 50 });
 
 async function runQuery(query: string) {
   if (query) {
+    console.log(1);
     const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
+    console.log(2);
     resetSelection();
     results.value = response;
   } else {

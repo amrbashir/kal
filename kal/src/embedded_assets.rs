@@ -14,7 +14,10 @@ pub(crate) struct EmbededAssets;
 pub const PROTOCOL_NAME: &str = "kal";
 
 /// `kal://` protocol
-pub fn protocol(_webview_id: WebViewId, request: Request<Vec<u8>>) -> ProtocolResult {
+pub fn protocol(webview_id: WebViewId, request: Request<Vec<u8>>) -> ProtocolResult {
+    let span = tracing::trace_span!("protocol::kal", ?webview_id, ?request);
+    let _enter = span.enter();
+
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 

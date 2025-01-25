@@ -1,3 +1,4 @@
+
 # "pnpm dev" (vite dev server) process info
 $pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
 $pnpmDevInfo.Arguments = "-Command pnpm -r dev"
@@ -8,6 +9,7 @@ $pnpmDev.StartInfo = $pnpmDevInfo
 # "cargo run" process info
 $cargoRunInfo = New-Object System.Diagnostics.ProcessStartInfo "cargo"
 $cargoRunInfo.Arguments = "run"
+$cargoRunInfo.EnvironmentVariables["KAL_LOG"] = "DEBUG"
 $cargoRunInfo.WorkingDirectory = Split-Path -Parent $PSScriptRoot
 $cargoRun = New-Object System.Diagnostics.Process
 $cargoRun.StartInfo = $cargoRunInfo

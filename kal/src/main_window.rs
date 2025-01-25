@@ -30,6 +30,9 @@ struct InitScript<'a> {
 
 impl App {
     pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
+        let span = tracing::info_span!("app::create::main_window");
+        let _enter = span.enter();
+
         let config_json = serde_json::value::to_raw_value(&self.config)?;
 
         let custom_css = self
@@ -56,6 +59,7 @@ impl App {
         );
 
         let builder = WebViewWindowBuilder::new()
+            .with_webview_id(MainWindowState::ID)
             .url(MainWindowState::URL)
             .init_script(&init_script.into_string())
             .inner_size(LogicalSize::new(
@@ -77,14 +81,14 @@ impl App {
         #[cfg(windows)]
         window.set_dwmwa_transitions(false);
 
-        self.windows.insert(MainWindowState::LABEL, window);
+        self.windows.insert(MainWindowState::ID, window);
 
         Ok(())
     }
 }
 
 #[derive(Debug)]
-pub enum MainWindowMessage {
+enum MainWindowMessage {
     Ipc {
         request: wry::http::Request<Vec<u8>>,
         tx: smol::channel::Sender<IpcResult>,
@@ -104,20 +108,20 @@ pub struct MainWindowState {
     main_thread_sender: mpsc::Sender<AppMessage>,
     event_loop_proxy: EventLoopProxy,
 
-    pub fuzzy_matcher: SkimMatcherV2,
+    fuzzy_matcher: SkimMatcherV2,
 
-    pub config: RwLock<Config>,
-    pub plugin_store: RwLock<PluginStore>,
-    pub results: RwLock<Vec<ResultItem>>,
+    config: RwLock<Config>,
+    plugin_store: RwLock<PluginStore>,
+    results: RwLock<Vec<ResultItem>>,
 }
 
 impl MainWindowState {
-    pub const LABEL: &str = "main";
+    pub const ID: &str = "main";
 
     #[cfg(debug_assertions)]
-    pub const URL: &str = "http://localhost:9010/";
+    const URL: &str = "http://localhost:9010/";
     #[cfg(not(debug_assertions))]
-    pub const URL: &str = "kal://localhost/";
+    const URL: &str = "kal://localhost/";
 
     async fn new(
         config: Config,
@@ -140,7 +144,7 @@ impl MainWindowState {
         }
     }
 
-    pub fn spawn(
+    fn spawn(
         config: Config,
         data_dir: PathBuf,
         main_thread_sender: mpsc::Sender<AppMessage>,
@@ -160,11 +164,7 @@ impl MainWindowState {
                             let state = state.clone();
 
                             smol::spawn(async move {
-                                tracing::debug!("Handling ipc request...");
-                                tracing::trace!("{request:?}");
                                 let res = state.ipc_handler(request).await;
-                                tracing::debug!("Finished handling ipc request");
-                                tracing::trace!("{res:?}");
 
                                 if let Err(e) = tx.send(res).await {
                                     tracing::error!("Failed to send async ipc response: {e}");
@@ -215,9 +215,13 @@ impl MainWindowState {
         self.send_event(AppMessage::RequestSufaceSize(size.into()))
     }
 
-    pub async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
+    async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
+        let span = tracing::debug_span!("ipc::handle::request", ?request);
+        let _enter = span.enter();
+
         let command: IpcCommand = request.uri().path()[1..].try_into()?;
-        tracing::debug!("Handling `IpcCommand::{command}`");
+
+        span.record("command", command.as_ref());
 
         match command {
             IpcCommand::Query => {
@@ -308,7 +312,7 @@ impl MainWindowState {
                 self.wake_event_loop();
             }
 
-            IpcCommand::HideMainWindow => self.batch_event(AppMessage::HideMainWindow(false))?,
+            IpcCommand::HideMainWindow => self.send_event(AppMessage::HideMainWindow(false))?,
         }
 
         response::empty()

@@ -89,7 +89,7 @@ impl App {
     }
 
     fn main_window(&self) -> &WebViewWindow {
-        self.windows.get(MainWindowState::LABEL).unwrap()
+        self.windows.get(MainWindowState::ID).unwrap()
     }
 
     pub fn show_main_window(&mut self) -> anyhow::Result<()> {
@@ -155,18 +155,19 @@ impl App {
         _event_loop: &dyn ActiveEventLoop,
         message: AppMessage,
     ) -> anyhow::Result<()> {
-        tracing::debug!("Handling app message: {message:?}");
+        let span = tracing::debug_span!("app::handle::message", ?message);
+        let _enter = span.enter();
 
         match message {
-            AppMessage::HotKey(e) if e.state == HotKeyState::Pressed => {
-                if self.main_window().window().is_visible().unwrap_or_default() {
-                    self.hide_main_window(true);
-                } else {
-                    self.show_main_window()?;
+            AppMessage::HotKey(e) => {
+                if e.state == HotKeyState::Pressed {
+                    if self.main_window().window().is_visible().unwrap_or_default() {
+                        self.hide_main_window(true);
+                    } else {
+                        self.show_main_window()?;
+                    }
                 }
             }
-
-            AppMessage::HotKey(_) => {}
 
             #[cfg(windows)]
             AppMessage::SystemSettingsChanged => {
@@ -193,8 +194,6 @@ impl App {
             }
         }
 
-        tracing::debug!("Finished handling app message");
-
         Ok(())
     }
 }
@@ -213,7 +212,7 @@ impl ApplicationHandler for App {
     }
 
     fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
-        tracing::trace!("Event loop has been awakend");
+        tracing::trace!("Event loop awakaned by proxy");
         while let Ok(message) = self.receiver.try_recv() {
             if let Err(e) = self.app_message(event_loop, message) {
                 tracing::error!("Error while handling app message: {e}");

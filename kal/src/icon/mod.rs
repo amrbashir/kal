@@ -127,9 +127,12 @@ pub const PROTOCOL_NAME: &str = "kalicon";
 
 /// `kalicon://` protocol
 pub fn protocol(
-    _webview_id: WebViewId<'_>,
+    webview_id: WebViewId<'_>,
     request: Request<Vec<u8>>,
 ) -> impl Future<Output = ProtocolResult> {
+    let span = tracing::trace_span!("protocol::kalicon", ?webview_id, ?request);
+    let _enter = span.enter();
+
     async move {
         let path = &request.uri().path()[1..];
         let path = percent_encoding::percent_decode_str(path).decode_utf8()?;

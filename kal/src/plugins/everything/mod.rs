@@ -112,7 +112,7 @@ impl EverythingEntry {
         let is_dir = path.is_dir();
         let id = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
         let icon = icons_dir.join(&name).with_extra_extension("png");
-        let _ = icon::extract_cached(&path, &icon);
+        let _ = icon::extract_cached(&path, &icon).inspect_err(|e| tracing::error!("{e}"));
         Self {
             name,
             path,

@@ -7,7 +7,6 @@ export function useCustomCSS() {
   onMounted(() => {
     window.KAL.ipc.on<string>(IpcEvent.UpdateCustomCSS, (newCustomCSS) => {
       customCSS.value = newCustomCSS;
-      console.log(newCustomCSS);
     });
   });
 
