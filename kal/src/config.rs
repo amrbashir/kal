@@ -178,6 +178,9 @@ impl Config {
 
     /// Asyncly loads config from a canonical path
     pub async fn load_async() -> anyhow::Result<Self> {
+        let span = tracing::info_span!("config::load");
+        let _enter = span.enter();
+
         let path = Self::path()?;
         let config = match path.exists() {
             true => {
@@ -189,12 +192,15 @@ impl Config {
                 Config::default()
             }
         };
-        tracing::info!("Config loaded: {config:?}");
+
         Ok(config)
     }
 
     /// Loads config from a canonical path
     pub fn load() -> anyhow::Result<Self> {
+        let span = tracing::info_span!("config::load");
+        let _enter = span.enter();
+
         let path = Self::path()?;
         let config = match path.exists() {
             true => {
@@ -206,7 +212,7 @@ impl Config {
                 Config::default()
             }
         };
-        tracing::info!("Config loaded: {config:?}");
+
         Ok(config)
     }
 

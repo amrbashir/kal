@@ -26,6 +26,7 @@ anyhow = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+tracing-chrome = "0.7"
 url = { version = "2.5", features = ["serde"] }
 global-hotkey = "0.6"
 calculator-rs = "0.1"

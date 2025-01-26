@@ -30,7 +30,7 @@ struct InitScript<'a> {
 
 impl App {
     pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
-        let span = tracing::trace_span!("app::create::main_window");
+        let span = tracing::debug_span!("app::create::main_window");
         let _enter = span.enter();
 
         let config_json = serde_json::value::to_raw_value(&self.config)?;
@@ -77,8 +77,6 @@ impl App {
             .devtools(true);
 
         let window = builder.build(event_loop)?;
-
-        tracing::info!("Created main window");
 
         #[cfg(windows)]
         window.set_dwmwa_transitions(false);
@@ -218,15 +216,14 @@ impl MainWindowState {
     }
 
     async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
-        let span = tracing::trace_span!("ipc::handle::request", ?request);
+        let span = tracing::debug_span!("ipc::handle::request", ?request);
         let _enter = span.enter();
 
-        let command: IpcCommand = request.uri().path()[1..].try_into()?;
+        let ipc_command: IpcCommand = request.uri().path()[1..].try_into()?;
 
-        span.record("command", command.as_ref());
-        tracing::debug!("Handling IpcCommand::{command}");
+        span.record("ipc_command", ipc_command.as_ref());
 
-        match command {
+        match ipc_command {
             IpcCommand::Query => {
                 let body = request.body();
                 let query = std::str::from_utf8(body)?;
@@ -264,7 +261,7 @@ impl MainWindowState {
                 let payload = request.body();
 
                 let Some((action, id)) = std::str::from_utf8(payload)?.split_once('#') else {
-                    anyhow::bail!("Invalid payload for command `{command}`: {payload:?}");
+                    anyhow::bail!("Invalid payload for command `{ipc_command}`: {payload:?}");
                 };
 
                 let results = self.results.read().await;

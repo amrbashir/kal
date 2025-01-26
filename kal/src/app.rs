@@ -155,10 +155,8 @@ impl App {
         _event_loop: &dyn ActiveEventLoop,
         message: AppMessage,
     ) -> anyhow::Result<()> {
-        let span = tracing::trace_span!("app::handle::message", ?message);
+        let span = tracing::debug_span!("app::handle::message", ?message);
         let _enter = span.enter();
-
-        tracing::debug!("Handling AppMessage::{message:?}");
 
         match message {
             AppMessage::HotKey(e) => {
@@ -201,11 +199,17 @@ impl App {
 }
 
 impl ApplicationHandler for App {
-    #[cfg(windows)]
     fn new_events(&mut self, event_loop: &dyn ActiveEventLoop, cause: winit::event::StartCause) {
         if cause == winit::event::StartCause::Init {
+            tracing::debug!("Eventloop initialized");
+
+            #[cfg(windows)]
             self.listen_for_settings_change(event_loop);
         }
+    }
+
+    fn exiting(&mut self, _event_loop: &dyn ActiveEventLoop) {
+        tracing::debug!("Eventloop Exited");
     }
 
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
@@ -214,7 +218,8 @@ impl ApplicationHandler for App {
     }
 
     fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
-        tracing::trace!("Event loop awakaned by proxy");
+        tracing::trace!("Eventloop awakaned by proxy");
+
         while let Ok(message) = self.receiver.try_recv() {
             if let Err(e) = self.app_message(event_loop, message) {
                 tracing::error!("Error while handling app message: {e}");

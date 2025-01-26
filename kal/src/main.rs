@@ -1,7 +1,11 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
+#[cfg(not(debug_assertions))]
 use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::EnvFilter;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 mod app;
@@ -18,7 +22,10 @@ mod result_item;
 mod utils;
 mod webview_window;
 
-fn run(data_dir: PathBuf) -> anyhow::Result<()> {
+pub fn run(data_dir: PathBuf) -> anyhow::Result<()> {
+    // Use two threads for async
+    std::env::set_var("SMOL_THREADS", "2");
+
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(ControlFlow::Wait);
 
@@ -30,30 +37,36 @@ fn run(data_dir: PathBuf) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    // Use two threads for async
-    std::env::set_var("SMOL_THREADS", "2");
-
     let data_dir = dirs::data_local_dir()
         .context("Failed to get $data_local_dir path")?
         .join("kal");
 
-    let env_filter = tracing_subscriber::EnvFilter::try_from_env("KAL_LOG").unwrap_or_else(|_| {
-        tracing_subscriber::EnvFilter::builder()
-            .with_default_directive(tracing_subscriber::filter::LevelFilter::DEBUG.into())
+    let env_filter = EnvFilter::try_from_env("KAL_LOG").unwrap_or_else(|_| {
+        EnvFilter::builder()
+            .with_default_directive(LevelFilter::DEBUG.into())
             .from_env_lossy()
     });
 
     let subscriber = tracing_subscriber::fmt()
         .compact()
-        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::ACTIVE)
+        .with_span_events(FmtSpan::ACTIVE)
         .with_max_level(tracing::Level::TRACE)
         .with_target(false)
-        .finish()
-        .with(env_filter);
+        .with_env_filter(env_filter)
+        .finish();
 
     #[cfg(not(debug_assertions))]
-    let (layer, _guard) = {
-        let appender = tracing_appender::rolling::daily(&data_dir, "kal.log");
+    let (chrome_layer, _c_guard) = {
+        let appender = tracing_appender::rolling::daily(&data_dir.join("logs"), "kal.trace");
+        let (layer, _guard) = tracing_chrome::ChromeLayerBuilder::new()
+            .writer(appender)
+            .build();
+        (layer, _guard)
+    };
+
+    #[cfg(not(debug_assertions))]
+    let (file_log_layer, _f_guard) = {
+        let appender = tracing_appender::rolling::daily(&data_dir.join("logs"), "kal.log");
         let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
         let layer = tracing_subscriber::fmt::Layer::default()
             // disable ansi coloring in log file
@@ -64,11 +77,13 @@ fn main() -> anyhow::Result<()> {
     };
 
     #[cfg(not(debug_assertions))]
-    let subscriber = subscriber.with(layer);
+    let subscriber = subscriber.with(chrome_layer);
+    #[cfg(not(debug_assertions))]
+    let subscriber = subscriber.with(file_log_layer);
 
     tracing::subscriber::set_global_default(subscriber)?;
 
-    tracing::info!("Logger initialized");
+    tracing::debug!("Logger initialized");
 
     run(data_dir).inspect_err(|e| tracing::error!("{e}"))
 }

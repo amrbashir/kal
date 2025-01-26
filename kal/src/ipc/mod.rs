@@ -49,7 +49,7 @@ pub fn emit(
     event: impl AsRef<str>,
     payload: impl Serialize,
 ) -> anyhow::Result<()> {
-    let span = tracing::trace_span!(
+    let span = tracing::debug_span!(
         "webview::emit",
         webview_id = webview.id(),
         event = event.as_ref()
