@@ -30,7 +30,7 @@ struct InitScript<'a> {
 
 impl App {
     pub fn create_main_window(&mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<()> {
-        let span = tracing::info_span!("app::create::main_window");
+        let span = tracing::trace_span!("app::create::main_window");
         let _enter = span.enter();
 
         let config_json = serde_json::value::to_raw_value(&self.config)?;
@@ -218,12 +218,13 @@ impl MainWindowState {
     }
 
     async fn ipc_handler(&self, request: Request<Vec<u8>>) -> IpcResult {
-        let span = tracing::debug_span!("ipc::handle::request", ?request);
+        let span = tracing::trace_span!("ipc::handle::request", ?request);
         let _enter = span.enter();
 
         let command: IpcCommand = request.uri().path()[1..].try_into()?;
 
         span.record("command", command.as_ref());
+        tracing::debug!("Handling IpcCommand::{command}");
 
         match command {
             IpcCommand::Query => {

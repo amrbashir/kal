@@ -37,6 +37,20 @@ fn main() -> anyhow::Result<()> {
         .context("Failed to get $data_local_dir path")?
         .join("kal");
 
+    let env_filter = tracing_subscriber::EnvFilter::try_from_env("KAL_LOG").unwrap_or_else(|_| {
+        tracing_subscriber::EnvFilter::builder()
+            .with_default_directive(tracing_subscriber::filter::LevelFilter::DEBUG.into())
+            .from_env_lossy()
+    });
+
+    let subscriber = tracing_subscriber::fmt()
+        .compact()
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::ACTIVE)
+        .with_max_level(tracing::Level::TRACE)
+        .with_target(false)
+        .finish()
+        .with(env_filter);
+
     #[cfg(not(debug_assertions))]
     let (layer, _guard) = {
         let appender = tracing_appender::rolling::daily(&data_dir, "kal.log");
@@ -49,20 +63,12 @@ fn main() -> anyhow::Result<()> {
         (layer, _guard)
     };
 
-    let env_filter = tracing_subscriber::EnvFilter::from_env("KAL_LOG");
-
-    let subscriber = tracing_subscriber::fmt()
-        .compact()
-        .with_max_level(tracing::Level::TRACE)
-        .finish()
-        .with(env_filter);
-
     #[cfg(not(debug_assertions))]
     let subscriber = subscriber.with(layer);
 
     tracing::subscriber::set_global_default(subscriber)?;
 
-    tracing::debug!("Logger initialized");
+    tracing::info!("Logger initialized");
 
     run(data_dir).inspect_err(|e| tracing::error!("{e}"))
 }

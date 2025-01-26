@@ -155,8 +155,10 @@ impl App {
         _event_loop: &dyn ActiveEventLoop,
         message: AppMessage,
     ) -> anyhow::Result<()> {
-        let span = tracing::debug_span!("app::handle::message", ?message);
+        let span = tracing::trace_span!("app::handle::message", ?message);
         let _enter = span.enter();
+
+        tracing::debug!("Handling AppMessage::{message:?}");
 
         match message {
             AppMessage::HotKey(e) => {
