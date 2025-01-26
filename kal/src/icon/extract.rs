@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use image::RgbaImage;
+
 /// Extract icons as png from paths.
 pub fn extract_multiple<I, P, P2>(files: I) -> anyhow::Result<()>
 where
@@ -59,11 +61,18 @@ where
     imp::extract(file, out)
 }
 
+/// Extract icon from path as rgba image.
+#[inline]
+pub fn extract_image<P>(file: P) -> anyhow::Result<RgbaImage>
+where
+    P: AsRef<Path>,
+{
+    imp::extract_image(file)
+}
+
 #[cfg(windows)]
 mod imp {
     use std::ffi::OsStr;
-    use std::fs::File;
-    use std::io::BufWriter;
     use std::ops::Deref;
 
     use anyhow::Context;
@@ -89,6 +98,19 @@ mod imp {
         let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
 
         save_rgba_as_png_to_disk(out, rgba, width, height)
+    }
+
+    pub fn extract_image<P>(file: P) -> anyhow::Result<RgbaImage>
+    where
+        P: AsRef<Path>,
+    {
+        let file = file.as_ref();
+
+        let hicon = unsafe { extract_hicon(file) }?;
+
+        let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
+
+        RgbaImage::from_vec(width, height, rgba).context("Failed to construct RgbaImage")
     }
 
     unsafe fn extract_hicon(file: &Path) -> anyhow::Result<Owned<HICON>> {
@@ -193,35 +215,16 @@ mod imp {
         Ok((buf, width_u32, height_u32))
     }
 
-    fn encode_png_into_writer<W: std::io::Write>(
-        buf: W,
-        rgba: Vec<u8>,
-        width: u32,
-        height: u32,
-    ) -> anyhow::Result<()> {
-        let file = BufWriter::new(buf);
-
-        let mut encoder = png::Encoder::new(file, width, height);
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-
-        let mut writer = encoder.write_header()?;
-        writer.write_image_data(&rgba).map_err(Into::into)
-    }
-
     fn save_rgba_as_png_to_disk(
         out: &Path,
         rgba: Vec<u8>,
         width: u32,
         height: u32,
     ) -> anyhow::Result<()> {
-        let out = File::options()
-            .create(true)
-            .truncate(true)
-            .write(true)
-            .open(out)?;
-
-        encode_png_into_writer(out, rgba, width, height)
+        RgbaImage::from_vec(width, height, rgba)
+            .context("Failed to construct RgbaImage")?
+            .save_with_format(out, image::ImageFormat::Png)
+            .map_err(Into::into)
     }
 }
 
