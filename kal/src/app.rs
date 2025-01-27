@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
@@ -15,6 +15,7 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
 use crate::config::Config;
+use crate::icon;
 use crate::ipc::IpcEvent;
 use crate::main_window::MainWindowState;
 use crate::webview_window::WebViewWindow;
@@ -44,11 +45,11 @@ pub struct App {
     #[cfg(windows)]
     pub previously_foreground_hwnd: HWND,
 
-    pub data_dir: PathBuf,
+    pub icon_service: Arc<icon::Service>,
 }
 
 impl App {
-    pub fn new(data_dir: PathBuf, event_loop_proxy: EventLoopProxy) -> anyhow::Result<Self> {
+    pub fn new(kal_data_dir: PathBuf, event_loop_proxy: EventLoopProxy) -> anyhow::Result<Self> {
         let (sender, receiver) = mpsc::channel();
 
         let config = Config::load()?;
@@ -65,6 +66,8 @@ impl App {
             }
         }));
 
+        let icon_service = Arc::new(icon::Service::new(&kal_data_dir));
+
         Ok(Self {
             event_loop_proxy,
             sender,
@@ -74,7 +77,7 @@ impl App {
             windows: HashMap::default(),
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
-            data_dir,
+            icon_service,
         })
     }
 

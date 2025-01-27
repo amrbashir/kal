@@ -16,8 +16,8 @@ use wry::http::{Request, Response};
 use wry::WebViewBuilderExtWindows;
 use wry::{WebView, WebViewBuilder};
 
+use crate::ipc;
 use crate::ipc::AsyncIpcMessage;
-use crate::{icon, ipc};
 
 pub type ProtocolResult = anyhow::Result<Response<Cow<'static, [u8]>>>;
 
@@ -198,8 +198,6 @@ impl WebViewWindowBuilder<'_> {
     }
 
     pub fn build(mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<WebViewWindow> {
-        self = self.async_protocol(icon::PROTOCOL_NAME, icon::protocol);
-
         #[cfg(not(debug_assertions))]
         {
             self = self.protocol(

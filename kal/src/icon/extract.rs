@@ -1,57 +1,9 @@
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 
 use image::RgbaImage;
 
-/// Extract icons as png from paths.
-pub fn extract_multiple<I, P, P2>(files: I) -> anyhow::Result<()>
-where
-    I: IntoIterator<Item = (P, P2)>,
-    P: AsRef<Path>,
-    P2: AsRef<Path>,
-{
-    for (src, out) in files {
-        extract(src, out)?;
-    }
-
-    Ok(())
-}
-
-/// Extract icons as png from paths and cache it..
-pub fn extract_multiple_cached<I, P, P2>(files: I) -> anyhow::Result<()>
-where
-    I: IntoIterator<Item = (P, P2)>,
-    P: AsRef<Path>,
-    P2: AsRef<Path>,
-{
-    for (src, out) in files {
-        extract_cached(src, out)?;
-    }
-
-    Ok(())
-}
-
-/// Extract icon as png from path and cache it.
-pub fn extract_cached<P, P2>(file: P, out: P2) -> anyhow::Result<()>
-where
-    P: AsRef<Path>,
-    P2: AsRef<Path>,
-{
-    use std::time::{Duration, SystemTime};
-
-    const DAY: Duration = Duration::from_secs(60 * 60 * 24);
-
-    let out = out.as_ref().to_path_buf();
-
-    if out.exists() && out.metadata()?.modified()? + DAY > SystemTime::now() {
-        return Ok(());
-    }
-
-    let file = file.as_ref().to_path_buf();
-
-    extract(file, out)
-}
-
-/// Extract icon as png from path.
+/// Extract icon as png from `path` and saves it into `out`.
 #[inline]
 pub fn extract<P, P2>(file: P, out: P2) -> anyhow::Result<()>
 where
@@ -61,13 +13,63 @@ where
     imp::extract(file, out)
 }
 
-/// Extract icon from path as rgba image.
-#[inline]
-pub fn extract_image<P>(file: P) -> anyhow::Result<RgbaImage>
+/// Same as [`extract`] but avoids extracting if out has not been modified in the past 24 hours.
+pub fn extract_cached<P, P2>(path: P, out: P2) -> anyhow::Result<()>
 where
     P: AsRef<Path>,
+    P2: AsRef<Path>,
 {
-    imp::extract_image(file)
+    const DAY: Duration = Duration::from_secs(60 * 60 * 24);
+
+    let out = out.as_ref().to_path_buf();
+
+    if out.exists() && out.metadata()?.modified()? + DAY > SystemTime::now() {
+        return Ok(());
+    }
+
+    extract(path, out)
+}
+
+/// Extract two icons from `bottom` and `top` then overlays `top` on `bottom`
+/// with half the size then saves it into `out`.
+pub fn extract_overlayed<P, P2, P3>(bottom: P, top: P2, out: P3) -> anyhow::Result<()>
+where
+    P: AsRef<Path>,
+    P2: AsRef<Path>,
+    P3: AsRef<Path>,
+{
+    let mut bottom = imp::extract_image(bottom)?;
+
+    let top = imp::extract_image(top)?;
+    let second = image::DynamicImage::ImageRgba8(top);
+
+    let top = second.thumbnail(bottom.width() / 2, bottom.height() / 2);
+
+    let x = bottom.width() - bottom.width() / 2;
+    let y = bottom.height() - bottom.height() / 2;
+    image::imageops::overlay(&mut bottom, &top, x.into(), y.into());
+
+    bottom
+        .save_with_format(out, image::ImageFormat::Png)
+        .map_err(Into::into)
+}
+
+/// Same as [`extract_overlayed`] but avoids extracting if out has not been modified in the past 24 hours.
+pub fn extract_overlayed_cached<P, P2, P3>(bottom: P, top: P2, out: P3) -> anyhow::Result<()>
+where
+    P: AsRef<Path>,
+    P2: AsRef<Path>,
+    P3: AsRef<Path>,
+{
+    const DAY: Duration = Duration::from_secs(60 * 60 * 24);
+
+    let out = out.as_ref().to_path_buf();
+
+    if out.exists() && out.metadata()?.modified()? + DAY > SystemTime::now() {
+        return Ok(());
+    }
+
+    extract_overlayed(bottom, top, out)
 }
 
 #[cfg(windows)]
@@ -85,52 +87,52 @@ mod imp {
 
     use super::*;
 
-    pub fn extract<P, P2>(file: P, out: P2) -> anyhow::Result<()>
+    pub fn extract<P, P2>(path: P, out: P2) -> anyhow::Result<()>
     where
         P: AsRef<Path>,
         P2: AsRef<Path>,
     {
-        let file = file.as_ref();
+        let path = path.as_ref();
         let out = out.as_ref();
 
-        let hicon = unsafe { extract_hicon(file) }?;
+        let hicon = unsafe { extract_hicon(path) }?;
 
         let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
 
         save_rgba_as_png_to_disk(out, rgba, width, height)
     }
 
-    pub fn extract_image<P>(file: P) -> anyhow::Result<RgbaImage>
+    pub fn extract_image<P>(path: P) -> anyhow::Result<RgbaImage>
     where
         P: AsRef<Path>,
     {
-        let file = file.as_ref();
+        let path = path.as_ref();
 
-        let hicon = unsafe { extract_hicon(file) }?;
+        let hicon = unsafe { extract_hicon(path) }?;
 
         let (rgba, width, height) = unsafe { hicon_to_rgba8(*hicon)? };
 
         RgbaImage::from_vec(width, height, rgba).context("Failed to construct RgbaImage")
     }
 
-    unsafe fn extract_hicon(file: &Path) -> anyhow::Result<Owned<HICON>> {
-        let file_hstr = HSTRING::from(file);
-        let file_wide = file_hstr.deref();
+    unsafe fn extract_hicon(path: &Path) -> anyhow::Result<Owned<HICON>> {
+        let path_hstr = HSTRING::from(path);
+        let path_wide = path_hstr.deref();
 
-        let len = file_wide.len().min(128);
-        let mut file_wide_arr = [0_u16; 128];
-        file_wide_arr[..len].copy_from_slice(&file_wide[..len]);
+        let len = path_wide.len().min(128);
+        let mut path_wide_arr = [0_u16; 128];
+        path_wide_arr[..len].copy_from_slice(&path_wide[..len]);
 
         let mut index = 0;
 
-        let mut hicon = unsafe { ExtractAssociatedIconW(None, &mut file_wide_arr, &mut index) };
+        let mut hicon = unsafe { ExtractAssociatedIconW(None, &mut path_wide_arr, &mut index) };
 
         // if failed and it is a shortcut, then try to resolve it
-        if hicon.is_invalid() && file.extension() == Some(OsStr::new("lnk")) {
+        if hicon.is_invalid() && path.extension() == Some(OsStr::new("lnk")) {
             let sl: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_ALL) }?;
             let pf = sl.cast::<IPersistFile>()?;
 
-            unsafe { pf.Load(&file_hstr, STGM_READ) }?;
+            unsafe { pf.Load(&path_hstr, STGM_READ) }?;
 
             let mut target_path = [0_u16; 128];
             let mut find_data = WIN32_FIND_DATAW::default();
@@ -141,7 +143,7 @@ mod imp {
         }
 
         if hicon.is_invalid() {
-            anyhow::bail!("Failed to get HICON from {}", file.display());
+            anyhow::bail!("Failed to get HICON from {}", path.display());
         }
 
         Ok(Owned::new(hicon))

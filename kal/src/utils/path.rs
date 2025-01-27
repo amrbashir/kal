@@ -1,8 +1,12 @@
 use std::ffi::OsStr;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 pub trait PathExt {
+    #[allow(unused)]
     fn with_extra_extension<S: AsRef<OsStr>>(&self, extension: S) -> PathBuf;
+
+    fn to_hash(&self) -> String;
 }
 
 impl<T: AsRef<Path>> PathExt for T {
@@ -16,6 +20,13 @@ impl<T: AsRef<Path>> PathExt for T {
             Some(ext) => path.with_extension(format!("{ext}.{}", extension.to_string_lossy())),
             None => path.with_extension(extension),
         }
+    }
+
+    fn to_hash(&self) -> String {
+        let path = self.as_ref();
+        let mut hasher = DefaultHasher::default();
+        path.hash(&mut hasher);
+        hasher.finish().to_string()
     }
 }
 

@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use strum::AsRefStr;
@@ -35,7 +33,7 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &Config, _: &Path) -> Self {
+    fn new(_config: &Config) -> Self {
         Self {
             commands: SystemCommand::all(),
         }

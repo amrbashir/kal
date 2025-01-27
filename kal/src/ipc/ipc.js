@@ -8,8 +8,7 @@ Object.defineProperty(window, "KAL", {
       },
 
       makeProtocolFileSrc(protocol, filePath) {
-        const path = encodeURIComponent(filePath);
-        return this.makeProtocolUrl(protocol, path);
+        return this.makeProtocolUrl(protocol, filePath);
       },
 
       toBytes(payload) {

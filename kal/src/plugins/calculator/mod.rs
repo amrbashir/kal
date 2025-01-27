@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use anyhow::Ok;
 use calculator_rs::Calculate;
 
@@ -34,7 +32,7 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(_: &Config, _: &Path) -> Self {
+    fn new(_: &Config) -> Self {
         Self
     }
 

@@ -1,19 +1,18 @@
 use std::ffi::OsString;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::{self, Icon};
+use crate::icon::Icon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
-use crate::utils::{self, PathExt};
+use crate::utils::{self};
 
 #[derive(Debug)]
 pub struct Plugin {
     es: PathBuf,
-    icons_dir: PathBuf,
     max_results: usize,
 }
 
@@ -28,13 +27,12 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, data_dir: &Path) -> Self {
+    fn new(config: &Config) -> Self {
         let max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Self {
             es: config.es.unwrap_or_else(|| PathBuf::from("es")),
-            icons_dir: data_dir.join("icons"),
             max_results,
         }
     }
@@ -83,10 +81,7 @@ impl crate::plugin::Plugin for Plugin {
 
         let output = String::from_utf8_lossy(output.stdout.as_slice());
 
-        let entries = output
-            .lines()
-            .map(|e| EverythingEntry::new(e, &self.icons_dir))
-            .collect::<Vec<_>>();
+        let entries = output.lines().map(EverythingEntry::new).collect::<Vec<_>>();
 
         Ok(entries
             .iter()
@@ -100,23 +95,19 @@ impl crate::plugin::Plugin for Plugin {
 struct EverythingEntry {
     name: OsString,
     path: PathBuf,
-    icon: PathBuf,
     is_dir: bool,
     id: String,
 }
 
 impl EverythingEntry {
-    fn new(path: &str, icons_dir: &Path) -> Self {
+    fn new(path: &str) -> Self {
         let path = PathBuf::from(path);
         let name = path.file_name().unwrap_or_default().to_os_string();
         let is_dir = path.is_dir();
         let id = format!("{}:{}", Plugin::NAME, name.to_string_lossy());
-        let icon = icons_dir.join(&name).with_extra_extension("png");
-        let _ = icon::extract_cached(&path, &icon).inspect_err(|e| tracing::error!("{e}"));
         Self {
             name,
             path,
-            icon,
             id,
             is_dir,
         }
@@ -153,14 +144,12 @@ impl IntoResultItem for EverythingEntry {
             ]
         };
 
-        let tooltip = format!("{}\n{}", self.name.to_string_lossy(), self.path.display());
-
         Some(ResultItem {
             id: self.id.as_str().into(),
-            icon: Icon::path(self.icon.to_string_lossy()),
+            icon: Icon::extract_path(self.path.to_string_lossy()),
             primary_text: self.name.to_string_lossy().into_owned(),
             secondary_text: self.path.to_string_lossy().into_owned(),
-            tooltip: Some(tooltip),
+            tooltip: None,
             actions,
             score: 0,
         })

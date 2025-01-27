@@ -1,26 +1,29 @@
-use std::future::Future;
-use std::path::PathBuf;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 use strum::{AsRefStr, EnumString};
-use wry::http::header::CONTENT_TYPE;
-use wry::http::Request;
-use wry::WebViewId;
-
-use crate::ipc;
-use crate::webview_window::ProtocolResult;
 
 mod extract;
+mod service;
 
 pub use self::extract::*;
+pub use self::service::*;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, EnumString)]
 pub enum IconType {
+    /// [`Icon::data`] is the path to icon.
     Path,
+    /// [`Icon::data`] is the path to extract icon from.
+    ExtractFromPath,
+    /// [`Icon::data`] is a combination of two icons where the
+    /// the second icon is overlayed on top with half size.
+    Overlay,
+    /// [`Icon::data`] is an SVG string.
     Svg,
     #[default]
+    /// [`Icon::data`] is a [`BuiltInIcon`] variant.
     BuiltIn,
+    /// [`Icon::data`] is a url to an icon.
     Url,
 }
 
@@ -42,6 +45,18 @@ impl Icon {
     #[inline]
     pub fn path(data: impl Into<String>) -> Self {
         Self::new(data, IconType::Path)
+    }
+
+    #[inline]
+    pub fn extract_path(data: impl Into<String>) -> Self {
+        Self::new(data, IconType::ExtractFromPath)
+    }
+
+    #[inline]
+    pub fn overlay(bottom: impl Into<String>, top: impl Into<String>) -> Self {
+        let bottom = bottom.into();
+        let top = top.into();
+        Self::new(format!("{bottom}<<>>{top}"), IconType::Overlay)
     }
 
     #[inline]
@@ -120,35 +135,5 @@ impl BuiltInIcon {
 impl From<BuiltInIcon> for Icon {
     fn from(value: BuiltInIcon) -> Self {
         value.icon()
-    }
-}
-
-pub const PROTOCOL_NAME: &str = "kalicon";
-
-/// `kalicon://` protocol
-pub fn protocol(
-    webview_id: WebViewId<'_>,
-    request: Request<Vec<u8>>,
-) -> impl Future<Output = ProtocolResult> {
-    let span = tracing::trace_span!("protocol::kalicon", ?webview_id, ?request);
-    let _enter = span.enter();
-
-    async move {
-        let path = &request.uri().path()[1..];
-        let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
-
-        let path = dunce::canonicalize(PathBuf::from(&*path))?;
-
-        let mimetype = match path.extension().unwrap_or_default().to_str() {
-            Some("png") => "image/png",
-            Some("jpg") | Some("jpeg") => "image/jpeg",
-            Some("svg") => "image/svg+xml",
-            _ => anyhow::bail!("Only png, jpg and svg icons are supported"),
-        };
-
-        ipc::response::base()
-            .header(CONTENT_TYPE, mimetype)
-            .body(smol::fs::read(path).await?.into())
-            .map_err(Into::into)
     }
 }

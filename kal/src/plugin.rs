@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::{Config, GenericPluginConfig};
@@ -10,7 +8,7 @@ use crate::result_item::ResultItem;
 #[async_trait::async_trait]
 pub trait Plugin: std::fmt::Debug + Send + Sync {
     /// Constructor for plugin.
-    fn new(config: &Config, data_dir: &Path) -> Self
+    fn new(config: &Config) -> Self
     where
         Self: Sized;
 
@@ -35,8 +33,8 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
             id: String::new(),
             icon: BuiltInIcon::Error.into(),
             primary_text: self.name().to_owned(),
-            secondary_text: error.clone(),
-            tooltip: Some(error),
+            secondary_text: error,
+            tooltip: None,
             actions: vec![],
             score: 0,
         }

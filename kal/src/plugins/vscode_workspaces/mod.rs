@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -6,7 +6,7 @@ use serde::Deserialize;
 use sqlite::OpenFlags;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::{self, BuiltInIcon, Icon};
+use crate::icon::{BuiltInIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, IteratorExt};
@@ -14,7 +14,6 @@ use crate::utils::{self, IteratorExt};
 #[derive(Debug)]
 pub struct Plugin {
     workspaces: Vec<Workspace>,
-    icon_path: PathBuf,
 }
 
 impl Plugin {
@@ -25,10 +24,9 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &crate::config::Config, data_dir: &std::path::Path) -> Self {
+    fn new(_config: &crate::config::Config) -> Self {
         Self {
             workspaces: Vec::new(),
-            icon_path: data_dir.join("icons").join("vscodeworkspaces.png"),
         }
     }
 
@@ -65,9 +63,7 @@ impl crate::plugin::Plugin for Plugin {
             Some(localappdata) => {
                 let folder_icon = &vscode_appdata;
                 let vscode_icon = localappdata.join("Programs/Microsoft VS Code/Code.exe");
-                let _ = extract_and_combine_icons((folder_icon, &vscode_icon), &self.icon_path)
-                    .inspect_err(|e| tracing::error!("{e}"));
-                Icon::path(self.icon_path.to_string_lossy())
+                Icon::overlay(folder_icon.to_string_lossy(), vscode_icon.to_string_lossy())
             }
             None => BuiltInIcon::Code.into(),
         };
@@ -144,7 +140,6 @@ impl Workspace {
 
 impl Workspace {
     fn item(&self, score: i64) -> ResultItem {
-        let tooltip = format!("{}\n{}", self.name, self.path.display());
         let uri = self.uri.clone();
 
         ResultItem {
@@ -152,7 +147,7 @@ impl Workspace {
             icon: self.icon.clone(),
             primary_text: self.name.clone(),
             secondary_text: self.path.to_string_lossy().to_string(),
-            tooltip: Some(tooltip),
+            tooltip: None,
             actions: vec![Action::primary(move |_| {
                 utils::execute_with_args(
                     "code",
@@ -172,19 +167,4 @@ impl IntoResultItem for Workspace {
             .fuzzy_match(&self.name, query)
             .map(|score| self.item(score))
     }
-}
-
-fn extract_and_combine_icons(icons: (&Path, &Path), out: &Path) -> anyhow::Result<()> {
-    let mut first = icon::extract_image(icons.0)?;
-    let second = icon::extract_image(icons.1)?;
-    let second = image::DynamicImage::ImageRgba8(second);
-    let mut second = second.thumbnail(first.width() / 2, first.height() / 2);
-
-    let x = first.width() - first.width() / 2;
-    let y = first.height() - first.height() / 2;
-    image::imageops::overlay(&mut first, &mut second, x.into(), y.into());
-
-    first
-        .save_with_format(out, image::ImageFormat::Png)
-        .map_err(Into::into)
 }

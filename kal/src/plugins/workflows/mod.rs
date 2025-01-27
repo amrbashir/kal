@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -52,7 +52,7 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, _data_dir: &Path) -> Self {
+    fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         let mut plugin = Self {

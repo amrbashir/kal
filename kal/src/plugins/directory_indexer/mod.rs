@@ -7,15 +7,14 @@ use serde::{Deserialize, Serialize};
 use smol::stream::*;
 
 use crate::config::Config;
-use crate::icon::{self, Icon};
+use crate::icon::Icon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
-use crate::utils::{self, ExpandEnvVars, IteratorExt, PathExt};
+use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
 #[derive(Debug)]
 pub struct Plugin {
     paths: Vec<String>,
-    icons_dir: PathBuf,
     entries: Vec<DirEntry>,
 }
 
@@ -41,7 +40,7 @@ impl Plugin {
 
         while let Some(e) = entries.next().await {
             if let Ok(e) = e.await {
-                let e = e.iter().map(|e| DirEntry::new(e.path(), &self.icons_dir));
+                let e = e.iter().map(|e| DirEntry::new(e.path()));
                 self.entries.extend(e);
             }
         }
@@ -50,12 +49,11 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, data_dir: &Path) -> Self {
+    fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Self {
             paths: config.paths,
-            icons_dir: data_dir.join("icons"),
             entries: Vec::new(),
         }
     }
@@ -66,19 +64,7 @@ impl crate::plugin::Plugin for Plugin {
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
-
         self.index_dirs().await;
-
-        let icons_dir = self.icons_dir.clone();
-        let paths = self
-            .entries
-            .iter()
-            .map(|e| (e.path.clone(), e.icon.clone()))
-            .collect::<Vec<_>>();
-
-        smol::fs::create_dir_all(icons_dir).await?;
-        let _ = icon::extract_multiple_cached(paths).inspect_err(|e| tracing::error!("{e}"));
-
         Ok(())
     }
 
@@ -101,22 +87,19 @@ struct DirEntry {
     name: OsString,
     path: PathBuf,
     is_dir: bool,
-    icon: PathBuf,
     id: String,
 }
 
 impl DirEntry {
-    fn new(path: PathBuf, icons_dir: &Path) -> Self {
+    fn new(path: PathBuf) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
         let filename = path.file_name().unwrap_or_default().to_os_string();
         let is_dir = path.is_dir();
-        let icon = icons_dir.join(&filename).with_extra_extension("png");
         let id = format!("{}:{}", Plugin::NAME, filename.to_string_lossy());
         Self {
             name,
             is_dir,
             path,
-            icon,
             id,
         }
     }
@@ -150,14 +133,12 @@ impl DirEntry {
             ]
         };
 
-        let tooltip = format!("{}\n{}", self.name.to_string_lossy(), self.path.display());
-
         ResultItem {
             id: self.id.as_str().into(),
-            icon: Icon::path(self.icon.to_string_lossy()),
+            icon: Icon::extract_path(self.path.to_string_lossy()),
             primary_text: self.name.to_string_lossy().into_owned(),
             secondary_text: self.path.to_string_lossy().into_owned(),
-            tooltip: Some(tooltip),
+            tooltip: None,
             actions,
             score,
         }

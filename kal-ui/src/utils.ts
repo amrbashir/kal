@@ -6,7 +6,11 @@ export function makeIconHTML(icon: Icon): string {
     case IconType.Svg:
       return icon.data;
     case IconType.Path:
-      return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}" />`;
+      return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}?${icon.type}"/>`;
+    case IconType.ExtractFromPath:
+      return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}?${icon.type}"/>`;
+    case IconType.Overlay:
+      return `<img src="${window.KAL.ipc.makeProtocolFileSrc("kalicon", icon.data)}?${icon.type}"/>`;
     case IconType.Url:
       return `<img src="${icon.data}" />`;
     default:

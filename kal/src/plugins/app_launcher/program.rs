@@ -7,28 +7,21 @@ use smol::prelude::*;
 
 use crate::icon::Icon;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
-use crate::utils::{self, ExpandEnvVars, PathExt, StringExt};
+use crate::utils::{self, ExpandEnvVars, StringExt};
 
 #[derive(Debug)]
 pub struct Program {
     pub name: OsString,
     pub path: PathBuf,
-    pub icon: PathBuf,
     pub id: String,
 }
 
 impl Program {
-    pub fn new(path: PathBuf, icons_dir: &Path) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
         let filename = path.file_name().unwrap_or_default().to_os_string();
-        let icon = icons_dir.join(&filename).with_extra_extension("png");
         let id = format!("{}:{}", super::Plugin::NAME, filename.to_string_lossy());
-        Self {
-            name,
-            path,
-            icon,
-            id,
-        }
+        Self { name, path, id }
     }
 
     fn item(&self, args: &str, score: i64) -> ResultItem {
@@ -48,7 +41,7 @@ impl Program {
 
         ResultItem {
             id: self.id.as_str().into(),
-            icon: Icon::path(self.icon.to_string_lossy()),
+            icon: Icon::extract_path(self.path.to_string_lossy()),
             primary_text: self.name.to_string_lossy().into_owned(),
             secondary_text: "Application".into(),
             tooltip: Some(tooltip),
@@ -69,11 +62,7 @@ impl IntoResultItem for Program {
     }
 }
 
-pub async fn find_all_in_paths(
-    paths: &[String],
-    extensions: &[String],
-    icons_dir: &Path,
-) -> Vec<Program> {
+pub async fn find_all_in_paths(paths: &[String], extensions: &[String]) -> Vec<Program> {
     let expanded_paths = paths.iter().map(ExpandEnvVars::expand_vars);
 
     let entries = expanded_paths.map(|p| read_dir_by_extensions(p, extensions));
@@ -84,7 +73,7 @@ pub async fn find_all_in_paths(
 
     while let Some(e) = entries.next().await {
         let Ok(e) = e.await else { continue };
-        let programs = e.into_iter().map(|e| Program::new(e.path(), icons_dir));
+        let programs = e.into_iter().map(|e| Program::new(e.path()));
         out.extend(programs);
     }
 

@@ -19,7 +19,7 @@ pub fn run() -> anyhow::Result<()> {
     // Use two threads for async
     std::env::set_var("SMOL_THREADS", "2");
 
-    let data_dir = dirs::data_local_dir()
+    let kal_data_dir = dirs::data_local_dir()
         .context("Failed to get $data_local_dir path")?
         .join("kal");
 
@@ -28,7 +28,7 @@ pub fn run() -> anyhow::Result<()> {
 
     let proxy = event_loop.create_proxy();
 
-    let mut app = crate::app::App::new(data_dir, proxy)?;
+    let mut app = crate::app::App::new(kal_data_dir, proxy)?;
 
     event_loop.run_app(&mut app).map_err(Into::into)
 }

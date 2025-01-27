@@ -26,7 +26,7 @@ const hoverBgColor10Percent = `${hoverBgColor}1A`;
     class="bg-transparent before:left-0 w-full part:content:flex part:content:w-full last:children:hover:flex"
     :selected
     @click="runAction(item.actions[0])"
-    :title="item.tooltip"
+    :title="item.tooltip ? item.tooltip : `${item.primary_text}\n${item.secondary_text}`"
   >
     <div
       :style="{ width: itemHeight }"

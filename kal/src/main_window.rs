@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -11,6 +10,7 @@ use wry::http::Request;
 
 use crate::app::{App, AppMessage};
 use crate::config::Config;
+use crate::icon;
 use crate::ipc::{response, AsyncIpcMessage, IpcCommand, IpcEvent, IpcResult};
 use crate::plugin_store::PluginStore;
 use crate::result_item::ResultItem;
@@ -53,10 +53,11 @@ impl App {
 
         let async_ipc_sender = MainWindowState::spawn(
             self.config.clone(),
-            self.data_dir.clone(),
             self.sender.clone(),
             self.event_loop_proxy.clone(),
         );
+
+        let icon_service = self.icon_service.clone();
 
         let builder = WebViewWindowBuilder::new()
             .with_webview_id(MainWindowState::ID)
@@ -67,6 +68,9 @@ impl App {
                 self.config.appearance.input_height + WebViewWindow::MAGIC_BORDERS,
             ))
             .async_ipc(async_ipc_sender)
+            .async_protocol(icon::Service::PROTOCOL_NAME, move |webview_id, request| {
+                icon_service.clone().protocol(webview_id, request)
+            })
             .center(true)
             .decorations(false)
             .resizable(false)
@@ -125,13 +129,12 @@ impl MainWindowState {
 
     async fn new(
         config: Config,
-        data_dir: PathBuf,
         main_thread_sender: mpsc::Sender<AppMessage>,
         event_loop_proxy: EventLoopProxy,
     ) -> Self {
         let max_results = config.general.max_results;
 
-        let mut plugin_store = crate::plugins::all(&config, &data_dir);
+        let mut plugin_store = crate::plugins::all(&config);
         plugin_store.reload(&config).await;
 
         Self {
@@ -146,13 +149,12 @@ impl MainWindowState {
 
     fn spawn(
         config: Config,
-        data_dir: PathBuf,
         main_thread_sender: mpsc::Sender<AppMessage>,
         event_loop_proxy: EventLoopProxy,
     ) -> smol::channel::Sender<MainWindowMessage> {
         let (sender, receiver) = smol::channel::unbounded();
 
-        let state = MainWindowState::new(config, data_dir, main_thread_sender, event_loop_proxy);
+        let state = MainWindowState::new(config, main_thread_sender, event_loop_proxy);
 
         smol::spawn(async move {
             let state = Arc::new(state.await);

@@ -26,7 +26,7 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &crate::config::Config, _data_dir: &std::path::Path) -> Self {
+    fn new(config: &crate::config::Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         Self {
             shell: config.shell.unwrap_or_default(),

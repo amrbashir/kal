@@ -1,13 +1,24 @@
+export enum IconType {
+  /** {@linkcode Icon.data} is the path to icon. */
+  Path = "Path",
+  /** {@linkcode Icon.data} is the path to extract icon from. */
+  ExtractFromPath = "ExtractFromPath",
+  /**
+   * {@linkcode Icon.data} is a combination of two icons where the
+   * the second icon is overlayed on top with half size.
+   */
+  Overlay = "Overlay",
+  /** {@linkcode Icon.data} is an SVG string. */
+  Svg = "Svg",
+  /** {@linkcode Icon.data} is a [`BuiltInIcon`] variant. */
+  BuiltIn = "BuiltIn",
+  /** {@linkcode Icon.data} is a url to an icon. */
+  Url = "Url",
+}
+
 export interface Icon {
   data: string;
   type: IconType;
-}
-
-export enum IconType {
-  Path = "Path",
-  Svg = "Svg",
-  BuiltIn = "BuiltIn",
-  Url = "Url",
 }
 
 export interface Action {

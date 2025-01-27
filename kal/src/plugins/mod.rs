@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use crate::config::Config;
 use crate::plugin::Plugin;
 use crate::plugin_store::PluginStore;
@@ -13,15 +11,15 @@ mod system_commands;
 mod vscode_workspaces;
 mod workflows;
 
-pub fn all(config: &Config, data_dir: &Path) -> PluginStore {
+pub fn all(config: &Config) -> PluginStore {
     PluginStore::new(vec![
-        app_launcher::Plugin::new(config, data_dir).into(),
-        calculator::Plugin::new(config, data_dir).into(),
-        directory_indexer::Plugin::new(config, data_dir).into(),
-        everything::Plugin::new(config, data_dir).into(),
-        shell::Plugin::new(config, data_dir).into(),
-        system_commands::Plugin::new(config, data_dir).into(),
-        workflows::Plugin::new(config, data_dir).into(),
-        vscode_workspaces::Plugin::new(config, data_dir).into(),
+        app_launcher::Plugin::new(config).into(),
+        calculator::Plugin::new(config).into(),
+        directory_indexer::Plugin::new(config).into(),
+        everything::Plugin::new(config).into(),
+        shell::Plugin::new(config).into(),
+        system_commands::Plugin::new(config).into(),
+        workflows::Plugin::new(config).into(),
+        vscode_workspaces::Plugin::new(config).into(),
     ])
 }

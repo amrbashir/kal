@@ -1,10 +1,7 @@
-use std::path::{Path, PathBuf};
-
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
@@ -18,7 +15,6 @@ pub struct Plugin {
     paths: Vec<String>,
     extensions: Vec<String>,
     include_packaged_apps: bool,
-    icons_dir: PathBuf,
     apps: Vec<App>,
 }
 
@@ -43,7 +39,7 @@ impl Plugin {
     }
 
     async fn find_apps(&mut self) {
-        self.apps = program::find_all_in_paths(&self.paths, &self.extensions, &self.icons_dir)
+        self.apps = program::find_all_in_paths(&self.paths, &self.extensions)
             .await
             .into_iter()
             .map(App::Program)
@@ -60,14 +56,13 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &Config, data_dir: &Path) -> Self {
+    fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Self {
             paths: config.paths,
             extensions: config.extensions,
             include_packaged_apps: config.include_packaged_apps,
-            icons_dir: data_dir.join("icons"),
             apps: Vec::new(),
         }
     }
@@ -87,17 +82,6 @@ impl crate::plugin::Plugin for Plugin {
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
         self.find_apps().await;
-
-        let icons_dir = self.icons_dir.clone();
-        let paths = self
-            .apps
-            .iter()
-            .filter_map(App::icon_path)
-            .collect::<Vec<_>>();
-
-        smol::fs::create_dir_all(icons_dir).await?;
-        let _ = icon::extract_multiple(paths).inspect_err(|e| tracing::error!("{e}"));
-
         Ok(())
     }
 
@@ -124,16 +108,6 @@ enum App {
     Program(program::Program),
     #[cfg(windows)]
     Packaged(packaged_app::PackagedApp),
-}
-
-impl App {
-    fn icon_path(&self) -> Option<(PathBuf, PathBuf)> {
-        match self {
-            App::Program(program) => Some((program.path.clone(), program.icon.clone())),
-            #[cfg(windows)]
-            App::Packaged(_) => None,
-        }
-    }
 }
 
 impl IntoResultItem for App {

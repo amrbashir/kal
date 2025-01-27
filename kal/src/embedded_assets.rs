@@ -21,13 +21,13 @@ pub fn protocol(webview_id: WebViewId, request: Request<Vec<u8>>) -> ProtocolRes
     let path = &request.uri().path()[1..];
     let path = percent_encoding::percent_decode_str(path).decode_utf8()?;
 
-    let file =
-        EmbededAssets::get(&path).unwrap_or_else(|| EmbededAssets::get("index.html").unwrap());
+    let fallback = || EmbededAssets::get("index.html").unwrap();
+    let file = EmbededAssets::get(&path).unwrap_or_else(fallback);
 
     let path = PathBuf::from(&*path);
     let mimetype = match path.extension().unwrap_or_default().to_str() {
-        Some("html") | Some("htm") => "text/html",
-        Some("js") | Some("mjs") => "text/javascript",
+        Some("html") => "text/html",
+        Some("js") => "text/javascript",
         Some("css") => "text/css",
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") => "image/jpeg",
