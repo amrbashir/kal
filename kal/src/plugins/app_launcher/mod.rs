@@ -1,5 +1,11 @@
+use std::path::Path;
+use std::sync::{Arc, Mutex};
+
 use fuzzy_matcher::skim::SkimMatcherV2;
+use notify::RecommendedWatcher;
+use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
+use windows::ApplicationModel::PackageCatalog;
 
 use crate::config::{Config, GenericPluginConfig};
 use crate::plugin::PluginQueryOutput;
@@ -15,8 +21,16 @@ pub struct Plugin {
     paths: Vec<String>,
     extensions: Vec<String>,
     include_packaged_apps: bool,
-    apps: Vec<App>,
+    apps: Arc<Mutex<Vec<App>>>,
+    programs_watcher: Option<Debouncer<RecommendedWatcher>>,
+    #[cfg(windows)]
+    package_catalog: Option<PackageCatalog>,
 }
+
+#[cfg(windows)]
+unsafe impl Send for Plugin {}
+#[cfg(windows)]
+unsafe impl Sync for Plugin {}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct PluginConfig {
@@ -39,16 +53,16 @@ impl Plugin {
     }
 
     async fn find_apps(&mut self) {
-        self.apps = program::find_all_in_paths(&self.paths, &self.extensions)
-            .await
-            .into_iter()
-            .map(App::Program)
-            .collect();
+        *self.apps.lock().unwrap() =
+            program::find_all_in_paths(&self.paths, &self.extensions).await;
 
         #[cfg(windows)]
         if self.include_packaged_apps {
             if let Ok(packaged_apps) = packaged_app::find_all() {
-                self.apps.extend(packaged_apps.map(App::Packaged));
+                self.apps
+                    .lock()
+                    .unwrap()
+                    .extend(packaged_apps.map(App::Packaged));
             }
         }
     }
@@ -63,7 +77,9 @@ impl crate::plugin::Plugin for Plugin {
             paths: config.paths,
             extensions: config.extensions,
             include_packaged_apps: config.include_packaged_apps,
-            apps: Vec::new(),
+            apps: Default::default(),
+            programs_watcher: None,
+            package_catalog: None,
         }
     }
 
@@ -82,6 +98,13 @@ impl crate::plugin::Plugin for Plugin {
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
         self.find_apps().await;
+        self.watch_programs()?;
+
+        #[cfg(windows)]
+        if self.package_catalog.is_none() {
+            self.watch_packaged_apps()?;
+        }
+
         Ok(())
     }
 
@@ -96,6 +119,8 @@ impl crate::plugin::Plugin for Plugin {
 
         Ok(self
             .apps
+            .lock()
+            .unwrap()
             .iter()
             .filter_map(|app| app.fuzzy_match(query, matcher))
             .collect_non_empty::<Vec<_>>()
@@ -108,6 +133,22 @@ enum App {
     Program(program::Program),
     #[cfg(windows)]
     Packaged(packaged_app::PackagedApp),
+}
+
+impl App {
+    pub fn name(&self) -> &str {
+        match self {
+            App::Program(program) => program.name.to_str().unwrap_or_default(),
+            App::Packaged(packaged_app) => &packaged_app.name,
+        }
+    }
+
+    pub fn path(&self) -> Option<&Path> {
+        match self {
+            App::Program(program) => Some(&program.path),
+            App::Packaged(_) => None,
+        }
+    }
 }
 
 impl IntoResultItem for App {
@@ -133,6 +174,7 @@ impl Default for PluginConfig {
 fn default_paths() -> Vec<String> {
     vec![
         "%USERPROFILE%\\Desktop".to_string(),
+        "%PUBLIC%\\Desktop".to_string(),
         "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
         "%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs".to_string(),
     ]

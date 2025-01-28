@@ -243,8 +243,10 @@ impl WebViewWindowBuilder<'_> {
             webview,
             #[cfg(windows)]
             softbuffer_ctx: {
-                let context = softbuffer::Context::new(window.clone()).unwrap();
-                let surface = softbuffer::Surface::new(&context, window).unwrap();
+                let context =
+                    softbuffer::Context::new(window.clone()).map_err(|e| anyhow::anyhow!("{e}"))?;
+                let surface = softbuffer::Surface::new(&context, window)
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
                 SoftBufferContext { context, surface }
             },
         };

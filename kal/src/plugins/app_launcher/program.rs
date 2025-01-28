@@ -1,10 +1,12 @@
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use smol::prelude::*;
 
+use super::App;
 use crate::icon::Icon;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, StringExt};
@@ -62,7 +64,7 @@ impl IntoResultItem for Program {
     }
 }
 
-pub async fn find_all_in_paths(paths: &[String], extensions: &[String]) -> Vec<Program> {
+pub async fn find_all_in_paths(paths: &[String], extensions: &[String]) -> Vec<super::App> {
     let expanded_paths = paths.iter().map(ExpandEnvVars::expand_vars);
 
     let entries = expanded_paths.map(|p| read_dir_by_extensions(p, extensions));
@@ -73,7 +75,9 @@ pub async fn find_all_in_paths(paths: &[String], extensions: &[String]) -> Vec<P
 
     while let Some(e) = entries.next().await {
         let Ok(e) = e.await else { continue };
-        let programs = e.into_iter().map(|e| Program::new(e.path()));
+        let programs = e
+            .into_iter()
+            .map(|e| super::App::Program(Program::new(e.path())));
         out.extend(programs);
     }
 
@@ -113,4 +117,54 @@ where
     }
 
     Ok(filtered)
+}
+
+impl super::Plugin {
+    pub fn watch_programs(&mut self) -> anyhow::Result<()> {
+        use notify::RecursiveMode;
+        use notify_debouncer_mini::DebounceEventResult;
+
+        let apps = self.apps.clone();
+        let extensions = self.extensions.clone();
+
+        let dur = Duration::from_secs(1);
+        let mut debouncer = notify_debouncer_mini::new_debouncer(dur, move |e| {
+            let Ok(events): DebounceEventResult = e else {
+                return;
+            };
+
+            for event in events {
+                let path = event.path;
+
+                tracing::trace!("[AppLauncher] detected a change in {}", path.display());
+
+                let flt = |ext| path.extension() == Some(OsStr::new(ext));
+                if extensions.iter().any(flt) {
+                    let mut apps = apps.lock().unwrap();
+                    if let Some(pos) = apps.iter().position(|app| app.path() == Some(&path)) {
+                        tracing::trace!("[AppLauncher] removing {}", apps[pos].name());
+
+                        apps.remove(pos);
+                    }
+
+                    if path.exists() {
+                        let program = Program::new(path);
+
+                        tracing::trace!("[AppLauncher] Adding {}", program.name.to_string_lossy());
+
+                        apps.push(App::Program(program));
+                    }
+                }
+            }
+        })?;
+
+        for path in &self.paths {
+            let path = Path::new(path).expand_vars();
+            debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
+        }
+
+        self.programs_watcher.replace(debouncer);
+
+        Ok(())
+    }
 }

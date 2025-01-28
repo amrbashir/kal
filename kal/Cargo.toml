@@ -37,6 +37,8 @@ rfd = { version = "0.15", default-features = false }
 smol = "2.0"
 async-trait = "0.1"
 sqlite = "0.36"
+notify = "8.0.0"
+notify-debouncer-mini = "0.6.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"

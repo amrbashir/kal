@@ -4,7 +4,11 @@ use std::path::PathBuf;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use windows::core::{w, HSTRING, PCWSTR};
-use windows::ApplicationModel::Package;
+use windows::ApplicationModel::{
+    Package, PackageCatalog, PackageInstallingEventArgs, PackageUninstallingEventArgs,
+    PackageUpdatingEventArgs,
+};
+use windows::Foundation::TypedEventHandler;
 use windows::Management::Deployment::PackageManager;
 use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
 use windows::Win32::Storage::Packaging::Appx::{
@@ -19,27 +23,36 @@ use crate::utils::{self, StringExt};
 
 const MS_RESOURCE: &str = "ms-resource:";
 
+#[derive(Debug, PartialEq, Eq)]
+struct PackageId {
+    name: String,
+    full_name: String,
+    family_name: String,
+}
+
+impl PackageId {
+    fn from_package(package: &Package) -> anyhow::Result<Self> {
+        let id = package.Id()?;
+
+        Ok(Self {
+            name: id.Name()?.to_string(),
+            full_name: id.FullName()?.to_string(),
+            family_name: id.FamilyName()?.to_string(),
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct PackagedApp {
-    pub name: OsString,
+    pub name: String,
     pub icon: Option<OsString>,
     pub appid: String,
     pub id: String,
     pub location: PathBuf,
+    package_id: PackageId,
 }
 
 impl PackagedApp {
-    pub fn new(name: OsString, icon: Option<OsString>, appid: String, location: PathBuf) -> Self {
-        let id = format!("{}:{}", super::Plugin::NAME, name.to_string_lossy());
-        Self {
-            name,
-            id,
-            icon,
-            appid,
-            location,
-        }
-    }
-
     fn item(&self, args: &str, score: i64) -> ResultItem {
         let icon = self
             .icon
@@ -64,16 +77,12 @@ impl PackagedApp {
         let location = self.location.clone();
         let open_location = Action::open_location(move |_| utils::open_dir(&location));
 
-        let tooltip = format!(
-            "{}\n{}",
-            self.name.to_string_lossy(),
-            self.location.display()
-        );
+        let tooltip = format!("{}\n{}", self.name, self.location.display());
 
         ResultItem {
             id: self.id.clone(),
             icon,
-            primary_text: self.name.to_string_lossy().into_owned(),
+            primary_text: self.name.clone(),
             secondary_text: "Packaged Application".into(),
             tooltip: Some(tooltip),
             actions: vec![open, open_elevated, open_location],
@@ -87,7 +96,7 @@ impl IntoResultItem for PackagedApp {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher
-            .fuzzy_match(&self.name.to_string_lossy(), query)
+            .fuzzy_match(&self.name, query)
             .map(|score| self.item(args, score))
     }
 }
@@ -176,14 +185,16 @@ fn app_from_manifest(
         .and_then(|uri| uri.RawUri())
         .map(|u| u.to_os_string());
 
-    let packaged = PackagedApp::new(
-        display_name.to_os_string(),
-        logo.ok(),
-        appid.to_string(),
-        PathBuf::from(package.InstalledPath()?.to_os_string()),
-    );
+    let name = display_name.to_string();
 
-    Ok(Some(packaged))
+    Ok(Some(PackagedApp {
+        id: format!("{}:{}", super::Plugin::NAME, name),
+        name,
+        icon: logo.ok(),
+        appid: appid.to_string(),
+        location: PathBuf::from(package.InstalledPath()?.to_os_string()),
+        package_id: PackageId::from_package(package)?,
+    }))
 }
 
 /// From: https://github.com/microsoft/PowerToys/blob/fef50971af193a8c04c697022b6c7c880edcdc46/src/modules/launcher/Plugins/Microsoft.Plugin.Program/Programs/UWPApplication.cs#L293
@@ -217,4 +228,102 @@ fn resource_from_pri(full_name: &str, key: &str) -> anyhow::Result<HSTRING> {
     }
 
     Ok(HSTRING::from_wide(&out))
+}
+
+impl super::Plugin {
+    pub fn watch_packaged_apps(&mut self) -> anyhow::Result<()> {
+        let catalog = PackageCatalog::OpenForCurrentUser()?;
+
+        let apps = self.apps.clone();
+        catalog.PackageInstalling(&TypedEventHandler::new(move |_, args| {
+            let Some(args): &Option<PackageInstallingEventArgs> = args else {
+                return Ok(());
+            };
+
+            if args.IsComplete() == Ok(true) {
+                let package = args.Package()?;
+                add_package(&mut apps.lock().unwrap(), package);
+            }
+
+            Ok(())
+        }))?;
+
+        let apps = self.apps.clone();
+        catalog.PackageUninstalling(&TypedEventHandler::new(move |_, args| {
+            let Some(args): &Option<PackageUninstallingEventArgs> = args else {
+                return Ok(());
+            };
+
+            if args.Progress() == Ok(0.) {
+                let package = args.Package()?;
+                remove_package(&mut apps.lock().unwrap(), package);
+            }
+
+            Ok(())
+        }))?;
+
+        let apps = self.apps.clone();
+        catalog.PackageUpdating(&TypedEventHandler::new(move |_, args| {
+            let Some(args): &Option<PackageUpdatingEventArgs> = args else {
+                return Ok(());
+            };
+
+            if args.Progress() == Ok(0.) {
+                let package = args.SourcePackage()?;
+                remove_package(&mut apps.lock().unwrap(), package);
+            }
+
+            if args.IsComplete() == Ok(true) {
+                let package = args.TargetPackage()?;
+                add_package(&mut apps.lock().unwrap(), package);
+            }
+
+            Ok(())
+        }))?;
+
+        self.package_catalog.replace(catalog);
+
+        Ok(())
+    }
+}
+
+fn add_package(apps: &mut Vec<super::App>, package: Package) {
+    if package
+        .InstalledPath()
+        .map(|p| p.is_empty())
+        .unwrap_or(true)
+    {
+        return;
+    }
+
+    tracing::debug!(
+        "[AppLauncher] Adding AppxPackage: {}",
+        package.Id().and_then(|i| i.Name()).unwrap_or_default()
+    );
+
+    let Ok(factory) = (unsafe { CoCreateInstance(&AppxFactory, None, CLSCTX_ALL) }) else {
+        return;
+    };
+
+    let Ok(Some(new_apps)) = apps_from_package(package, &factory) else {
+        return;
+    };
+
+    apps.extend(new_apps.into_iter().map(super::App::Packaged));
+}
+
+fn remove_package(apps: &mut Vec<super::App>, package: Package) {
+    tracing::debug!(
+        "[AppLauncher] Removing AppxPackage: {}",
+        package.Id().and_then(|i| i.Name()).unwrap_or_default()
+    );
+
+    let Ok(package_id) = PackageId::from_package(&package) else {
+        return;
+    };
+
+    apps.retain(|app| match app {
+        super::App::Program(_) => true,
+        super::App::Packaged(app) => app.package_id != package_id,
+    });
 }

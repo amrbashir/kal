@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use anyhow::Context;
 use wry::http::header::CONTENT_TYPE;
 use wry::http::Request;
 use wry::WebViewId;
@@ -47,7 +48,9 @@ impl Service {
                 Some(IconType::Path) => smol::fs::read(path?).await?,
 
                 Some(IconType::Overlay) => {
-                    let (bottom, top) = path_str.split_once("<<>>").unwrap();
+                    let (bottom, top) = path_str
+                        .split_once("<<>>")
+                        .context("malformed overlay icon data")?;
 
                     let bottom = dunce::canonicalize(bottom)?;
                     let top = dunce::canonicalize(top)?;
