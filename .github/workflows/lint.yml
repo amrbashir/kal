@@ -12,11 +12,9 @@ concurrency:
 
 jobs:
   clippy:
-    runs-on: ${{ windows-latest }}
-
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
