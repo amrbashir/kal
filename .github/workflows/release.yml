@@ -12,6 +12,12 @@ jobs:
       - uses: actions/checkout@v2
       - uses: dtolnay/rust-toolchain@stable
 
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "pnpm"
+
       - name: install NSIS
         run: |
           iwr -useb get.scoop.sh -outfile 'install.ps1'
@@ -20,10 +26,10 @@ jobs:
           scoop bucket add extras
           scoop install nsis
 
+      - run: pnpm i
       - run: ./.scripts/create-installer.ps1
-
-      - run: mv kal.exe kal-${{github.ref_name}}.exe
-      - run: mv kal-setup.exe kal-${{github.ref_name}}-setup.exe
+      - run: mv dist/kal.exe kal-${{github.ref_name}}.exe
+      - run: mv dist/kal-setup.exe kal-${{github.ref_name}}-setup.exe
 
       - name: release
         uses: softprops/action-gh-release@v1

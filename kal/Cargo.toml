@@ -1,6 +1,6 @@
 [package]
 name = "kal"
-version = "0.0.0"
+version = "0.1.0"
 description = "Keyboard-driven app launcher and productivity tool."
 authors = ["Amr Bashir <contact@amrbashir.me>"]
 repository = "https://github.com/amrbashir/kal"

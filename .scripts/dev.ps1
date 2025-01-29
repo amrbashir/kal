@@ -1,4 +1,3 @@
-
 # "pnpm dev" (vite dev server) process info
 $pnpmDevInfo = New-Object System.Diagnostics.ProcessStartInfo "powershell"
 $pnpmDevInfo.Arguments = "-Command pnpm -r dev"

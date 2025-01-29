@@ -2,7 +2,11 @@
 
 Keyboard-driven app launcher and productivity tool (only Windows for now).
 
-![App Launcher](screenshots/AppLauncher.png)
+> [!WARNING]
+>
+> kal is still in early development, use at your own risk.
+
+<p align="center"><img width="600" alt="App Launcher" src="screenshots/AppLauncher.png" /></p>
 
 ## Why?
 
@@ -16,48 +20,58 @@ and [simple directory indexer](#directoryindexer) to acess some common directori
 
 Also I want to write plugins in any programming langauge and not just C# and .NET or electron and Node.js.
 
+## Usage
+
+By default, you can open kal by using <kbd>Alt+Space</kbd>. This can be configured in [config](#config).
+
 ## Features
 
 ### <p align="center">App Launcher</p>
 
-<p align="center"><img width="400" alt="App Launcher" src="screenshots/AppLauncher.png" /></p>
+<p align="center"><img width="500" alt="App Launcher" src="screenshots/AppLauncher.png" /></p>
 
 ### <p align="center">DirectoryIndexer</p>
 
-<p align="center"><img width="400" alt="Directory Indexer" src="screenshots/DirectoryIndexer.png" /></p>
+<p align="center"><img width="500" alt="Directory Indexer" src="screenshots/DirectoryIndexer.png" /></p>
 
 ### <p align="center">Everything Search</p>
 
-<p align="center"><img width="400" alt="Everything Search" src="screenshots/Everything.png" /></p>
+<p align="center"><img width="500" alt="Everything Search" src="screenshots/Everything.png" /></p>
 
 ### <p align="center">Calculator</p>
 
-<p align="center"><img width="400" alt="Calculator" src="screenshots/Calculator.png" /></p>
+<p align="center"><img width="500" alt="Calculator" src="screenshots/Calculator.png" /></p>
 
 ### <p align="center">System Commands</p>
 
-<p align="center"><img width="400" alt="System Commands" src="screenshots/SystemCommands.png" /></p>
+<p align="center"><img width="500" alt="System Commands" src="screenshots/SystemCommands.png" /></p>
 
 ### <p align="center">Shell</p>
 
-<p align="center"><img width="400" alt="Shell" src="screenshots/Shell.png" /></p>
+<p align="center"><img width="500" alt="Shell" src="screenshots/Shell.png" /></p>
 
 ### <p align="center">VSCode Workspaces</p>
 
-<p align="center"><img width="400" alt="VSCode Workspaces" src="screenshots/VSCodeWorkspaces.png" /></p>
+<p align="center"><img width="500" alt="VSCode Workspaces" src="screenshots/VSCodeWorkspaces.png" /></p>
 
 ### <p align="center">Workflows</p>
 
-<p align="center"><img width="400" alt="Workflows" src="screenshots/Workflows.png" /></p>
+<p align="center"><img width="500" alt="Workflows" src="screenshots/Workflows.png" /></p>
 
 ## Config
 
-Config by default is read from `$HOME/.config/kal.toml`
+Config by default is read from `$HOME/.config/kal.toml`.
 
 ## Future plans
 
+- [ ] Document current plugins
+- [ ] Config schema and example config file.
+- [ ] Commands to control Kal itself
+- [ ] Scoop.sh installer
+- [ ] Winget installer
 - [ ] Settings UI
 - [ ] Plugins in any programming language (C ABI compatible)
+- [ ] Native-like hover tooltips
 - [ ] Linux
 
 ## Development
