@@ -116,14 +116,20 @@ mod imp {
     }
 
     unsafe fn extract_hicon(path: &Path) -> anyhow::Result<Owned<HICON>> {
-        let mut hicon = HICON::default();
-
         let path_hstr = HSTRING::from(path);
+        let path_wide = path_hstr.deref();
 
-        // if it is a shortcut, try to extract from its traget
-        // this makes the icon generated without a shortcut icon
-        // which matches the Start Menu behavior
-        if path.extension() == Some(OsStr::new("lnk")) {
+        let len = path_wide.len().min(128);
+        let mut path_wide_arr = [0_u16; 128];
+        path_wide_arr[..len].copy_from_slice(&path_wide[..len]);
+
+        let mut index = 0;
+
+        // TODO: find a way to remove the shortcut arrow
+        let mut hicon = unsafe { ExtractAssociatedIconW(None, &mut path_wide_arr, &mut index) };
+
+        // if failed and it is a shortcut, try to extract from its traget
+        if hicon.is_invalid() && path.extension() == Some(OsStr::new("lnk")) {
             let sl: IShellLinkW = unsafe { CoCreateInstance(&ShellLink, None, CLSCTX_ALL) }?;
             let pf = sl.cast::<IPersistFile>()?;
 
@@ -135,19 +141,6 @@ mod imp {
 
             let mut index = 0;
             hicon = unsafe { ExtractAssociatedIconW(None, &mut target_path, &mut index) };
-        }
-
-        // if not a shortcut, or extracing from shotcut failed
-        if hicon.is_invalid() {
-            let path_wide = path_hstr.deref();
-
-            let len = path_wide.len().min(128);
-            let mut path_wide_arr = [0_u16; 128];
-            path_wide_arr[..len].copy_from_slice(&path_wide[..len]);
-
-            let mut index = 0;
-
-            hicon = unsafe { ExtractAssociatedIconW(None, &mut path_wide_arr, &mut index) };
         }
 
         if hicon.is_invalid() {

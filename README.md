@@ -18,37 +18,37 @@ Also I want to write plugins in any programming langauge and not just C# and .NE
 
 ## Features
 
-### App Launcher
+### <p align="center">App Launcher</p>
 
-<img width="400" alt="App Launcher" src="screenshots/AppLauncher.png" />
+<p align="center"><img width="400" alt="App Launcher" src="screenshots/AppLauncher.png" /></p>
 
-### DirectoryIndexer
+### <p align="center">DirectoryIndexer</p>
 
-<img width="400" alt="Directory Indexer" src="screenshots/DirectoryIndexer.png" />
+<p align="center"><img width="400" alt="Directory Indexer" src="screenshots/DirectoryIndexer.png" /></p>
 
-### Everything Search
+### <p align="center">Everything Search</p>
 
-<img width="400" alt="Everything Search" src="screenshots/Everything.png" />
+<p align="center"><img width="400" alt="Everything Search" src="screenshots/Everything.png" /></p>
 
-### Calculator
+### <p align="center">Calculator</p>
 
-<img width="400" alt="Calculator" src="screenshots/Calculator.png" />
+<p align="center"><img width="400" alt="Calculator" src="screenshots/Calculator.png" /></p>
 
-### System Commands
+### <p align="center">System Commands</p>
 
-<img width="400" alt="System Commands" src="screenshots/SystemCommands.png" />
+<p align="center"><img width="400" alt="System Commands" src="screenshots/SystemCommands.png" /></p>
 
-### Shell
+### <p align="center">Shell</p>
 
-<img width="400" alt="Shell" src="screenshots/Shell.png" />
+<p align="center"><img width="400" alt="Shell" src="screenshots/Shell.png" /></p>
 
-### VSCode Workspaces
+### <p align="center">VSCode Workspaces</p>
 
-<img width="400" alt="VSCode Workspaces" src="screenshots/VSCodeWorkspaces.png" />
+<p align="center"><img width="400" alt="VSCode Workspaces" src="screenshots/VSCodeWorkspaces.png" /></p>
 
-### Workflows
+### <p align="center">Workflows</p>
 
-<img width="400" alt="Workflows" src="screenshots/Workflows.png" />
+<p align="center"><img width="400" alt="Workflows" src="screenshots/Workflows.png" /></p>
 
 ## Config
 
