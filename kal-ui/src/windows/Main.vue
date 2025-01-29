@@ -199,7 +199,7 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
     >
     </SearchBox>
 
-    <Divider class="bg-[var(--neutral-stroke-divider-rest)]"></Divider>
+    <Divider class="bg-[var(--divider)]"></Divider>
 
     <ul
       ref="items-container-ref"
@@ -224,6 +224,7 @@ main {
   --accent: v-bind(accentColor);
   --text-primary: #ffffff;
   --text-secondary: #cbcbcb;
+  --divider: #3d3d3d;
 
   color: var(--text-primary);
 }
