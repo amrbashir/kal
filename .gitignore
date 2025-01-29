@@ -12,5 +12,4 @@ yarn-error.log*
 kal.toml
 .TODO
 
-kal.exe
-kal-setup.exe
+*.exe

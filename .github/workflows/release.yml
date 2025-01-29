@@ -21,6 +21,8 @@ jobs:
           scoop install nsis
 
       - run: ./.scripts/build.ps1
+      - run: ./.scripts/create-installer.ps1
+
       - run: mv kal.exe kal-${{github.ref_name}}.exe
       - run: mv kal-setup.exe kal-${{github.ref_name}}-setup.exe
 
