@@ -1,4 +1,4 @@
-// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::path::PathBuf;
 
@@ -39,8 +39,8 @@ pub fn run(data_dir: PathBuf) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let data_dir = dirs::data_local_dir()
-        .context("Failed to get $data_local_dir path")?
+    let data_dir = dirs::data_dir()
+        .context("Failed to get $data_dir path")?
         .join("kal");
 
     let env_filter = EnvFilter::try_from_env("KAL_LOG").unwrap_or_else(|_| {

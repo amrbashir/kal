@@ -20,9 +20,15 @@ impl Service {
     pub const PROTOCOL_NAME: &str = "kalicon";
 
     pub fn new(kal_data_dir: &Path) -> Self {
-        Self {
-            icons_dir: kal_data_dir.join("icons"),
+        let icons_dir = kal_data_dir.join("icons");
+        if let Err(e) = std::fs::create_dir_all(&icons_dir) {
+            tracing::error!(
+                "Failed to create icons directory at {}: {e}",
+                icons_dir.display()
+            );
         }
+
+        Self { icons_dir }
     }
 
     /// `kalicon://` protocol

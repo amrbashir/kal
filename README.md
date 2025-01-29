@@ -50,6 +50,10 @@ Also I want to write plugins in any programming langauge and not just C# and .NE
 
 <img width="400" alt="Workflows" src="screenshots/Workflows.png" />
 
+## Config
+
+Config by default is read from `$HOME/.config/kal.toml`
+
 ## Future plans
 
 - [ ] Settings UI

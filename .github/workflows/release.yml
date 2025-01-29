@@ -1,0 +1,29 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - name: install NSIS
+        run: |
+          iwr -useb get.scoop.sh -outfile 'install.ps1'
+          .\install.ps1 -RunAsAdmin
+          scoop update
+          scoop bucket add extras
+          scoop install nsis
+      - run: ./.scripts/build.ps1
+      - run: mv kal.exe kal-${{github.ref_name}}.exe
+      - run: mv kal-setup.exe kal-${{github.ref_name}}-setup.exe
+      - name: release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            kal-${{github.ref_name}}.exe
+            kal-${{github.ref_name}}-setup.exe
