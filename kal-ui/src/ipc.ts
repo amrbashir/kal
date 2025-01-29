@@ -1,3 +1,5 @@
+import { Action } from "./result_item";
+
 export enum IpcCommand {
   Query = "Query",
   ClearResults = "ClearResults",
@@ -11,4 +13,9 @@ export enum IpcEvent {
   UpdateConfig = "UpdateConfig",
   UpdateSystemAccentColor = "UpdateSystemAccentColor",
   UpdateCustomCSS = "UpdateCustomCSS",
+}
+
+export async function runAction(action: Action, itemId: string) {
+  const payload = `${action.id}#${itemId}`;
+  await window.KAL.ipc.invoke(IpcCommand.RunAction, payload);
 }

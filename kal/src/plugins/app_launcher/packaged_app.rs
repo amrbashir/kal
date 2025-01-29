@@ -17,7 +17,7 @@ use windows::Win32::Storage::Packaging::Appx::{
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
-use crate::icon::{BuiltInIcon, Icon};
+use crate::icon::{BuiltinIcon, Icon};
 use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, StringExt};
 
@@ -58,7 +58,7 @@ impl PackagedApp {
             .icon
             .as_ref()
             .map(|i| Icon::path(i.to_string_lossy()))
-            .unwrap_or_else(|| BuiltInIcon::BlankFile.into());
+            .unwrap_or_else(|| BuiltinIcon::BlankFile.into());
 
         let appid = self.appid.clone();
         let args_ = args.to_string();

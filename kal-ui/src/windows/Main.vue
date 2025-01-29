@@ -3,12 +3,12 @@ import { computed, onMounted, ref, useTemplateRef } from "vue";
 import { isEventForHotkey as isEventForAccelerator, isVScrollable } from "../utils";
 import { watchDebounced } from "@vueuse/core";
 import { ResultItem, Action } from "../result_item";
-import ReloadIcon from "../components/ReloadIcon.vue";
 import ResultItemComponent from "../components/ResultItem.vue";
+import SearchBox from "../components/SearchBox.vue";
+import Divider from "../components/Divider.vue";
 import { IpcCommand, IpcEvent } from "../ipc";
 import { useConfig } from "../composables/config";
 import { useSystemAccentColors } from "../composables/systemAccentColor";
-import { accentFillRest } from "@fluentui/web-components";
 import { useCustomCSS } from "../composables/customCss";
 import { useHead } from "@unhead/vue";
 
@@ -24,16 +24,13 @@ useHead({
 });
 
 const systemAccentColors = useSystemAccentColors();
-const accentFillRestStr = accentFillRest.getValueFor(document.documentElement).toColorString();
-const accentColor = computed(() => systemAccentColors.value.accent_light2 ?? accentFillRestStr);
+const accentColor = computed(() => systemAccentColors.value.accent_light2 ?? "#02a9ea#");
 
-const inputRef = useTemplateRef<HTMLElement>("input-ref");
+const inputRef = useTemplateRef("input-ref");
 onMounted(() =>
   window.KAL.ipc.on(IpcEvent.FocusInput, () => {
-    const shadowRoot = inputRef.value?.shadowRoot;
-    const input = shadowRoot?.querySelector<HTMLInputElement>("#control");
-    input?.focus();
-    input?.select();
+    inputRef?.value?.focus();
+    inputRef?.value?.select();
   }),
 );
 
@@ -49,17 +46,18 @@ const currentSelection = ref(0);
 const currentSelectedItem = computed(() => results.value[currentSelection.value]);
 const currentSelectedAction = ref(0);
 
-watchDebounced(currentQuery, (query) => runQuery(query), { debounce: 50 });
+watchDebounced(
+  currentQuery,
+  (query) => {
+    query ? runQuery(query) : resetQuery();
+  },
+  { debounce: 50 },
+);
 
 async function runQuery(query: string) {
-  if (query) {
-    const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
-    resetSelection();
-    results.value = response;
-  } else {
-    results.value = [];
-    await window.KAL.ipc.invoke(IpcCommand.ClearResults);
-  }
+  const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
+  resetSelection();
+  results.value = response;
 }
 
 function resetSelection() {
@@ -67,9 +65,10 @@ function resetSelection() {
   currentSelectedAction.value = 0;
 }
 
-function resetQuery() {
-  currentQuery.value = "";
+async function resetQuery() {
   resetSelection();
+  results.value = [];
+  await window.KAL.ipc.invoke(IpcCommand.ClearResults);
 }
 
 async function hideMainWindow() {
@@ -143,12 +142,6 @@ async function reload() {
   runQuery(currentQuery.value);
 }
 
-function onInputChange(e: InputEvent) {
-  if (e.target && "value" in e.target && e.target.value === "") {
-    resetQuery();
-  }
-}
-
 async function onInputKeyDown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     e.preventDefault();
@@ -195,28 +188,18 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
 
 <template>
   <main class="w-full h-full" :class="bgPrimaryColor">
-    <fluent-search
+    <SearchBox
       ref="input-ref"
-      :style="{ height: inputHeight }"
-      :class="[
-        'part:root:h-full w-full px-4 text-1rem',
-        'part:root:bg-none part:start:scale-120 after:hidden',
-        results.length === 0 ? 'rd-2' : 'rd-[0.5rem_0.5rem_0_0]',
-      ]"
+      :inputHeight
+      :reloading
       placeholder="Start typing..."
+      :style="{ height: inputHeight }"
       v-model="currentQuery"
       @keydown="onInputKeyDown"
-      @change="onInputChange"
     >
-      <div slot="clear-button" class="flex justify-center items-center">
-        <Transition name="fade">
-          <ReloadIcon v-if="reloading" class="animate-spin" />
-          <span v-else></span>
-        </Transition>
-      </div>
-    </fluent-search>
+    </SearchBox>
 
-    <fluent-divider />
+    <Divider class="bg-[var(--neutral-stroke-divider-rest)]"></Divider>
 
     <ul
       ref="items-container-ref"
@@ -225,19 +208,23 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
       tabindex="-1"
     >
       <ResultItemComponent
-        :itemHeight
+        :style="{ height: itemHeight }"
         v-for="(item, index) in results"
         ref="result-item-refs"
         :item
         :selected="index === currentSelection"
-        :selectedAction="currentSelectedAction"
+        :selectedActionIndex="currentSelectedAction"
       />
     </ul>
   </main>
 </template>
 
 <style>
-* {
-  --accent-fill-rest: v-bind(accentColor);
+main {
+  --accent: v-bind(accentColor);
+  --text-primary: #ffffff;
+  --text-secondary: #cbcbcb;
+
+  color: var(--text-primary);
 }
 </style>

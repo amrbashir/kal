@@ -3,7 +3,7 @@ use fuzzy_matcher::FuzzyMatcher;
 use strum::AsRefStr;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::{BuiltInIcon, Icon};
+use crate::icon::{BuiltinIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
@@ -122,12 +122,12 @@ impl SystemCommand {
 
     fn icon(&self) -> Icon {
         match self {
-            Self::Shutdown => BuiltInIcon::Shutdown.into(),
-            Self::Restart => BuiltInIcon::Restart.into(),
-            Self::SignOut => BuiltInIcon::SignOut.into(),
-            Self::Lock => BuiltInIcon::Lock.into(),
-            Self::Hibernate => BuiltInIcon::Hibernate.into(),
-            Self::Sleep => BuiltInIcon::Sleep.into(),
+            Self::Shutdown => BuiltinIcon::Shutdown.into(),
+            Self::Restart => BuiltinIcon::Restart.into(),
+            Self::SignOut => BuiltinIcon::SignOut.into(),
+            Self::Lock => BuiltinIcon::Lock.into(),
+            Self::Hibernate => BuiltinIcon::Hibernate.into(),
+            Self::Sleep => BuiltinIcon::Sleep.into(),
         }
     }
 

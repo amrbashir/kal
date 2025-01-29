@@ -20,4 +20,5 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --all-features
+      - run: mkdir kal-ui/dist # release builds expect this directory to exist
       - run: cargo test --release --all-features

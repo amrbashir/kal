@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::BuiltInIcon;
+use crate::icon::BuiltinIcon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, ResultItem};
 use crate::utils;
@@ -96,7 +96,7 @@ impl Shell {
 
         ResultItem {
             id: Plugin::ID.into(),
-            icon: BuiltInIcon::Shell.into(),
+            icon: BuiltinIcon::Shell.into(),
             primary_text: command,
             secondary_text: Plugin::DESCRIPTION.into(),
             tooltip: None,

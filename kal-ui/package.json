@@ -9,13 +9,13 @@
     "ts:check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@fluentui/web-components": "^2.6",
     "@unhead/vue": "^1.11.18",
     "@vueuse/core": "^12.3.0",
     "vue": "^3.4",
     "vue-router": "^4.3"
   },
   "devDependencies": {
+    "@iconify/utils": "^2.2.1",
     "@vitejs/plugin-vue": "^5.0",
     "typescript": "^5.4",
     "unocss": "^0.65.3",

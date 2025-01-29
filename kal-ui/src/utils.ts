@@ -2,7 +2,7 @@ import { Icon, IconType } from "./result_item";
 
 export function makeIconHTML(icon: Icon): string {
   switch (icon.type) {
-    case IconType.BuiltIn:
+    case IconType.Builtin:
     case IconType.Svg:
       return icon.data;
     case IconType.Path:

@@ -1,77 +1,53 @@
 <script setup lang="ts">
-import { IpcCommand } from "../ipc";
-import { Action, ResultItem } from "../result_item";
+import { runAction } from "../ipc";
+import { ResultItem } from "../result_item";
 import { makeIconHTML } from "../utils";
-import { neutralForegroundHover } from "@fluentui/web-components";
+import ResultItemAction from "./ResultItemAction.vue";
 
-const props = defineProps<{
+defineProps<{
   item: ResultItem;
   selected: boolean;
-  itemHeight: string;
-  selectedAction: number;
+  selectedActionIndex: number;
 }>();
-
-async function runAction(action: Action) {
-  const payload = `${action.id}#${props.item.id}`;
-  await window.KAL.ipc.invoke(IpcCommand.RunAction, payload);
-}
-
-const hoverBgColor = neutralForegroundHover.getValueFor(document.documentElement).toColorString();
-const hoverBgColor10Percent = `${hoverBgColor}1A`;
 </script>
 
 <template>
-  <fluent-option
-    :style="{ height: itemHeight }"
-    class="bg-transparent before:left-0 w-full part:content:flex part:content:w-full last:children:hover:flex"
-    :selected
-    @click="runAction(item.actions[0])"
+  <div
+    class="bg-transparent w-full flex last:children:hover:flex hover:bg-white/5 rd-1 relative"
+    :class="{
+      'bg-white/5 before:content-[\'\'] before:w-3px before:bg-[var(--accent)] before:rd-1':
+        selected,
+      'before:absolute before:h-40% before:translate-y--50% before:top-50%': selected,
+    }"
+    :aria-selected="selected"
+    @click="runAction(item.actions[0], item.id)"
     :title="item.tooltip ? item.tooltip : `${item.primary_text}\n${item.secondary_text}`"
   >
     <div
-      :style="{ width: itemHeight }"
-      class="flex justify-center items-center children:w-50% children:h-50%"
+      class="flex w-10% justify-center items-center children:h-50% children:aspect-ratio-square"
       v-html="makeIconHTML(item.icon)"
-    ></div>
+    />
 
     <div class="flex-1 flex flex-col justify-center overflow-hidden children:text-ellipsis">
-      <span class="text-1rem">
+      <span class="text-size-base">
         {{ item.primary_text }}
       </span>
-      <span class="text-[var(--neutral-fill-strong-hover)] text-xs">
+      <span class="text-[var(--text-secondary)] text-xs">
         {{ item.secondary_text }}
       </span>
     </div>
 
-    <div
+    <ul
       v-if="item.actions"
       class="justify-center items-center mr-2 gap-2 hidden"
       :class="{ flex: selected }"
     >
-      <button
-        class="py-2 px-2 bg-transparent outline-none rounded b-solid b-0.1rem b-transparent hover:bg-white/10 hover:b-white/20"
+      <ResultItemAction
         v-for="(action, index) in item.actions.slice(1)"
-        :title="`${action.description} (${action.accelerator})`"
-        @click.stop="runAction(action)"
-        :class="{ 'bg-white/10 b-white/20': selected && selectedAction == index + 1 }"
-      >
-        <div v-if="action.icon" class="h-4 w-4" v-html="makeIconHTML(action.icon)"></div>
-      </button>
-    </div>
-  </fluent-option>
+        :action
+        :itemId="item.id"
+        :selected="selected && selectedActionIndex == index + 1"
+      />
+    </ul>
+  </div>
 </template>
-
-<style scoped>
-ul fluent-option::part(content) {
-  height: v-bind(itemHeight);
-}
-
-ul fluent-option:hover,
-ul fluent-option[aria-selected="true"] {
-  background-color: v-bind(hoverBgColor10Percent);
-}
-
-ul fluent-option::before {
-  --base-height-multiplier: 12;
-}
-</style>

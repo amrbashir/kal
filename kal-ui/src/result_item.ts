@@ -10,8 +10,8 @@ export enum IconType {
   Overlay = "Overlay",
   /** {@linkcode Icon.data} is an SVG string. */
   Svg = "Svg",
-  /** {@linkcode Icon.data} is a [`BuiltInIcon`] variant. */
-  BuiltIn = "BuiltIn",
+  /** {@linkcode Icon.data} is a {@linkcode BuiltinIcon} variant. */
+  Builtin = "Builtin",
   /** {@linkcode Icon.data} is a url to an icon. */
   Url = "Url",
 }

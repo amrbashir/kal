@@ -2,7 +2,7 @@ use anyhow::Ok;
 use calculator_rs::Calculate;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::BuiltInIcon;
+use crate::icon::BuiltinIcon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, ResultItem};
 
@@ -17,7 +17,7 @@ impl Plugin {
     fn item(&self, result: String) -> ResultItem {
         ResultItem {
             id: Self::ID.into(),
-            icon: BuiltInIcon::Calculator.into(),
+            icon: BuiltinIcon::Calculator.into(),
             primary_text: result,
             secondary_text: Self::DESCRIPTION.into(),
             tooltip: None,

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::{BuiltInIcon, Icon};
+use crate::icon::{BuiltinIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt};
@@ -137,7 +137,7 @@ struct Workflow {
 
 impl Workflow {
     fn icon(&self) -> Icon {
-        self.icon.clone().unwrap_or(BuiltInIcon::Workflow.into())
+        self.icon.clone().unwrap_or(BuiltinIcon::Workflow.into())
     }
 
     fn confirmed(&self) -> bool {

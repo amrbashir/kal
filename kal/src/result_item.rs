@@ -1,7 +1,7 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::Serialize;
 
-use crate::icon::{BuiltInIcon, Icon};
+use crate::icon::{BuiltinIcon, Icon};
 
 #[derive(Serialize, Debug)]
 pub struct ResultItem {
@@ -94,7 +94,7 @@ impl Action {
         F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self::new("RunElevated", action)
-            .with_icon(BuiltInIcon::Admin.into())
+            .with_icon(BuiltinIcon::Admin.into())
             .with_description("Run as adminstrator")
             .with_accelerator("Shift+Enter")
     }
@@ -104,7 +104,7 @@ impl Action {
         F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
         Self::new("OpenLocation", action)
-            .with_icon(BuiltInIcon::FolderOpen.into())
+            .with_icon(BuiltinIcon::FolderOpen.into())
             .with_description("Open containing folder")
             .with_accelerator("Ctrl+O")
     }

@@ -1,7 +1,7 @@
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::BuiltInIcon;
+use crate::icon::BuiltinIcon;
 use crate::result_item::ResultItem;
 
 #[allow(unused_variables)]
@@ -31,7 +31,7 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
     fn error_item(&self, error: String) -> ResultItem {
         ResultItem {
             id: String::new(),
-            icon: BuiltInIcon::Error.into(),
+            icon: BuiltinIcon::Error.into(),
             primary_text: self.name().to_owned(),
             secondary_text: error,
             tooltip: None,

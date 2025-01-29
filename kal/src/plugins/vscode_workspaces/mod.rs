@@ -6,7 +6,7 @@ use serde::Deserialize;
 use sqlite::OpenFlags;
 
 use crate::config::{Config, GenericPluginConfig};
-use crate::icon::{BuiltInIcon, Icon};
+use crate::icon::{BuiltinIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, IteratorExt};
@@ -65,7 +65,7 @@ impl crate::plugin::Plugin for Plugin {
                 let vscode_icon = localappdata.join("Programs/Microsoft VS Code/Code.exe");
                 Icon::overlay(folder_icon.to_string_lossy(), vscode_icon.to_string_lossy())
             }
-            None => BuiltInIcon::Code.into(),
+            None => BuiltinIcon::Code.into(),
         };
 
         self.workspaces = workspaces
