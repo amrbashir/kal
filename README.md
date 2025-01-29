@@ -72,6 +72,7 @@ Config by default is read from `$HOME/.config/kal.toml`
 
 - `.scripts/dev.ps1` to start development.
 - `.scripts/build.ps1` to build the app.
+- `.scripts/create-installer.ps1` to create the installer.
 
 ## Thanks and Acknowledgement
 

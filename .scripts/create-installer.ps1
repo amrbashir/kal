@@ -1,10 +1,14 @@
 Copy-Item -Force "kal/assets/icon.ico" "installer/icon.ico"
 
-if ($env:CARGO_TARGET_DIR) {
-  Copy-Item -Force "$env:CARGO_TARGET_DIR/release/kal.exe" "installer/kal.exe"
-} else {
-  Copy-Item -Force "./target/release/kal.exe" "installer/kal.exe"
+$targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { './target' }
+
+$exe = "$targetDir/release/kal.exe"
+
+if (!(Test-Path $exe)) {
+  & ./.scripts/build.ps1
 }
+
+Copy-Item -Force $exe "installer/kal.exe"
 
 makensis /V4 installer/installer.nsi
 
