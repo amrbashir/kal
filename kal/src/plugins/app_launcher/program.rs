@@ -16,6 +16,7 @@ pub struct Program {
     pub name: OsString,
     pub path: PathBuf,
     pub id: String,
+    pub description: String,
 }
 
 impl Program {
@@ -23,7 +24,22 @@ impl Program {
         let name = path.file_stem().unwrap_or_default().to_os_string();
         let filename = path.file_name().unwrap_or_default().to_os_string();
         let id = format!("{}:{}", super::Plugin::NAME, filename.to_string_lossy());
-        Self { name, path, id }
+
+        let mut description = String::from("Application");
+
+        #[cfg(windows)]
+        if path.extension() == Some(OsStr::new("lnk")) {
+            if let Ok(target) = utils::resolve_shortcut_target(&path) {
+                description = get_app_type(&target).description().into();
+            }
+        }
+
+        Self {
+            name,
+            path,
+            id,
+            description,
+        }
     }
 
     fn item(&self, args: &str, score: i64) -> ResultItem {
@@ -45,7 +61,7 @@ impl Program {
             id: self.id.as_str().into(),
             icon: Icon::extract_path(self.path.to_string_lossy()),
             primary_text: self.name.to_string_lossy().into_owned(),
-            secondary_text: "Application".into(),
+            secondary_text: self.description.clone(),
             tooltip: Some(tooltip),
             actions: vec![open, open_elevated, open_location],
             score,
@@ -166,5 +182,44 @@ impl super::Plugin {
         self.programs_watcher.replace(debouncer);
 
         Ok(())
+    }
+}
+
+enum ProgramType {
+    Win32Application,
+    ShortcutApplication,
+    ApprefApplication,
+    InternetShortcutApplication,
+    GenericFile,
+}
+
+impl ProgramType {
+    const fn description(&self) -> &str {
+        match self {
+            ProgramType::Win32Application
+            | ProgramType::ShortcutApplication
+            | ProgramType::ApprefApplication => "Application",
+            ProgramType::InternetShortcutApplication => "Internet shortcut application",
+            ProgramType::GenericFile => "File",
+        }
+    }
+}
+
+fn get_app_type(path: &Path) -> ProgramType {
+    // taken from https://github.com/microsoft/PowerToys/blob/5fe761949fb92ba3ec60d5a41f1803aa845ba488/src/modules/launcher/Plugins/Microsoft.Plugin.Program/Programs/Win32Program.cs#L96
+    const EXE_EXTENSIONS: &[&str] = &[
+        "exe", "bat", "bin", "com", "cpl", "msc", "msi", "cmd", "ps1", "job", "msp", "mst", "sct",
+        "ws", "wsh", "wsf",
+    ];
+    let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+        return ProgramType::GenericFile;
+    };
+
+    match ext {
+        "lnk" => ProgramType::ShortcutApplication,
+        "appref-ms" => ProgramType::ApprefApplication,
+        "url" => ProgramType::InternetShortcutApplication,
+        ext if EXE_EXTENSIONS.contains(&ext) => ProgramType::Win32Application,
+        _ => ProgramType::GenericFile,
     }
 }
