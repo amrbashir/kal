@@ -1,3 +1,5 @@
+Copy-Item -Force "kal/assets/icon.ico" "installer/icon.ico"
+
 if ($env:CARGO_TARGET_DIR) {
   Copy-Item -Force "$env:CARGO_TARGET_DIR/release/kal.exe" "installer/kal.exe"
 } else {
