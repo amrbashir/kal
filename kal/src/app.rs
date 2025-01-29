@@ -4,8 +4,14 @@ use std::sync::{mpsc, Arc};
 
 use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(windows)]
-use windows::Win32::Foundation::HWND;
+use windows::core::*;
+#[cfg(windows)]
+use windows::Win32::Foundation::*;
+#[cfg(windows)]
+use windows::Win32::System::LibraryLoader::*;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
 use winit::application::ApplicationHandler;
@@ -22,7 +28,9 @@ use crate::webview_window::WebViewWindow;
 
 #[derive(Debug)]
 pub enum AppMessage {
-    HotKey(global_hotkey::GlobalHotKeyEvent),
+    HotKey(GlobalHotKeyEvent),
+    TrayIcon(TrayIconEvent),
+    Menu(MenuEvent),
     #[cfg(windows)]
     SystemSettingsChanged,
     RequestSufaceSize(Size),
@@ -46,6 +54,9 @@ pub struct App {
     pub previously_foreground_hwnd: HWND,
 
     pub icon_service: Arc<icon::Service>,
+
+    #[allow(unused)]
+    pub tray_icon: TrayIcon,
 }
 
 impl App {
@@ -60,10 +71,49 @@ impl App {
         let event_loop_proxy_ = event_loop_proxy.clone();
         let sender_ = sender.clone();
         GlobalHotKeyEvent::set_event_handler(Some(move |e| {
-            event_loop_proxy_.wake_up();
             if let Err(e) = sender_.send(AppMessage::HotKey(e)) {
                 tracing::error!("Failed to send `AppMessage::HotKey`: {e}");
             }
+            event_loop_proxy_.wake_up();
+        }));
+
+        let menu = Menu::with_items(&[
+            &MenuItem::with_id("show", "Show Launcher", true, None),
+            &MenuItem::with_id("settings", "Settings (soon)", false, None),
+            &MenuItem::with_id("quit", "Quit", true, None),
+        ])?;
+
+        let mut tray_icon = TrayIconBuilder::new()
+            .with_menu(Box::new(menu))
+            .with_tooltip("kal");
+
+        #[cfg(windows)]
+        {
+            const ICON_ID: PCWSTR = PCWSTR(2 as _);
+            let hinst = HINSTANCE(unsafe { GetModuleHandleW(None) }?.0);
+            let hicon = unsafe { LoadIconW(Some(hinst), ICON_ID) }?;
+            let icon = tray_icon::Icon::from_handle(hicon.0 as _);
+            tray_icon = tray_icon.with_icon(icon);
+        }
+
+        let tray_icon = tray_icon.build()?;
+
+        let event_loop_proxy_ = event_loop_proxy.clone();
+        let sender_ = sender.clone();
+        TrayIconEvent::set_event_handler(Some(move |e| {
+            if let Err(e) = sender_.send(AppMessage::TrayIcon(e)) {
+                tracing::error!("Failed to send `AppMessage::TrayIcon`: {e}");
+            }
+            event_loop_proxy_.wake_up();
+        }));
+
+        let event_loop_proxy_ = event_loop_proxy.clone();
+        let sender_ = sender.clone();
+        MenuEvent::set_event_handler(Some(move |e| {
+            if let Err(e) = sender_.send(AppMessage::Menu(e)) {
+                tracing::error!("Failed to send `AppMessage::Menu`: {e}");
+            }
+            event_loop_proxy_.wake_up();
         }));
 
         let icon_service = Arc::new(icon::Service::new(&kal_data_dir));
@@ -78,6 +128,7 @@ impl App {
             #[cfg(windows)]
             previously_foreground_hwnd: HWND::default(),
             icon_service,
+            tray_icon,
         })
     }
 
@@ -155,7 +206,7 @@ impl App {
 
     fn app_message(
         &mut self,
-        _event_loop: &dyn ActiveEventLoop,
+        event_loop: &dyn ActiveEventLoop,
         message: AppMessage,
     ) -> anyhow::Result<()> {
         let span = tracing::debug_span!("app::handle::message", ?message);
@@ -171,6 +222,22 @@ impl App {
                     }
                 }
             }
+
+            AppMessage::TrayIcon(e) => {
+                if let TrayIconEvent::DoubleClick {
+                    button: tray_icon::MouseButton::Left,
+                    ..
+                } = e
+                {
+                    self.show_main_window()?;
+                }
+            }
+
+            AppMessage::Menu(e) => match e.id.as_ref() {
+                "show" => self.show_main_window()?,
+                "quit" => event_loop.exit(),
+                _ => {}
+            },
 
             #[cfg(windows)]
             AppMessage::SystemSettingsChanged => {

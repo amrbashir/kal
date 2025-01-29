@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   width="32"
+   height="32"
+   viewBox="0 0 8.4666665 8.4666669"
+   version="1.1"
+>
+  <g
+     id="layer1">
+    <circle
+       style="fill:#509fd0;fill-opacity:1;fill-rule:evenodd;stroke-width:0.3799"
+       id="path10"
+       cx="4.2333336"
+       cy="4.2333336"
+       r="4.2333331" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.3185px;line-height:1.25;font-family:sans-serif;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:0.257964"
+       x="1.5773572"
+       y="7.5298314"
+       id="text837"><tspan
+         id="tspan835"
+         x="1.5773572"
+         y="7.5298314"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Calibri;-inkscape-font-specification:Calibri;fill:#ffffff;stroke-width:0.257964">K</tspan></text>
+  </g>
+</svg>

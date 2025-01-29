@@ -45,7 +45,7 @@ impl crate::plugin::Plugin for Plugin {
         GenericPluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(false),
-            direct_activation_command: Some(" ".into()),
+            direct_activation_command: Some("?".into()),
         }
     }
 

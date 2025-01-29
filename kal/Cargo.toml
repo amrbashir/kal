@@ -8,11 +8,13 @@ license = "MIT"
 edition = "2021"
 
 [build-dependencies]
-embed-manifest = "1.4"
+embed-resource = "2.5"
 
 [dependencies]
 wry = { git = "https://github.com/tauri-apps/wry", rev = "b3926d01db1628e521ca22861e7efbe6f30a538f" }
-winit = { path = "../../winit" }
+winit = { git = "https://github.com/amrbashir/winit", rev = "f26f5419bac8b135ffa6996ee8293c3138683d10" }
+global-hotkey = "0.6"
+tray-icon = "0.19"
 serde = "1"
 serde_json = "1"
 toml = "0.8"
@@ -28,7 +30,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tracing-chrome = "0.7"
 url = { version = "2.5", features = ["serde"] }
-global-hotkey = "0.6"
 calculator-rs = "0.1"
 arboard = "3.4"
 image = { version = "0.25", default-features = false, features = ["png"] }
