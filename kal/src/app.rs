@@ -31,6 +31,8 @@ pub enum AppMessage {
     HotKey(GlobalHotKeyEvent),
     TrayIcon(TrayIconEvent),
     Menu(MenuEvent),
+    #[cfg(all(not(debug_assertions), windows))]
+    WebviewFocused(WindowId, bool),
     #[cfg(windows)]
     SystemSettingsChanged,
     RequestSufaceSize(Size),
@@ -213,6 +215,15 @@ impl App {
         let _enter = span.enter();
 
         match message {
+            #[cfg(all(not(debug_assertions), windows))]
+            AppMessage::WebviewFocused(window_id, focus) => {
+                let main_window = self.main_window().window();
+                // hide main window when it loses focus
+                if window_id == main_window.id() && !focus {
+                    main_window.set_visible(false);
+                }
+            }
+
             AppMessage::HotKey(e) => {
                 if e.state == HotKeyState::Pressed {
                     if self.main_window().window().is_visible().unwrap_or_default() {
@@ -319,7 +330,7 @@ impl ApplicationHandler for App {
                 }
             }
 
-            #[cfg(not(debug_assertions))]
+            #[cfg(all(not(debug_assertions), not(windows)))]
             WindowEvent::Focused(focus) => {
                 let main_window = self.main_window().window();
                 // hide main window when it loses focus

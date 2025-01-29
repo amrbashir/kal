@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 use std::future::Future;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,7 @@ use wry::http::{Request, Response};
 use wry::WebViewBuilderExtWindows;
 use wry::{WebView, WebViewBuilder};
 
+use crate::app::AppMessage;
 use crate::ipc;
 use crate::ipc::AsyncIpcMessage;
 
@@ -197,7 +198,11 @@ impl WebViewWindowBuilder<'_> {
         self
     }
 
-    pub fn build(mut self, event_loop: &dyn ActiveEventLoop) -> anyhow::Result<WebViewWindow> {
+    pub fn build(
+        mut self,
+        event_loop: &dyn ActiveEventLoop,
+        #[allow(unused)] sender: &mpsc::Sender<AppMessage>,
+    ) -> anyhow::Result<WebViewWindow> {
         #[cfg(not(debug_assertions))]
         {
             self = self.protocol(
@@ -253,6 +258,11 @@ impl WebViewWindowBuilder<'_> {
 
         #[cfg(windows)]
         webview_window.clear_window_surface()?;
+        #[cfg(all(not(debug_assertions), windows))]
+        {
+            let proxy = event_loop.create_proxy();
+            webview_window.attach_webview_focus_handler(sender, proxy)?;
+        }
 
         Ok(webview_window)
     }
@@ -355,6 +365,48 @@ impl WebViewWindow {
         buffer.fill(0);
 
         buffer.present().map_err(|e| anyhow::anyhow!("{e}"))?;
+
+        Ok(())
+    }
+
+    #[cfg(all(not(debug_assertions), windows))]
+    pub fn attach_webview_focus_handler(
+        &self,
+        sender: &mpsc::Sender<AppMessage>,
+        proxy: winit::event_loop::EventLoopProxy,
+    ) -> anyhow::Result<()> {
+        use webview2_com::FocusChangedEventHandler;
+        use windows::Win32::System::WinRT::EventRegistrationToken;
+        use wry::WebViewExtWindows;
+
+        let controller = self.webview.controller();
+
+        let mut token = EventRegistrationToken::default();
+
+        unsafe {
+            let window_id = self.id();
+            let sender_ = sender.clone();
+            let proxy_ = proxy.clone();
+            controller.add_GotFocus(
+                &FocusChangedEventHandler::create(Box::new(move |_, _| {
+                    let _ = sender_.send(AppMessage::WebviewFocused(window_id, true));
+                    proxy_.wake_up();
+                    Ok(())
+                })),
+                &mut token,
+            )?;
+
+            let window_id = self.id();
+            let sender = sender.clone();
+            controller.add_LostFocus(
+                &FocusChangedEventHandler::create(Box::new(move |_, _| {
+                    let _ = sender.send(AppMessage::WebviewFocused(window_id, false));
+                    proxy.wake_up();
+                    Ok(())
+                })),
+                &mut token,
+            )?;
+        }
 
         Ok(())
     }

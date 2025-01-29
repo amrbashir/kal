@@ -80,7 +80,7 @@ impl App {
             .skip_taskbar(cfg!(any(windows, target_os = "linux")))
             .devtools(true);
 
-        let window = builder.build(event_loop)?;
+        let window = builder.build(event_loop, &self.sender)?;
 
         #[cfg(windows)]
         window.set_dwmwa_transitions(false);
