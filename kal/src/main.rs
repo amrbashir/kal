@@ -8,6 +8,7 @@ use tracing_subscriber::fmt::format::FmtSpan;
 #[cfg(not(debug_assertions))]
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::EnvFilter;
+use utils::open_url;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 mod app;
@@ -24,7 +25,26 @@ mod result_item;
 mod utils;
 mod webview_window;
 
+const WEBVIEW2_DOWNLOAD_LINK: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
+
 pub fn run(data_dir: PathBuf) -> anyhow::Result<()> {
+    if wry::webview_version().is_err() {
+        let res = rfd::MessageDialog::new()
+            .set_title("Missing WebView2 Runtime")
+            .set_description(
+                format!("This application requires WebView2 Runtime.\nDownload from {WEBVIEW2_DOWNLOAD_LINK}")
+            )
+            .set_level(rfd::MessageLevel::Error)
+            .set_buttons(rfd::MessageButtons::OkCancel)
+            .show();
+
+        if res == rfd::MessageDialogResult::Ok {
+            open_url(&WEBVIEW2_DOWNLOAD_LINK.parse()?)?;
+        }
+
+        std::process::exit(1);
+    }
+
     // Use two threads for async
     std::env::set_var("SMOL_THREADS", "2");
 
