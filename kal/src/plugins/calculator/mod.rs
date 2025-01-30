@@ -51,7 +51,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+        _matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if !query.starts_with(|c: char| c.is_ascii_digit()) {
             return Ok(PluginQueryOutput::None);

@@ -56,7 +56,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        _matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+        _matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self.shell.item(query.to_string(), self.no_exit).into())
     }

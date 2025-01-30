@@ -1,6 +1,5 @@
 use std::sync::{mpsc, Arc};
 
-use fuzzy_matcher::skim::SkimMatcherV2;
 use global_hotkey::hotkey::HotKey;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use smol::lock::RwLock;
@@ -112,7 +111,7 @@ pub struct MainWindowState {
     main_thread_sender: mpsc::Sender<AppMessage>,
     event_loop_proxy: EventLoopProxy,
 
-    fuzzy_matcher: SkimMatcherV2,
+    fuzzy_matcher: RwLock<crate::fuzzy_matcher::Matcher>,
 
     config: RwLock<Config>,
     plugin_store: RwLock<PluginStore>,
@@ -140,7 +139,7 @@ impl MainWindowState {
         Self {
             main_thread_sender,
             event_loop_proxy,
-            fuzzy_matcher: SkimMatcherV2::default(),
+            fuzzy_matcher: RwLock::new(crate::fuzzy_matcher::Matcher::default()),
             config: RwLock::new(config),
             plugin_store: RwLock::new(plugin_store),
             results: RwLock::new(Vec::with_capacity(max_results)),
@@ -232,9 +231,12 @@ impl MainWindowState {
 
                 let mut results = Vec::new();
 
+                // it is fine to block here since only one query can be processed at a time
                 let mut plugins_store = self.plugin_store.write().await;
+                let mut fuzzy_matcher = self.fuzzy_matcher.write().await;
+
                 plugins_store
-                    .query(query, &self.fuzzy_matcher, &mut results)
+                    .query(query, &mut fuzzy_matcher, &mut results)
                     .await?;
 
                 // sort results in reverse so higher scores are first

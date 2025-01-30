@@ -1,5 +1,3 @@
-use fuzzy_matcher::skim::SkimMatcherV2;
-
 use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltinIcon;
 use crate::result_item::ResultItem;
@@ -49,7 +47,7 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
     async fn query(
         &mut self,
         query: &str,
-        matcher: &SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(PluginQueryOutput::None)
     }
@@ -58,7 +56,7 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         self.query(query, matcher).await
     }

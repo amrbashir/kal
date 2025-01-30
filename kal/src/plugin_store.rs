@@ -1,8 +1,5 @@
 use std::ops::{Deref, DerefMut};
 
-use fuzzy_matcher::skim::SkimMatcherV2;
-use smol::prelude::*;
-
 use crate::config::Config;
 use crate::plugin::Plugin;
 use crate::result_item::ResultItem;
@@ -101,7 +98,7 @@ impl PluginStore {
     pub async fn query(
         &mut self,
         query: &str,
-        matcher: &SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
         results: &mut Vec<ResultItem>,
     ) -> anyhow::Result<()> {
         // check if a plugin is being invoked directly
@@ -116,15 +113,13 @@ impl PluginStore {
         } else {
             let trimmed_query = query.trim();
 
-            // otherwise get result from all queriable plugins
-            let mut results_iter = smol::stream::iter(self.queriable_plugins()).map(|p| async {
-                p.query(trimmed_query, matcher)
+            for plugin in self.queriable_plugins() {
+                let result = plugin
+                    .query(trimmed_query, matcher)
                     .await
-                    .map_err(|e| p.error_item(e.to_string()))
-            });
+                    .map_err(|e| plugin.error_item(e.to_string()));
 
-            while let Some(r) = results_iter.next().await {
-                match r.await {
+                match result {
                     Ok(r) => r.extend_into(results),
                     Err(r) => results.push(r),
                 }

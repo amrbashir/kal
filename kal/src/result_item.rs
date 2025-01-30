@@ -1,4 +1,3 @@
-use fuzzy_matcher::skim::SkimMatcherV2;
 use serde::Serialize;
 
 use crate::icon::{BuiltinIcon, Icon};
@@ -11,11 +10,15 @@ pub struct ResultItem {
     pub secondary_text: String,
     pub tooltip: Option<String>,
     pub actions: Vec<Action>,
-    pub score: i64,
+    pub score: u16,
 }
 
 pub trait IntoResultItem {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem>;
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem>;
 }
 
 type ActionFn = dyn Fn(&ResultItem) -> anyhow::Result<()> + Send + Sync;

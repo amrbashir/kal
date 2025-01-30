@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use serde::Deserialize;
 use sqlite::OpenFlags;
 
@@ -81,7 +79,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self
             .workspaces
@@ -139,7 +137,7 @@ impl Workspace {
 }
 
 impl Workspace {
-    fn item(&self, score: i64) -> ResultItem {
+    fn item(&self, score: u16) -> ResultItem {
         let uri = self.uri.clone();
 
         ResultItem {
@@ -162,7 +160,7 @@ impl Workspace {
 }
 
 impl IntoResultItem for Workspace {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
             .map(|score| self.item(score))

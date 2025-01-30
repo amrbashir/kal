@@ -1,8 +1,6 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::ApplicationModel::{
     Package, PackageCatalog, PackageInstallingEventArgs, PackageUninstallingEventArgs,
@@ -53,7 +51,7 @@ pub struct PackagedApp {
 }
 
 impl PackagedApp {
-    fn item(&self, args: &str, score: i64) -> ResultItem {
+    fn item(&self, args: &str, score: u16) -> ResultItem {
         let icon = self
             .icon
             .as_ref()
@@ -92,7 +90,7 @@ impl PackagedApp {
 }
 
 impl IntoResultItem for PackagedApp {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher

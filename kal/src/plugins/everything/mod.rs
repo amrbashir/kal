@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
+
 use serde::{Deserialize, Serialize};
 
 use crate::config::{Config, GenericPluginConfig};
@@ -59,7 +59,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             return Ok(PluginQueryOutput::None);
@@ -115,7 +115,7 @@ impl EverythingEntry {
 }
 
 impl IntoResultItem for EverythingEntry {
-    fn fuzzy_match(&self, _query: &str, _matcher: &SkimMatcherV2) -> Option<ResultItem> {
+    fn fuzzy_match(&self, _query: &str, _matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
         let actions = if self.is_dir {
             vec![
                 {

@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use fuzzy_matcher::skim::SkimMatcherV2;
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
@@ -111,7 +110,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        matcher: &SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             return Ok(PluginQueryOutput::None);
@@ -152,7 +151,7 @@ impl App {
 }
 
 impl IntoResultItem for App {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
         match self {
             App::Program(program) => program.fuzzy_match(query, matcher),
             #[cfg(windows)]

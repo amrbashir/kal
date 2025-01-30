@@ -15,6 +15,7 @@ mod app;
 mod config;
 #[cfg(not(debug_assertions))]
 mod embedded_assets;
+mod fuzzy_matcher;
 mod icon;
 mod ipc;
 mod main_window;

@@ -1,5 +1,3 @@
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use strum::AsRefStr;
 
 use crate::config::{Config, GenericPluginConfig};
@@ -23,7 +21,7 @@ impl Plugin {
             .collect_non_empty()
     }
 
-    fn all_for_query(&self, query: &str, matcher: &SkimMatcherV2) -> Option<Vec<ResultItem>> {
+    fn all_for_query(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<Vec<ResultItem>> {
         self.commands
             .iter()
             .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
@@ -58,7 +56,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self.all_for_query(query, matcher).into())
     }
@@ -66,7 +64,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &fuzzy_matcher::skim::SkimMatcherV2,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             Ok(self.all().into())
@@ -203,7 +201,7 @@ impl SystemCommand {
         unimplemented!()
     }
 
-    fn item(&self, score: i64) -> ResultItem {
+    fn item(&self, score: u16) -> ResultItem {
         let system_command = *self;
         ResultItem {
             id: self.id().into(),
@@ -218,7 +216,7 @@ impl SystemCommand {
 }
 
 impl IntoResultItem for SystemCommand {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
         matcher
             .fuzzy_match(self.as_ref(), query)
             .map(|score| self.item(score))

@@ -2,8 +2,6 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use fuzzy_matcher::skim::SkimMatcherV2;
-use fuzzy_matcher::FuzzyMatcher;
 use smol::prelude::*;
 
 use super::App;
@@ -42,7 +40,7 @@ impl Program {
         }
     }
 
-    fn item(&self, args: &str, score: i64) -> ResultItem {
+    fn item(&self, args: &str, score: u16) -> ResultItem {
         let path = self.path.clone();
         let args_ = args.to_string();
         let open = Action::primary(move |_| utils::execute_with_args(&path, &args_, false, false));
@@ -70,7 +68,7 @@ impl Program {
 }
 
 impl IntoResultItem for Program {
-    fn fuzzy_match(&self, query: &str, matcher: &SkimMatcherV2) -> Option<ResultItem> {
+    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher
