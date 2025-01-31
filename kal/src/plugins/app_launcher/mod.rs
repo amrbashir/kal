@@ -32,6 +32,7 @@ unsafe impl Send for Plugin {}
 unsafe impl Sync for Plugin {}
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 struct PluginConfig {
     #[serde(default = "default_paths")]
     paths: Vec<String>,

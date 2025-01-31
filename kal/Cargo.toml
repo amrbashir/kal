@@ -6,6 +6,7 @@ authors = ["Amr Bashir <contact@amrbashir.me>"]
 repository = "https://github.com/amrbashir/kal"
 license = "MIT"
 edition = "2021"
+default-run = "kal"
 
 [build-dependencies]
 embed-resource = "2.5"

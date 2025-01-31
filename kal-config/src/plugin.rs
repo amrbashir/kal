@@ -1,17 +1,53 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PluginConfig {
     /// Whether this plugin is enabled or not.
     pub enabled: Option<bool>,
     /// Whether to include this plugin in results in global queries.
+    #[serde(
+        alias = "include_in_global_results",
+        alias = "include-in-global-results"
+    )]
     pub include_in_global_results: Option<bool>,
     /// Direct activation command for this plugin.
+    #[serde(
+        alias = "direct_activation_command",
+        alias = "direct-activation-command"
+    )]
     pub direct_activation_command: Option<String>,
 
     /// An opaque type represnting plugin config options.
     #[serde(flatten)]
     pub inner: Option<toml::Table>,
+}
+
+impl JsonSchema for PluginConfig {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "PluginConfig".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema! ({
+            "type": ["object", "null"],
+            "properties": {
+                "enabled": {
+                    "type": ["boolean", "null"],
+                    "description": "Whether this plugin is enabled or not."
+                },
+                "includeInGlobalResults": {
+                    "type": ["boolean", "null"],
+                    "description": "Whether to include this plugin in results in global queries."
+                },
+                "directActivationCommand": {
+                    "type": ["string", "null"],
+                    "description": "Direct activation command for this plugin."
+                },
+            }
+        })
+    }
 }
 
 impl PluginConfig {

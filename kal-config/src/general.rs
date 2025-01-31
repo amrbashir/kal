@@ -1,7 +1,9 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// General configuration.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct GeneralConfig {
     /// A Hotkey string that consists of one key or modifiers + keys.
     /// For example: `Space` or `Alt+Space` or `Alt+Shift+Space`.
@@ -12,12 +14,20 @@ pub struct GeneralConfig {
     /// Whether pressing `Tab` will cycle through action buttons or go to next result item.
     ///
     /// Default: `true`
-    #[serde(default = "default_true")]
+    #[serde(
+        default = "default_true",
+        alias = "tab_through_action_buttons",
+        alias = "tab-through-action-buttons"
+    )]
     pub tab_through_action_buttons: bool,
     /// Max number of results to show per query.
     ///
     /// Default: `24`
-    #[serde(default = "default_max_results")]
+    #[serde(
+        default = "default_max_results",
+        alias = "max_results",
+        alias = "max-results"
+    )]
     pub max_results: usize,
 }
 

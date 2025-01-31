@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Vibrancy effects.
 ///
 /// Default: [`Vibrancy::Mica`]
-#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Copy, JsonSchema)]
 pub enum Vibrancy {
     /// Mica effect, Windows 11 only.
     #[default]
@@ -17,42 +18,63 @@ pub enum Vibrancy {
 }
 
 /// Appearance configuration.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AppearanceConfig {
     /// Window width.
     ///
     /// Default: `650`
-    #[serde(default = "default_window_width")]
+    #[serde(
+        default = "default_window_width",
+        alias = "window_width",
+        alias = "window-width"
+    )]
     pub window_width: u32,
     /// Input height.
     ///
     /// Default: `65`
-    #[serde(default = "default_input_height")]
+    #[serde(
+        default = "default_input_height",
+        alias = "input_height",
+        alias = "input-height"
+    )]
     pub input_height: u32,
     /// Gap between input and result items.
     ///
     /// Default: `16`
-    #[serde(default = "default_input_items_gap")]
+    #[serde(
+        default = "default_input_items_gap",
+        alias = "input_items_gap",
+        alias = "input-items-gap"
+    )]
     pub input_items_gap: u32,
     /// Number of items to show before scrolling.
     ///
     /// Default: `8`
-    #[serde(default = "default_max_items")]
+    #[serde(
+        default = "default_max_items",
+        alias = "max_items",
+        alias = "max-items"
+    )]
     pub max_items: u32,
     /// Result item height.
     ///
     /// Default: `55`
-    #[serde(default = "default_item_height")]
+    #[serde(
+        default = "default_item_height",
+        alias = "item_height",
+        alias = "item-height"
+    )]
     pub item_height: u32,
     /// Gap between result items.
     ///
     /// Default: `4`
-    #[serde(default = "default_item_gap")]
+    #[serde(default = "default_item_gap", alias = "item_gap", alias = "item-gap")]
     pub item_gap: u32,
-    #[serde(default = "default_true")]
     /// Whether the window is transparent or not.
     ///
     /// Default: `true`
+    #[serde(default = "default_true")]
     pub transparent: bool,
     /// Whether the window has shadows or not.
     ///
@@ -67,6 +89,7 @@ pub struct AppearanceConfig {
     /// A path to a custom CSS file.
     ///
     /// Default: None
+    #[serde(alias = "custom_css_file", alias = "custom-css-file")]
     pub custom_css_file: Option<PathBuf>,
 }
 

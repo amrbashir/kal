@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 mod appearance;
@@ -14,7 +15,8 @@ pub use general::*;
 pub use plugin::*;
 
 /// Kal configuration.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Config {
     /// General configuration.
     #[serde(default)]

@@ -1,5 +1,5 @@
 [workspace]
-members = ["kal", 'kal-config']
+members = ["kal", "kal-config", "kal-config-schema-generator"]
 resolver = "2"
 
 [profile.release]
@@ -15,3 +15,4 @@ serde_json = "1"
 toml = "0.8"
 tracing = "0.1"
 dirs = "5.0"
+schemars = "1.0.0-alpha.17"

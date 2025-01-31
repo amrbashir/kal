@@ -1,5 +1,5 @@
 [package]
-name = "kal-config"
+name = "kal-config-schema-generator"
 version = "0.1.0"
 description = "Configuration types for kal."
 authors = ["Amr Bashir <contact@amrbashir.me>"]
@@ -7,10 +7,7 @@ repository = "https://github.com/amrbashir/kal"
 license = "MIT"
 edition = "2021"
 
-[dependencies]
-serde = { workspace = true, features = ["derive"] }
-toml.workspace = true
-thiserror = "1"
-tracing.workspace = true
-dirs.workspace = true
+[build-dependencies]
 schemars.workspace = true
+serde_json.workspace = true
+kal-config = { path = "../kal-config" }

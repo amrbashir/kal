@@ -13,6 +13,7 @@ pub struct Plugin {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
 struct PluginConfig {
     shell: Option<Shell>,
     no_exit: Option<bool>,

@@ -15,6 +15,7 @@ pub struct Plugin {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
+#[serde(deny_unknown_fields)]
 struct PluginConfig {
     #[serde(default)]
     workflows: Vec<Workflow>,
