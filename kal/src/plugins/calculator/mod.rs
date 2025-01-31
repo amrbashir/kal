@@ -1,5 +1,4 @@
 use anyhow::Ok;
-use calculator_rs::Calculate;
 use kal_config::Config;
 
 use crate::icon::BuiltinIcon;
@@ -54,11 +53,12 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         _matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
-        if !query.starts_with(|c: char| c.is_ascii_digit()) {
-            return Ok(PluginQueryOutput::None);
-        }
+        let mut ctx = sci_calc::context::Context::new();
 
-        let result = query.calculate()?.to_string();
+        let result = sci_calc::calculate(&query, &mut ctx)
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .to_string();
+
         let item = self.item(result);
 
         Ok(PluginQueryOutput::One(item))

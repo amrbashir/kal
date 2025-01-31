@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tracing-chrome = "0.7"
 url = { version = "2.5", features = ["serde"] }
-calculator-rs = "0.1"
+sci-calc = "1.0.1"
 arboard = "3.4"
 image = { version = "0.25", default-features = false, features = ["png"] }
 strum = { version = "0.26", features = ["derive"] }
