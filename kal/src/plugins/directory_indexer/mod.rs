@@ -26,7 +26,7 @@ impl Plugin {
     const NAME: &'static str = "DirectoryIndexer";
 
     fn update_config(&mut self, config: &Config) {
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.paths = config.paths;
     }
 
@@ -48,7 +48,7 @@ impl Plugin {
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Self {
             paths: config.paths,

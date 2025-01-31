@@ -45,7 +45,7 @@ impl Plugin {
     const NAME: &'static str = "AppLauncher";
 
     fn update_config(&mut self, config: &Config) {
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.paths = config.paths;
         self.extensions = config.extensions;
         self.include_packaged_apps = config.include_packaged_apps;
@@ -70,7 +70,7 @@ impl Plugin {
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Self {
             paths: config.paths,

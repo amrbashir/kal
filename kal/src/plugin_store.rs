@@ -50,11 +50,30 @@ impl PluginEntry {
             .unwrap_or(false)
     }
 
-    pub fn invoke_cmd_len(&self) -> usize {
+    pub fn direct_invoke_len(&self) -> usize {
         self.direct_activation_command
             .as_ref()
             .map(|c| c.len())
             .unwrap_or_default()
+    }
+
+    fn update_from_config(&mut self, config: &Config) {
+        let default_c = self.default_plugin_config();
+
+        match config.plugins.get(self.name()) {
+            Some(c) => {
+                self.enabled = c.enabled_or(default_c.enabled);
+                self.include_in_global_results =
+                    c.include_in_global_results_or(default_c.include_in_global_results);
+                self.direct_activation_command =
+                    c.direct_activation_command_or(default_c.direct_activation_command.as_ref());
+            }
+            None => {
+                self.enabled = default_c.enabled();
+                self.include_in_global_results = default_c.include_in_global_results();
+                self.direct_activation_command = default_c.direct_activation_command();
+            }
+        };
     }
 }
 
@@ -70,19 +89,9 @@ impl PluginStore {
 
     pub async fn reload(&mut self, config: &Config) {
         for plugin in self.plugins.iter_mut() {
-            // update plugin generic config
-            let default_generic_config = plugin.default_plugin_config();
-            let generic_config = config
-                .plugin_config(plugin.name())
-                .cloned()
-                .map(|c| c.apply_from(&default_generic_config))
-                .unwrap_or_else(|| default_generic_config);
+            plugin.update_from_config(config);
 
-            plugin.enabled = generic_config.enabled();
-            plugin.include_in_global_results = generic_config.include_in_global_results();
-            plugin.direct_activation_command = generic_config.direct_activation_command;
-
-            // run plugin reload if enabled
+            // reload plugin reload if enabled
             if plugin.enabled {
                 if let Err(e) = plugin.reload(config).await {
                     tracing::error!("Failed to reload `{}`: {e}", plugin.name());
@@ -105,8 +114,8 @@ impl PluginStore {
     ) -> anyhow::Result<()> {
         // check if a plugin is being invoked directly
         if let Some(plugin) = self.plugins.iter_mut().find(|p| p.is_direct_invoke(query)) {
-            let invoke_cmd_len = plugin.invoke_cmd_len();
-            let new_query = &query[invoke_cmd_len..].trim();
+            let direct_invoke_len = plugin.direct_invoke_len();
+            let new_query = &query[direct_invoke_len..].trim();
 
             match plugin.query_direct(new_query, matcher).await {
                 Ok(res) => res.extend_into(results),

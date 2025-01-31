@@ -27,7 +27,7 @@ impl Plugin {
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         Self {
             shell: config.shell.unwrap_or_default(),
             no_exit: config.no_exit.unwrap_or_default(),
@@ -48,7 +48,7 @@ impl crate::plugin::Plugin for Plugin {
     }
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.shell = config.shell.unwrap_or_default();
         self.no_exit = config.no_exit.unwrap_or_default();
         Ok(())

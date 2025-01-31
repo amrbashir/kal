@@ -15,24 +15,6 @@ pub struct PluginConfig {
 }
 
 impl PluginConfig {
-    /// Applies default options from `another`.
-    pub fn apply_from(mut self, another: &Self) -> Self {
-        if self.enabled.is_none() {
-            self.enabled = another.enabled;
-        }
-
-        if self.include_in_global_results.is_none() {
-            self.include_in_global_results = another.include_in_global_results;
-        }
-
-        if self.direct_activation_command.is_none() {
-            self.direct_activation_command
-                .clone_from(&another.direct_activation_command);
-        }
-
-        self
-    }
-
     /// Whether this plugin is enabled or not.
     ///
     /// Default: `true`
@@ -40,10 +22,43 @@ impl PluginConfig {
         self.enabled.unwrap_or(true)
     }
 
+    /// Whether this plugin is enabled or not.
+    /// Falling back to provided default if `Some`.
+    ///
+    /// Default: `true`
+    pub fn enabled_or(&self, enabled: Option<bool>) -> bool {
+        self.enabled.or(enabled).unwrap_or(true)
+    }
+
     /// Whether to include this plugin in results in global queries.
     ///
     /// Default: `true`
     pub fn include_in_global_results(&self) -> bool {
         self.include_in_global_results.unwrap_or(true)
+    }
+
+    /// Whether to include this plugin in results in global queries.
+    ///
+    /// Falling back to provided default if `Some`.
+    ///
+    /// Default: `true`
+    pub fn include_in_global_results_or(&self, include: Option<bool>) -> bool {
+        self.include_in_global_results.or(include).unwrap_or(true)
+    }
+
+    /// Direct activation command for this plugin.
+    pub fn direct_activation_command(&self) -> Option<String> {
+        self.direct_activation_command.clone()
+    }
+
+    /// Direct activation command for this plugin.
+    ///
+    /// Falling back to provided default if `Some`.
+    ///
+    /// Default: `true`
+    pub fn direct_activation_command_or(&self, include: Option<&String>) -> Option<String> {
+        self.direct_activation_command
+            .clone()
+            .or_else(|| include.cloned())
     }
 }

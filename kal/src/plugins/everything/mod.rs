@@ -28,7 +28,7 @@ impl Plugin {
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let max_results = config.general.max_results;
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
         Self {
             es: config.es.unwrap_or_else(|| PathBuf::from("es")),
@@ -51,7 +51,7 @@ impl crate::plugin::Plugin for Plugin {
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.max_results = config.general.max_results;
-        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.es = config.es.unwrap_or_else(|| PathBuf::from("es"));
         Ok(())
     }

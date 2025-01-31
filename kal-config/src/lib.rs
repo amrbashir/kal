@@ -79,13 +79,9 @@ impl Config {
             .unwrap_or_default()
     }
 
-    /// Gets the config for specified plugin
-    pub fn plugin_config(&self, name: &str) -> Option<&PluginConfig> {
-        self.plugins.get(name)
-    }
-
-    /// Gets the inner config for specified plugin
-    pub fn plugin_config_inner<T>(&self, name: &str) -> T
+    /// Gets the inner config for specified plugin,
+    /// falling back to default if not found or failing to deserialize.
+    pub fn plugin_config<T>(&self, name: &str) -> T
     where
         T: Default,
         for<'de> T: Deserialize<'de>,
