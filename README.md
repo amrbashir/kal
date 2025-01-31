@@ -28,33 +28,49 @@ By default, you can open kal by using <kbd>Alt+Space</kbd>. This can be configur
 
 ### <p align="center">App Launcher</p>
 
+_<p align="center">Search and launch Applications</p>_
+
 <p align="center"><img width="500" alt="App Launcher" src="screenshots/AppLauncher.png" /></p>
 
 ### <p align="center">DirectoryIndexer</p>
+
+_<p align="center">Index a defined set of directories for quick access</p>_
 
 <p align="center"><img width="500" alt="Directory Indexer" src="screenshots/DirectoryIndexer.png" /></p>
 
 ### <p align="center">Everything Search</p>
 
+_<p align="center">Search through the file system using [Everything](https://www.voidtools.com/)</p>_
+
 <p align="center"><img width="500" alt="Everything Search" src="screenshots/Everything.png" /></p>
 
 ### <p align="center">Calculator</p>
+
+_<p align="center">Simple calcuolator for quick mathematical operations</p>_
 
 <p align="center"><img width="500" alt="Calculator" src="screenshots/Calculator.png" /></p>
 
 ### <p align="center">System Commands</p>
 
+_<p align="center">A set of commands to control the OS</p>_
+
 <p align="center"><img width="500" alt="System Commands" src="screenshots/SystemCommands.png" /></p>
 
 ### <p align="center">Shell</p>
+
+_<p align="center">Quickly execute commands in shell</p>_
 
 <p align="center"><img width="500" alt="Shell" src="screenshots/Shell.png" /></p>
 
 ### <p align="center">VSCode Workspaces</p>
 
+_<p align="center">List and search through VSCode recently opened workspaces</p>_
+
 <p align="center"><img width="500" alt="VSCode Workspaces" src="screenshots/VSCodeWorkspaces.png" /></p>
 
 ### <p align="center">Workflows</p>
+
+_<p align="center">Define a set of common workflows, like opening multiple applications together</p>_
 
 <p align="center"><img width="500" alt="Workflows" src="screenshots/Workflows.png" /></p>
 
@@ -64,12 +80,10 @@ Config by default is read from `$HOME/.config/kal.toml`.
 
 ## Future plans
 
-- [ ] Document current plugins
-- [ ] Config schema and example config file.
+- [ ] Settings UI
 - [ ] Commands to control Kal itself
 - [ ] Scoop.sh installer
 - [ ] Winget installer
-- [ ] Settings UI
 - [ ] Plugins in any programming language (C ABI compatible)
 - [ ] Native-like hover tooltips
 - [ ] Linux
