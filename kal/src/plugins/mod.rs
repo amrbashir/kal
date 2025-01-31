@@ -6,6 +6,7 @@ use crate::plugin_store::PluginStore;
 mod app_launcher;
 mod calculator;
 mod directory_indexer;
+#[cfg(windows)]
 mod everything;
 mod shell;
 mod system_commands;
@@ -17,6 +18,7 @@ pub fn all(config: &Config) -> PluginStore {
         app_launcher::Plugin::new(config).into(),
         calculator::Plugin::new(config).into(),
         directory_indexer::Plugin::new(config).into(),
+        #[cfg(windows)]
         everything::Plugin::new(config).into(),
         shell::Plugin::new(config).into(),
         system_commands::Plugin::new(config).into(),

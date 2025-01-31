@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 
 use kal_config::Config;
@@ -66,11 +67,13 @@ impl crate::plugin::Plugin for Plugin {
             return Ok(PluginQueryOutput::None);
         }
 
-        let output = std::process::Command::new(&self.es)
-            .arg(query)
-            .arg("-n")
-            .arg(self.max_results.to_string())
-            .output()?;
+        let mut cmd = std::process::Command::new(&self.es);
+        cmd.arg(query).arg("-n").arg(self.max_results.to_string());
+
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let output = cmd.output()?;
 
         match output.status.success() {
             true => {}
