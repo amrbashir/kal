@@ -1,5 +1,8 @@
-$path = "kal/Cargo.toml"
-(Get-Content $path) -replace "version = `"[0-9].[0-9].[0-9]`"", "version = `"$args`"" | Set-Content $path
+foreach ($cargoToml in Get-ChildItem "kal*/Cargo.toml") {
+  $path = $cargoToml.FullName
+  (Get-Content $path) -replace "version = `"[0-9].[0-9].[0-9]`"", "version = `"$args`"" | Set-Content $path
+}
+
 
 $path = "kal-ui/package.json"
 (Get-Content $path) -replace "`"version`": `"[0-9].[0-9].[0-9]`"", "`"version`": `"$args`"" | Set-Content $path

@@ -1,5 +1,6 @@
 [workspace]
-members = ["kal", "kal-config", "kal-config-schema-generator"]
+members = ["kal", "kal-*"]
+exclude = ["kal-ui"]
 resolver = "2"
 
 [profile.release]

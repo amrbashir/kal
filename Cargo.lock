@@ -1878,7 +1878,7 @@ dependencies = [
 
 [[package]]
 name = "kal-config"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dirs",
  "schemars",
@@ -1890,7 +1890,7 @@ dependencies = [
 
 [[package]]
 name = "kal-config-schema-generator"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kal-config",
  "schemars",
