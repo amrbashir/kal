@@ -102,7 +102,7 @@ function updateSelection(e: KeyboardEvent) {
   }
 
   if (e.key === "Tab" && !e.shiftKey) {
-    if (!config.value.general.tab_through_context_buttons) {
+    if (!config.value.general.tabThroughContextButtons) {
       selectNextItem();
     } else if (currentSelectedAction.value == currentSelectedItem.value.actions.length - 1) {
       selectNextItem();
@@ -112,7 +112,7 @@ function updateSelection(e: KeyboardEvent) {
   }
 
   if (e.key === "Tab" && e.shiftKey) {
-    if (!config.value.general.tab_through_context_buttons) {
+    if (!config.value.general.tabThroughContextButtons) {
       selectPrevItem();
     } else if (currentSelectedAction.value == 0) {
       selectPrevItem();
@@ -181,8 +181,8 @@ const isTransparent = computed(() => config.value.appearance.transparent);
 const bgPrimaryColor = computed(() =>
   isTransparent.value ? "bg-transparent" : "bg-[rgba(21,_20,_20,_0.75)]",
 );
-const inputHeight = computed(() => `${config.value.appearance.input_height}px`);
-const itemHeight = computed(() => `${config.value.appearance.item_height}px`);
+const inputHeight = computed(() => `${config.value.appearance.inputHeight}px`);
+const itemHeight = computed(() => `${config.value.appearance.itemHeight}px`);
 const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`);
 </script>
 

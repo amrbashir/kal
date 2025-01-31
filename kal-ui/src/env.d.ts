@@ -1,12 +1,12 @@
 /// <reference types="vite/client" />
 
 declare type KalConfig = {
-  general: { tab_through_context_buttons: boolean };
+  general: { tabThroughContextButtons: boolean };
 
   appearance: {
     transparent?: boolean;
-    input_height: number;
-    item_height: number;
+    inputHeight: number;
+    itemHeight: number;
   };
 };
 
