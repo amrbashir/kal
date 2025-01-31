@@ -55,7 +55,7 @@ impl crate::plugin::Plugin for Plugin {
     ) -> anyhow::Result<PluginQueryOutput> {
         let mut ctx = sci_calc::context::Context::new();
 
-        let result = sci_calc::calculate(&query, &mut ctx)
+        let result = sci_calc::calculate(query, &mut ctx)
             .map_err(|e| anyhow::anyhow!("{e}"))?
             .to_string();
 
