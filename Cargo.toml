@@ -1,5 +1,5 @@
 [workspace]
-members = ["kal"]
+members = ["kal", 'kal-config']
 resolver = "2"
 
 [profile.release]
@@ -8,3 +8,10 @@ lto = true        # Enables link-time-optimizations.
 opt-level = "s"   # Prioritizes small binary size. Use `3` if you prefer speed.
 panic = "abort"   # Higher performance by disabling panic handlers.
 strip = true      # Ensures debug symbols are removed.
+
+[workspace.dependencies]
+serde = "1"
+serde_json = "1"
+toml = "0.8"
+tracing = "0.1"
+dirs = "5.0"

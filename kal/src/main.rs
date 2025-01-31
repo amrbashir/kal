@@ -12,7 +12,6 @@ use utils::open_url;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 mod app;
-mod config;
 #[cfg(not(debug_assertions))]
 mod embedded_assets;
 mod fuzzy_matcher;

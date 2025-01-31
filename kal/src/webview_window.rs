@@ -5,7 +5,8 @@ use std::rc::Rc;
 use std::sync::{mpsc, Arc};
 
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
+use kal_config::Vibrancy;
+use serde::Serialize;
 use winit::dpi::{LogicalPosition, Position, Size};
 use winit::event_loop::ActiveEventLoop;
 #[cfg(windows)]
@@ -21,14 +22,6 @@ use crate::ipc;
 use crate::ipc::AsyncIpcMessage;
 
 pub type ProtocolResult = anyhow::Result<Response<Cow<'static, [u8]>>>;
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub enum Vibrancy {
-    Mica,
-    Tabbed,
-    Acrylic,
-    Blur,
-}
 
 pub struct WebViewWindowBuilder<'a> {
     window_attrs: WindowAttributes,

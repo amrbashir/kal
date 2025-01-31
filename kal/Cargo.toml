@@ -11,21 +11,22 @@ edition = "2021"
 embed-resource = "2.5"
 
 [dependencies]
+kal-config = { path = "../kal-config" }
 wry = { git = "https://github.com/tauri-apps/wry", rev = "b3926d01db1628e521ca22861e7efbe6f30a538f" }
 winit = { git = "https://github.com/amrbashir/winit", rev = "f26f5419bac8b135ffa6996ee8293c3138683d10" }
 global-hotkey = "0.6"
 tray-icon = "0.19"
-serde = "1"
-serde_json = "1"
-toml = "0.8"
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
 rust-embed = "8.1"
 serialize-to-javascript = "0.1"
 nucleo-matcher = "0.3"
-dirs = "5.0"
+dirs.workspace = true
 percent-encoding = "2.3"
 dunce = "1"
 anyhow = "1"
-tracing = "0.1"
+tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 tracing-chrome = "0.7"

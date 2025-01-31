@@ -4,6 +4,7 @@ use std::sync::{mpsc, Arc};
 
 use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+use kal_config::Config;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(windows)]
@@ -20,7 +21,6 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
-use crate::config::Config;
 use crate::icon;
 use crate::ipc::IpcEvent;
 use crate::main_window::MainWindowState;
@@ -65,7 +65,7 @@ impl App {
     pub fn new(kal_data_dir: PathBuf, event_loop_proxy: EventLoopProxy) -> anyhow::Result<Self> {
         let (sender, receiver) = mpsc::channel();
 
-        let config = Config::load()?;
+        let config = Config::load_with_fallback();
 
         let global_hotkey_manager = GlobalHotKeyManager::new()?;
         global_hotkey_manager.register(HotKey::try_from(config.general.hotkey.as_str())?)?;

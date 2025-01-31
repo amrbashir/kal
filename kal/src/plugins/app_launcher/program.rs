@@ -68,7 +68,11 @@ impl Program {
 }
 
 impl IntoResultItem for Program {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher

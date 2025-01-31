@@ -90,7 +90,11 @@ impl PackagedApp {
 }
 
 impl IntoResultItem for PackagedApp {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 
         matcher

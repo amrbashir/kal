@@ -1,6 +1,6 @@
+use kal_config::Config;
 use strum::AsRefStr;
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{BuiltinIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
@@ -21,7 +21,11 @@ impl Plugin {
             .collect_non_empty()
     }
 
-    fn all_for_query(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<Vec<ResultItem>> {
+    fn all_for_query(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<Vec<ResultItem>> {
         self.commands
             .iter()
             .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
@@ -41,11 +45,12 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(true),
             direct_activation_command: Some("!".into()),
+            inner: None,
         }
     }
 
@@ -216,7 +221,11 @@ impl SystemCommand {
 }
 
 impl IntoResultItem for SystemCommand {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(self.as_ref(), query)
             .map(|score| self.item(score))

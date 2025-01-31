@@ -1,10 +1,9 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-
+use kal_config::Config;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::icon::Icon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
@@ -29,7 +28,7 @@ impl Plugin {
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let max_results = config.general.max_results;
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
 
         Self {
             es: config.es.unwrap_or_else(|| PathBuf::from("es")),
@@ -41,17 +40,18 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(false),
             direct_activation_command: Some("?".into()),
+            inner: toml::Table::try_from(PluginConfig::default()).ok(),
         }
     }
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.max_results = config.general.max_results;
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
         self.es = config.es.unwrap_or_else(|| PathBuf::from("es"));
         Ok(())
     }
@@ -115,7 +115,11 @@ impl EverythingEntry {
 }
 
 impl IntoResultItem for EverythingEntry {
-    fn fuzzy_match(&self, _query: &str, _matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        _query: &str,
+        _matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         let actions = if self.is_dir {
             vec![
                 {

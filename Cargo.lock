@@ -1715,6 +1715,7 @@ dependencies = [
  "embed-resource",
  "global-hotkey",
  "image",
+ "kal-config",
  "notify",
  "notify-debouncer-mini",
  "nucleo-matcher",
@@ -1739,6 +1740,17 @@ dependencies = [
  "windows",
  "winit",
  "wry",
+]
+
+[[package]]
+name = "kal-config"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "serde",
+ "thiserror 1.0.69",
+ "toml",
+ "tracing",
 ]
 
 [[package]]

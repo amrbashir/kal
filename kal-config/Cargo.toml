@@ -1,0 +1,15 @@
+[package]
+name = "kal-config"
+version = "0.1.0"
+description = "Configuration types for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+serde.workspace = true
+toml.workspace = true
+thiserror = "1"
+tracing.workspace = true
+dirs.workspace = true

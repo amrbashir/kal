@@ -1,6 +1,6 @@
+use kal_config::Config;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltinIcon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, ResultItem};
@@ -26,8 +26,8 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(config: &crate::config::Config) -> Self {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+    fn new(config: &Config) -> Self {
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
         Self {
             shell: config.shell.unwrap_or_default(),
             no_exit: config.no_exit.unwrap_or_default(),
@@ -38,16 +38,17 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(false),
             direct_activation_command: Some(">".into()),
+            inner: None,
         }
     }
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
         self.shell = config.shell.unwrap_or_default();
         self.no_exit = config.no_exit.unwrap_or_default();
         Ok(())

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
+use kal_config::Config;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{BuiltinIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
@@ -40,7 +40,11 @@ impl Plugin {
             .collect_non_empty()
     }
 
-    fn all_for_query(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<Vec<ResultItem>> {
+    fn all_for_query(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<Vec<ResultItem>> {
         self.workflows
             .iter()
             .filter_map(|workflow| workflow.fuzzy_match(query, matcher))
@@ -51,7 +55,7 @@ impl Plugin {
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
 
         let mut plugin = Self {
             workflows: config.workflows,
@@ -66,16 +70,17 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(true),
             direct_activation_command: Some("@".into()),
+            inner: None,
         }
     }
 
     async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
-        let config = config.plugin_config::<PluginConfig>(self.name());
+        let config = config.plugin_config_inner::<PluginConfig>(self.name());
 
         self.workflows = config.workflows;
         self.update_ids();
@@ -203,7 +208,11 @@ impl Workflow {
 }
 
 impl IntoResultItem for Workflow {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
             .or_else(|| {

@@ -1,4 +1,5 @@
-use crate::config::Config;
+use kal_config::Config;
+
 use crate::plugin::Plugin;
 use crate::plugin_store::PluginStore;
 

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
+use kal_config::Config;
 use serde::Deserialize;
 use sqlite::OpenFlags;
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::icon::{BuiltinIcon, Icon};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
@@ -22,7 +22,7 @@ impl Plugin {
 
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
-    fn new(_config: &crate::config::Config) -> Self {
+    fn new(_config: &Config) -> Self {
         Self {
             workspaces: Vec::new(),
         }
@@ -32,11 +32,12 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(false),
             direct_activation_command: Some("{".into()),
+            inner: None,
         }
     }
 
@@ -160,7 +161,11 @@ impl Workspace {
 }
 
 impl IntoResultItem for Workspace {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
             .map(|score| self.item(score))

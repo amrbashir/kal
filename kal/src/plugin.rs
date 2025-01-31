@@ -1,4 +1,5 @@
-use crate::config::{Config, GenericPluginConfig};
+use kal_config::{Config, PluginConfig};
+
 use crate::icon::BuiltinIcon;
 use crate::result_item::ResultItem;
 
@@ -17,11 +18,12 @@ pub trait Plugin: std::fmt::Debug + Send + Sync {
     fn name(&self) -> &'static str;
 
     /// Default generic config
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> PluginConfig {
+        PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(true),
             direct_activation_command: None,
+            inner: None,
         }
     }
 

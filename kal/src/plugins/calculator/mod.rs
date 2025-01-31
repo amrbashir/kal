@@ -1,7 +1,7 @@
 use anyhow::Ok;
 use calculator_rs::Calculate;
+use kal_config::Config;
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::icon::BuiltinIcon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, ResultItem};
@@ -40,11 +40,12 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(true),
             direct_activation_command: Some("=".into()),
+            inner: None,
         }
     }
 

@@ -1,12 +1,12 @@
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use kal_config::Config;
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
 use windows::ApplicationModel::PackageCatalog;
 
-use crate::config::{Config, GenericPluginConfig};
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
@@ -45,7 +45,7 @@ impl Plugin {
     const NAME: &'static str = "AppLauncher";
 
     fn update_config(&mut self, config: &Config) {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
         self.paths = config.paths;
         self.extensions = config.extensions;
         self.include_packaged_apps = config.include_packaged_apps;
@@ -70,7 +70,7 @@ impl Plugin {
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
 
         Self {
             paths: config.paths,
@@ -86,11 +86,12 @@ impl crate::plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    fn default_generic_config(&self) -> GenericPluginConfig {
-        GenericPluginConfig {
+    fn default_plugin_config(&self) -> kal_config::PluginConfig {
+        kal_config::PluginConfig {
             enabled: Some(true),
             include_in_global_results: Some(true),
             direct_activation_command: Some(".".into()),
+            inner: toml::Table::try_from(PluginConfig::default()).ok(),
         }
     }
 
@@ -151,7 +152,11 @@ impl App {
 }
 
 impl IntoResultItem for App {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         match self {
             App::Program(program) => program.fuzzy_match(query, matcher),
             #[cfg(windows)]

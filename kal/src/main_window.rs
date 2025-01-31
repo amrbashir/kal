@@ -1,6 +1,7 @@
 use std::sync::{mpsc, Arc};
 
 use global_hotkey::hotkey::HotKey;
+use kal_config::Config;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use smol::lock::RwLock;
 use winit::dpi::LogicalSize;
@@ -8,7 +9,6 @@ use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use wry::http::Request;
 
 use crate::app::{App, AppMessage};
-use crate::config::Config;
 use crate::icon;
 use crate::ipc::{response, AsyncIpcMessage, IpcCommand, IpcEvent, IpcResult};
 use crate::plugin_store::PluginStore;
@@ -288,7 +288,7 @@ impl MainWindowState {
 
                 let old_hotkey = config.general.hotkey.clone();
 
-                *config = Config::load_async().await?;
+                *config = Config::load_with_fallback();
 
                 let mut plugin_store = self.plugin_store.write().await;
                 plugin_store.reload(&config).await;

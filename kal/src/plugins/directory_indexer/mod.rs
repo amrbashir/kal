@@ -1,12 +1,10 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-
-
+use kal_config::Config;
 use serde::{Deserialize, Serialize};
 use smol::stream::*;
 
-use crate::config::Config;
 use crate::icon::Icon;
 use crate::plugin::PluginQueryOutput;
 use crate::result_item::{Action, IntoResultItem, ResultItem};
@@ -28,7 +26,7 @@ impl Plugin {
     const NAME: &'static str = "DirectoryIndexer";
 
     fn update_config(&mut self, config: &Config) {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
         self.paths = config.paths;
     }
 
@@ -50,7 +48,7 @@ impl Plugin {
 #[async_trait::async_trait]
 impl crate::plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
-        let config = config.plugin_config::<PluginConfig>(Self::NAME);
+        let config = config.plugin_config_inner::<PluginConfig>(Self::NAME);
 
         Self {
             paths: config.paths,
@@ -146,7 +144,11 @@ impl DirEntry {
 }
 
 impl IntoResultItem for DirEntry {
-    fn fuzzy_match(&self, query: &str, matcher: &mut crate::fuzzy_matcher::Matcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)
             .or_else(|| matcher.fuzzy_match(&self.path.to_string_lossy(), query))

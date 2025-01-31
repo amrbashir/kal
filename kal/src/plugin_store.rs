@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::config::Config;
+use kal_config::Config;
+
 use crate::plugin::Plugin;
 use crate::result_item::ResultItem;
 
@@ -33,7 +34,7 @@ impl<P: Plugin + 'static> From<P> for PluginEntry {
 
 impl PluginEntry {
     fn new<P: Plugin + 'static>(plugin: P) -> Self {
-        let config = plugin.default_generic_config();
+        let config = plugin.default_plugin_config();
         Self {
             enabled: config.enabled.unwrap_or(true),
             include_in_global_results: config.include_in_global_results.unwrap_or(true),
@@ -70,9 +71,10 @@ impl PluginStore {
     pub async fn reload(&mut self, config: &Config) {
         for plugin in self.plugins.iter_mut() {
             // update plugin generic config
-            let default_generic_config = plugin.default_generic_config();
+            let default_generic_config = plugin.default_plugin_config();
             let generic_config = config
-                .generic_config_for_plugin(plugin.name())
+                .plugin_config(plugin.name())
+                .cloned()
                 .map(|c| c.apply_from(&default_generic_config))
                 .unwrap_or_else(|| default_generic_config);
 
