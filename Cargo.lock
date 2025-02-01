@@ -1855,6 +1855,7 @@ dependencies = [
  "percent-encoding",
  "rfd",
  "rust-embed",
+ "schemars",
  "sci-calc",
  "serde",
  "serde_json",
@@ -1886,15 +1887,6 @@ dependencies = [
  "thiserror 1.0.69",
  "toml",
  "tracing",
-]
-
-[[package]]
-name = "kal-config-schema-generator"
-version = "0.2.0"
-dependencies = [
- "kal-config",
- "schemars",
- "serde_json",
 ]
 
 [[package]]

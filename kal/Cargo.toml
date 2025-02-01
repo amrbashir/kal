@@ -10,6 +10,9 @@ default-run = "kal"
 
 [build-dependencies]
 embed-resource = "2.5"
+schemars.workspace = true
+serde_json.workspace = true
+kal-config = { path = "../kal-config" }
 
 [dependencies]
 kal-config = { path = "../kal-config" }
