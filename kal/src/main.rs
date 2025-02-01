@@ -19,7 +19,7 @@ mod icon;
 mod ipc;
 mod main_window;
 mod plugin;
-mod plugin_store;
+mod plugin_manager;
 mod plugins;
 mod result_item;
 mod utils;

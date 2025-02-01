@@ -1,7 +1,7 @@
 use kal_config::Config;
 
 use crate::plugin::Plugin;
-use crate::plugin_store::PluginStore;
+use crate::plugin_manager::PluginManager;
 
 mod app_launcher;
 mod calculator;
@@ -13,8 +13,8 @@ mod system_commands;
 mod vscode_workspaces;
 mod workflows;
 
-pub fn all(config: &Config) -> PluginStore {
-    PluginStore::new(vec![
+pub fn all(config: &Config) -> PluginManager {
+    PluginManager::new(vec![
         app_launcher::Plugin::new(config).into(),
         calculator::Plugin::new(config).into(),
         directory_indexer::Plugin::new(config).into(),

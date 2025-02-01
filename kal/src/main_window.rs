@@ -11,7 +11,7 @@ use wry::http::Request;
 use crate::app::{App, AppMessage};
 use crate::icon;
 use crate::ipc::{response, AsyncIpcMessage, IpcCommand, IpcEvent, IpcResult};
-use crate::plugin_store::PluginStore;
+use crate::plugin_manager::PluginManager;
 use crate::result_item::ResultItem;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
@@ -111,10 +111,8 @@ pub struct MainWindowState {
     main_thread_sender: mpsc::Sender<AppMessage>,
     event_loop_proxy: EventLoopProxy,
 
-    fuzzy_matcher: RwLock<crate::fuzzy_matcher::Matcher>,
-
     config: RwLock<Config>,
-    plugin_store: RwLock<PluginStore>,
+    plugin_manager: RwLock<PluginManager>,
     results: RwLock<Vec<ResultItem>>,
 }
 
@@ -133,15 +131,14 @@ impl MainWindowState {
     ) -> Self {
         let max_results = config.general.max_results;
 
-        let mut plugin_store = crate::plugins::all(&config);
-        plugin_store.reload(&config).await;
+        let mut plugin_manager = crate::plugins::all(&config);
+        plugin_manager.reload(&config).await;
 
         Self {
             main_thread_sender,
             event_loop_proxy,
-            fuzzy_matcher: RwLock::new(crate::fuzzy_matcher::Matcher::default()),
             config: RwLock::new(config),
-            plugin_store: RwLock::new(plugin_store),
+            plugin_manager: RwLock::new(plugin_manager),
             results: RwLock::new(Vec::with_capacity(max_results)),
         }
     }
@@ -229,18 +226,10 @@ impl MainWindowState {
                 let body = request.body();
                 let query = std::str::from_utf8(body)?;
 
-                let mut results = Vec::new();
-
                 // it is fine to block here since only one query can be processed at a time
-                let mut plugins_store = self.plugin_store.write().await;
-                let mut fuzzy_matcher = self.fuzzy_matcher.write().await;
+                let mut plugins_store = self.plugin_manager.write().await;
 
-                plugins_store
-                    .query(query, &mut fuzzy_matcher, &mut results)
-                    .await?;
-
-                // sort results in reverse so higher scores are first
-                results.sort_by(|a, b| b.score.cmp(&a.score));
+                let results = plugins_store.query(query).await?;
 
                 let config = self.config.read().await;
 
@@ -290,8 +279,8 @@ impl MainWindowState {
 
                 *config = Config::load_with_fallback();
 
-                let mut plugin_store = self.plugin_store.write().await;
-                plugin_store.reload(&config).await;
+                let mut plugin_manager = self.plugin_manager.write().await;
+                plugin_manager.reload(&config).await;
 
                 let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
                 let new_hotkey = HotKey::try_from(config.general.hotkey.as_str())?;

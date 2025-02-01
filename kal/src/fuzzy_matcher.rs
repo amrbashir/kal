@@ -1,4 +1,4 @@
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Matcher {
     inner: nucleo_matcher::Matcher,
 }
