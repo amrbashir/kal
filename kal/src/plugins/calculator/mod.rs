@@ -23,7 +23,7 @@ impl Plugin {
                 let mut clipboard = arboard::Clipboard::new()?;
                 clipboard.set_text(&item.primary_text).map_err(Into::into)
             })],
-            score: 0,
+            score: 200,
         }
     }
 }
@@ -54,12 +54,12 @@ impl crate::plugin::Plugin for Plugin {
     ) -> anyhow::Result<PluginQueryOutput> {
         let mut ctx = sci_calc::context::Context::new();
 
-        if let Ok(result) = sci_calc::calculate(query, &mut ctx) {
-            let item = self.item(result.to_string());
-            Ok(PluginQueryOutput::One(item))
-        } else {
-            Ok(PluginQueryOutput::None)
-        }
+        let Ok(result) = sci_calc::calculate(query, &mut ctx) else {
+            return Ok(PluginQueryOutput::None);
+        };
+
+        let item = self.item(result.to_string());
+        Ok(PluginQueryOutput::One(item))
     }
 
     async fn query_direct(
@@ -67,6 +67,7 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         _matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
+        // empty query should show empty result
         if query.is_empty() {
             return Ok(PluginQueryOutput::One(self.item("".to_string())));
         }
