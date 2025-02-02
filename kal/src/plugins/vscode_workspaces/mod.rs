@@ -5,8 +5,8 @@ use serde::Deserialize;
 use sqlite::OpenFlags;
 
 use crate::icon::{BuiltinIcon, Icon};
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{Action, IntoResultItem, ResultItem};
+use kal_plugin::PluginQueryOutput;
+use kal_plugin::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, IteratorExt};
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(_config: &Config) -> Self {
         Self {
             workspaces: Vec::new(),
@@ -80,7 +80,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self
             .workspaces
@@ -161,11 +161,7 @@ impl Workspace {
 }
 
 impl IntoResultItem for Workspace {
-    fn fuzzy_match(
-        &self,
-        query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
-    ) -> Option<ResultItem> {
+    fn fuzzy_match(&self, query: &str, matcher: &mut kal_plugin::FuzzyMatcher) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
             .map(|score| self.item(score))

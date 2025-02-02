@@ -2,13 +2,12 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use kal_config::Config;
+use kal_plugin::{IntoResultItem, PluginQueryOutput, ResultItem};
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
 use windows::ApplicationModel::PackageCatalog;
 
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
 
 #[cfg(windows)]
@@ -69,7 +68,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
@@ -112,7 +111,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             return Ok(PluginQueryOutput::None);
@@ -156,7 +155,7 @@ impl IntoResultItem for App {
     fn fuzzy_match(
         &self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<ResultItem> {
         match self {
             App::Program(program) => program.fuzzy_match(query, matcher),

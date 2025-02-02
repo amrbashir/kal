@@ -1,9 +1,9 @@
 #[derive(Default, Debug)]
-pub struct Matcher {
+pub struct FuzzyMatcher {
     inner: nucleo_matcher::Matcher,
 }
 
-impl Matcher {
+impl FuzzyMatcher {
     pub fn fuzzy_match(&mut self, haystack: &str, needle: &str) -> Option<u16> {
         let mut haystack_buf = Vec::new();
         let mut needle_buf = Vec::new();

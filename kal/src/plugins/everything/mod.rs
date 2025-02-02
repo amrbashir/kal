@@ -3,11 +3,10 @@ use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 
 use kal_config::Config;
+use kal_plugin::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
 use serde::{Deserialize, Serialize};
 
 use crate::icon::Icon;
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self};
 
 #[derive(Debug)]
@@ -27,7 +26,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
@@ -61,7 +60,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             return Ok(PluginQueryOutput::None);
@@ -122,7 +121,7 @@ impl IntoResultItem for EverythingEntry {
     fn fuzzy_match(
         &self,
         _query: &str,
-        _matcher: &mut crate::fuzzy_matcher::Matcher,
+        _matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<ResultItem> {
         let actions = if self.is_dir {
             vec![

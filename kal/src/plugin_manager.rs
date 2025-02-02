@@ -1,17 +1,25 @@
 use std::ops::{Deref, DerefMut};
 
 use kal_config::Config;
+use kal_plugin::{Plugin, ResultItem};
 use smol::lock::RwLock;
 
-use crate::plugin::Plugin;
-use crate::result_item::ResultItem;
-
-#[derive(Debug)]
 pub struct PluginEntry {
     pub enabled: bool,
     pub include_in_global_results: bool,
     pub direct_activation_command: Option<String>,
     plugin: Box<dyn Plugin>,
+}
+
+impl std::fmt::Debug for PluginEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PluginEntry")
+            .field("enabled", &self.enabled)
+            .field("include_in_global_results", &self.include_in_global_results)
+            .field("direct_activation_command", &self.direct_activation_command)
+            .field("plugin_name", &self.plugin.name())
+            .finish()
+    }
 }
 
 impl Deref for PluginEntry {
@@ -41,6 +49,19 @@ impl PluginEntry {
             include_in_global_results: config.include_in_global_results.unwrap_or(true),
             direct_activation_command: config.direct_activation_command,
             plugin: Box::new(plugin),
+        }
+    }
+
+    /// Convenient method to construct an error [ResultItem] for this plugin.
+    fn error_item(&self, error: String) -> ResultItem {
+        ResultItem {
+            id: String::new(),
+            icon: crate::icon::BuiltinIcon::Error.into(),
+            primary_text: self.name().to_owned(),
+            secondary_text: error,
+            tooltip: None,
+            actions: vec![],
+            score: 0,
         }
     }
 
@@ -82,7 +103,7 @@ impl PluginEntry {
 pub struct PluginManager {
     pub plugins: Vec<PluginEntry>,
     pub max_results: usize,
-    pub fuzzy_matcher: RwLock<crate::fuzzy_matcher::Matcher>,
+    pub fuzzy_matcher: RwLock<kal_plugin::FuzzyMatcher>,
 }
 
 impl PluginManager {
@@ -90,7 +111,7 @@ impl PluginManager {
         Self {
             plugins,
             max_results: 0,
-            fuzzy_matcher: RwLock::new(crate::fuzzy_matcher::Matcher::default()),
+            fuzzy_matcher: RwLock::new(kal_plugin::FuzzyMatcher::default()),
         }
     }
 

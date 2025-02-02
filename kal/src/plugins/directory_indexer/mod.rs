@@ -2,12 +2,11 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use kal_config::Config;
+use kal_plugin::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
 use serde::{Deserialize, Serialize};
 use smol::stream::*;
 
 use crate::icon::Icon;
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
 #[derive(Debug)]
@@ -47,7 +46,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
 
@@ -70,7 +69,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self
             .entries
@@ -148,7 +147,7 @@ impl IntoResultItem for DirEntry {
     fn fuzzy_match(
         &self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name.to_string_lossy(), query)

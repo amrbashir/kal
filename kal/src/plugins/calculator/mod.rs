@@ -1,8 +1,7 @@
 use kal_config::Config;
+use kal_plugin::{Action, PluginQueryOutput, ResultItem};
 
 use crate::icon::BuiltinIcon;
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{Action, ResultItem};
 
 #[derive(Debug)]
 pub struct Plugin;
@@ -29,7 +28,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(_: &Config) -> Self {
         Self
     }
@@ -50,7 +49,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        _matcher: &mut crate::fuzzy_matcher::Matcher,
+        _matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         let mut ctx = sci_calc::context::Context::new();
 
@@ -65,7 +64,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        _matcher: &mut crate::fuzzy_matcher::Matcher,
+        _matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         // empty query should show empty result
         if query.is_empty() {

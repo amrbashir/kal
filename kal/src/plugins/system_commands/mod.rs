@@ -2,8 +2,8 @@ use kal_config::Config;
 use strum::AsRefStr;
 
 use crate::icon::{BuiltinIcon, Icon};
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{Action, IntoResultItem, ResultItem};
+use kal_plugin::PluginQueryOutput;
+use kal_plugin::{Action, IntoResultItem, ResultItem};
 use crate::utils::IteratorExt;
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ impl Plugin {
     fn all_for_query(
         &self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<Vec<ResultItem>> {
         self.commands
             .iter()
@@ -34,7 +34,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(_config: &Config) -> Self {
         Self {
             commands: SystemCommand::all(),
@@ -61,7 +61,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query(
         &mut self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self.all_for_query(query, matcher).into())
     }
@@ -69,7 +69,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         if query.is_empty() {
             Ok(self.all().into())
@@ -224,7 +224,7 @@ impl IntoResultItem for SystemCommand {
     fn fuzzy_match(
         &self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(self.as_ref(), query)

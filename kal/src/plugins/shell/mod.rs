@@ -1,9 +1,8 @@
 use kal_config::Config;
+use kal_plugin::{Action, PluginQueryOutput, ResultItem};
 use serde::{Deserialize, Serialize};
 
 use crate::icon::BuiltinIcon;
-use crate::plugin::PluginQueryOutput;
-use crate::result_item::{Action, ResultItem};
 use crate::utils;
 
 #[derive(Debug)]
@@ -26,7 +25,7 @@ impl Plugin {
 }
 
 #[async_trait::async_trait]
-impl crate::plugin::Plugin for Plugin {
+impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         Self {
@@ -58,7 +57,7 @@ impl crate::plugin::Plugin for Plugin {
     async fn query_direct(
         &mut self,
         query: &str,
-        _matcher: &mut crate::fuzzy_matcher::Matcher,
+        _matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
         Ok(self.shell.item(query.to_string(), self.no_exit).into())
     }

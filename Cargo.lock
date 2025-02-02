@@ -1849,6 +1849,7 @@ dependencies = [
  "global-hotkey",
  "image",
  "kal-config",
+ "kal-plugin",
  "notify",
  "notify-debouncer-mini",
  "nucleo-matcher",
@@ -1887,6 +1888,18 @@ dependencies = [
  "thiserror 1.0.69",
  "toml",
  "tracing",
+]
+
+[[package]]
+name = "kal-plugin"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "nucleo-matcher",
+ "serde",
+ "strum",
 ]
 
 [[package]]

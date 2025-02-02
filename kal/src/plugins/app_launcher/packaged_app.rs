@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use kal_plugin::{Action, IntoResultItem, ResultItem};
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::ApplicationModel::{
     Package, PackageCatalog, PackageInstallingEventArgs, PackageUninstallingEventArgs,
@@ -16,7 +17,6 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
 
 use crate::icon::{BuiltinIcon, Icon};
-use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, StringExt};
 
 const MS_RESOURCE: &str = "ms-resource:";
@@ -93,7 +93,7 @@ impl IntoResultItem for PackagedApp {
     fn fuzzy_match(
         &self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<ResultItem> {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 

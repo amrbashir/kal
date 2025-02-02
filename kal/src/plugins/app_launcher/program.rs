@@ -2,11 +2,11 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use kal_plugin::{Action, IntoResultItem, ResultItem};
 use smol::prelude::*;
 
 use super::App;
 use crate::icon::Icon;
-use crate::result_item::{Action, IntoResultItem, ResultItem};
 use crate::utils::{self, ExpandEnvVars, StringExt};
 
 #[derive(Debug)]
@@ -71,7 +71,7 @@ impl IntoResultItem for Program {
     fn fuzzy_match(
         &self,
         query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
+        matcher: &mut kal_plugin::FuzzyMatcher,
     ) -> Option<ResultItem> {
         let (query, args) = query.split_args().unwrap_or((query, ""));
 

@@ -1,6 +1,6 @@
 use kal_config::Config;
+use kal_plugin::Plugin;
 
-use crate::plugin::Plugin;
 use crate::plugin_manager::PluginManager;
 
 mod app_launcher;

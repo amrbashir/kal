@@ -16,6 +16,7 @@ kal-config = { path = "../kal-config" }
 
 [dependencies]
 kal-config = { path = "../kal-config" }
+kal-plugin = { path = "../kal-plugin" }
 wry = { git = "https://github.com/tauri-apps/wry", rev = "b3926d01db1628e521ca22861e7efbe6f30a538f" }
 winit = { git = "https://github.com/amrbashir/winit", rev = "f26f5419bac8b135ffa6996ee8293c3138683d10" }
 global-hotkey = "0.6"
@@ -25,11 +26,11 @@ serde_json.workspace = true
 toml.workspace = true
 rust-embed = "8.1"
 serialize-to-javascript = "0.1"
-nucleo-matcher = "0.3"
+nucleo-matcher.workspace = true
 dirs.workspace = true
 percent-encoding = "2.3"
 dunce = "1"
-anyhow = "1"
+anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
@@ -38,10 +39,10 @@ url = { version = "2.5", features = ["serde"] }
 sci-calc = "1.0.1"
 arboard = "3.4"
 image = { version = "0.25", default-features = false, features = ["png"] }
-strum = { version = "0.26", features = ["derive"] }
+strum = { workspace = true, features = ["derive"] }
 rfd = { version = "0.15", default-features = false }
 smol = "2.0"
-async-trait = "0.1"
+async-trait.workspace = true
 sqlite = "0.36"
 notify = "8.0.0"
 notify-debouncer-mini = "0.6.0"

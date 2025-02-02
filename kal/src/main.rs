@@ -14,14 +14,11 @@ use winit::event_loop::{ControlFlow, EventLoop};
 mod app;
 #[cfg(not(debug_assertions))]
 mod embedded_assets;
-mod fuzzy_matcher;
 mod icon;
 mod ipc;
 mod main_window;
-mod plugin;
 mod plugin_manager;
 mod plugins;
-mod result_item;
 mod utils;
 mod webview_window;
 

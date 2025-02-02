@@ -1,25 +1,6 @@
 use serde::Serialize;
 
-use crate::icon::{BuiltinIcon, Icon};
-
-#[derive(Serialize, Debug)]
-pub struct ResultItem {
-    pub id: String,
-    pub icon: Icon,
-    pub primary_text: String,
-    pub secondary_text: String,
-    pub tooltip: Option<String>,
-    pub actions: Vec<Action>,
-    pub score: u16,
-}
-
-pub trait IntoResultItem {
-    fn fuzzy_match(
-        &self,
-        query: &str,
-        matcher: &mut crate::fuzzy_matcher::Matcher,
-    ) -> Option<ResultItem>;
-}
+use crate::{BuiltinIcon, Icon, ResultItem};
 
 type ActionFn = dyn Fn(&ResultItem) -> anyhow::Result<()> + Send + Sync;
 
@@ -83,13 +64,7 @@ impl Action {
     where
         F: Fn(&ResultItem) -> anyhow::Result<()> + 'static + Send + Sync,
     {
-        Self {
-            id: "RunPrimary",
-            description: None,
-            icon: None,
-            accelerator: Some("Enter"),
-            action: Box::new(action),
-        }
+        Self::new("RunPrimary", action).with_accelerator("Enter")
     }
 
     pub fn open_elevated<F>(action: F) -> Self

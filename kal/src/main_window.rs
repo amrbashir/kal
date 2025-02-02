@@ -2,6 +2,7 @@ use std::sync::{mpsc, Arc};
 
 use global_hotkey::hotkey::HotKey;
 use kal_config::Config;
+use kal_plugin::ResultItem;
 use serialize_to_javascript::{Options as JsSerializeOptions, Template as JsTemplate};
 use smol::lock::RwLock;
 use winit::dpi::LogicalSize;
@@ -12,7 +13,6 @@ use crate::app::{App, AppMessage};
 use crate::icon;
 use crate::ipc::{response, AsyncIpcMessage, IpcCommand, IpcEvent, IpcResult};
 use crate::plugin_manager::PluginManager;
-use crate::result_item::ResultItem;
 use crate::webview_window::{WebViewWindow, WebViewWindowBuilder};
 
 const INIT_TEMPLATE: &str = r#"(function () {
