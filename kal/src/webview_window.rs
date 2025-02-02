@@ -44,7 +44,7 @@ impl WebViewWindowBuilder<'_> {
                 .with_undecorated_shadow(true)
                 .with_clip_children(false);
 
-            let colors = crate::utils::SystemAccentColors::load().unwrap_or_default();
+            let colors = kal_utils::SystemAccentColors::load().unwrap_or_default();
 
             webview_builder = webview_builder
                 .with_initialization_script(&colors.init_script())

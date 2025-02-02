@@ -3,12 +3,12 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
+use kal_utils::open_url;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 #[cfg(not(debug_assertions))]
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::EnvFilter;
-use utils::open_url;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 mod app;
@@ -18,8 +18,6 @@ mod icon;
 mod ipc;
 mod main_window;
 mod plugin_manager;
-mod plugins;
-mod utils;
 mod webview_window;
 
 const WEBVIEW2_DOWNLOAD_LINK: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";

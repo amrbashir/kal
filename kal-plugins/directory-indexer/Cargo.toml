@@ -1,0 +1,21 @@
+[package]
+name = "kal-plugin-directory-indexer"
+version = "0.2.0"
+description = "Directory indexer plugin for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+kal-config = { path = "../../kal-config" }
+kal-plugin = { path = "../../kal-plugin" }
+kal-utils = { path = "../../kal-utils" }
+anyhow.workspace = true
+async-trait.workspace = true
+smol.workspace = true
+serde.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+workspace = true
+features = ["Win32_Storage_FileSystem"]

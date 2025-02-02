@@ -1,0 +1,18 @@
+[package]
+name = "kal-plugin-workflows"
+version = "0.2.0"
+description = "Workflows plugin for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+kal-config = { path = "../../kal-config" }
+kal-plugin = { path = "../../kal-plugin" }
+kal-utils = { path = "../../kal-utils" }
+anyhow.workspace = true
+async-trait.workspace = true
+url.workspace = true
+serde.workspace = true
+rfd.workspace = true

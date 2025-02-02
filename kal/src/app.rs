@@ -252,7 +252,7 @@ impl App {
 
             #[cfg(windows)]
             AppMessage::SystemSettingsChanged => {
-                if let Ok(colors) = crate::utils::SystemAccentColors::load() {
+                if let Ok(colors) = kal_utils::SystemAccentColors::load() {
                     for window in self.windows.values() {
                         window.emit(IpcEvent::UpdateSystemAccentColor, colors)?;
                     }

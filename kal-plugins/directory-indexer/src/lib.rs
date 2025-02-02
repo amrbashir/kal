@@ -2,12 +2,10 @@ use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use kal_config::Config;
-use kal_plugin::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_plugin::{Action, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_utils::{ExpandEnvVars, IteratorExt};
 use serde::{Deserialize, Serialize};
 use smol::stream::*;
-
-use crate::icon::Icon;
-use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
 #[derive(Debug)]
 pub struct Plugin {
@@ -107,26 +105,26 @@ impl DirEntry {
             vec![
                 {
                     let path = self.path.clone();
-                    Action::primary(move |_| utils::open_dir(&path))
+                    Action::primary(move |_| kal_utils::open_dir(&path))
                 },
                 {
                     let path = self.path.clone();
-                    Action::open_location(move |_| utils::reveal_item_in_dir(&path))
+                    Action::open_location(move |_| kal_utils::reveal_item_in_dir(&path))
                 },
             ]
         } else {
             vec![
                 {
                     let path = self.path.clone();
-                    Action::primary(move |_| utils::execute(&path, false))
+                    Action::primary(move |_| kal_utils::execute(&path, false))
                 },
                 {
                     let path = self.path.clone();
-                    Action::open_elevated(move |_| utils::execute(&path, true))
+                    Action::open_elevated(move |_| kal_utils::execute(&path, true))
                 },
                 {
                     let path = self.path.clone();
-                    Action::open_location(move |_| utils::reveal_item_in_dir(&path))
+                    Action::open_location(move |_| kal_utils::reveal_item_in_dir(&path))
                 },
             ]
         };

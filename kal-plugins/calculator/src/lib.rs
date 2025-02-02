@@ -1,7 +1,5 @@
 use kal_config::Config;
-use kal_plugin::{Action, PluginQueryOutput, ResultItem};
-
-use crate::icon::BuiltinIcon;
+use kal_plugin::{Action, BuiltinIcon, PluginQueryOutput, ResultItem};
 
 #[derive(Debug)]
 pub struct Plugin;

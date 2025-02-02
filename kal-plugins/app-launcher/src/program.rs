@@ -2,12 +2,11 @@ use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use kal_plugin::{Action, IntoResultItem, ResultItem};
+use kal_plugin::{Action, Icon, IntoResultItem, ResultItem};
+use kal_utils::{ExpandEnvVars, StringExt};
 use smol::prelude::*;
 
 use super::App;
-use crate::icon::Icon;
-use crate::utils::{self, ExpandEnvVars, StringExt};
 
 #[derive(Debug)]
 pub struct Program {
@@ -27,7 +26,7 @@ impl Program {
 
         #[cfg(windows)]
         if path.extension() == Some(OsStr::new("lnk")) {
-            if let Ok(target) = utils::resolve_shortcut_target(&path) {
+            if let Ok(target) = kal_utils::resolve_shortcut_target(&path) {
                 description = get_app_type(&target).description().into();
             }
         }
@@ -43,15 +42,17 @@ impl Program {
     fn item(&self, args: &str, score: u16) -> ResultItem {
         let path = self.path.clone();
         let args_ = args.to_string();
-        let open = Action::primary(move |_| utils::execute_with_args(&path, &args_, false, false));
+        let open =
+            Action::primary(move |_| kal_utils::execute_with_args(&path, &args_, false, false));
 
         let path = self.path.clone();
         let args_ = args.to_string();
-        let open_elevated =
-            Action::open_elevated(move |_| utils::execute_with_args(&path, &args_, true, false));
+        let open_elevated = Action::open_elevated(move |_| {
+            kal_utils::execute_with_args(&path, &args_, true, false)
+        });
 
         let path = self.path.clone();
-        let open_location = Action::open_location(move |_| utils::reveal_item_in_dir(&path));
+        let open_location = Action::open_location(move |_| kal_utils::reveal_item_in_dir(&path));
 
         let tooltip = format!("{}\n{}", self.name.to_string_lossy(), self.path.display());
 

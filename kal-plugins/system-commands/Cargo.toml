@@ -1,0 +1,23 @@
+[package]
+name = "kal-plugin-system-commands"
+version = "0.2.0"
+description = "System Commands plugin for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+kal-config = { path = "../../kal-config" }
+kal-plugin = { path = "../../kal-plugin" }
+kal-utils = { path = "../../kal-utils" }
+anyhow.workspace = true
+async-trait.workspace = true
+rfd = { workspace = true, default-features = false }
+strum.workspace = true
+serde.workspace = true
+
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+workspace = true
+features = ["Win32_System_Shutdown", "Win32_System_Power"]

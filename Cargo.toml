@@ -1,12 +1,11 @@
 [workspace]
-members = ["kal", "kal-*"]
-exclude = ["kal-ui"]
+members = ["kal", "kal-config", "kal-plugin", "kal-plugins/*"]
 resolver = "2"
 
 [profile.release]
 codegen-units = 1 # Allows LLVM to perform better optimization.
 lto = true        # Enables link-time-optimizations.
-opt-level = "s"   # Prioritizes small binary size. Use `3` if you prefer speed.
+opt-level = "s"   # Prioritizes small binary size.
 panic = "abort"   # Higher performance by disabling panic handlers.
 strip = true      # Ensures debug symbols are removed.
 
@@ -21,3 +20,9 @@ anyhow = "1"
 nucleo-matcher = "0.3"
 strum = "0.26"
 async-trait = "0.1"
+windows = "0.59"
+rfd = { version = "0.15", default-features = false }
+url = "2.5"
+serialize-to-javascript = "0.1"
+smol = "2.0"
+percent-encoding = "2.3"

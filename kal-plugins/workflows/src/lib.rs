@@ -1,12 +1,10 @@
 use std::path::PathBuf;
 
 use kal_config::Config;
-use kal_plugin::{Action, IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_plugin::{Action, BuiltinIcon, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_utils::{ExpandEnvVars, IteratorExt};
 use serde::{Deserialize, Serialize};
 use url::Url;
-
-use crate::icon::{BuiltinIcon, Icon};
-use crate::utils::{self, ExpandEnvVars, IteratorExt};
 
 #[derive(Debug)]
 pub struct Plugin {
@@ -167,15 +165,15 @@ impl Workflow {
             match step {
                 WorkflowStep::Path { path, .. } => {
                     let path = path.expand_vars();
-                    utils::execute(path, elevated)?
+                    kal_utils::execute(path, elevated)?
                 }
-                WorkflowStep::Url { url } => utils::open_url(url)?,
+                WorkflowStep::Url { url } => kal_utils::open_url(url)?,
                 WorkflowStep::Shell {
                     shell,
                     script,
                     working_directory,
                     hidden,
-                } => utils::execute_in_shell(
+                } => kal_utils::execute_in_shell(
                     shell.as_ref(),
                     script,
                     working_directory.as_ref(),

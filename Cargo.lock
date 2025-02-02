@@ -1841,7 +1841,6 @@ name = "kal"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "arboard",
  "async-trait",
  "dirs",
  "dunce",
@@ -1850,20 +1849,25 @@ dependencies = [
  "image",
  "kal-config",
  "kal-plugin",
- "notify",
- "notify-debouncer-mini",
+ "kal-plugin-app-launcher",
+ "kal-plugin-calculator",
+ "kal-plugin-directory-indexer",
+ "kal-plugin-everything",
+ "kal-plugin-shell",
+ "kal-plugin-system-commands",
+ "kal-plugin-vscode-workspaces",
+ "kal-plugin-workflows",
+ "kal-utils",
  "nucleo-matcher",
  "percent-encoding",
  "rfd",
  "rust-embed",
  "schemars",
- "sci-calc",
  "serde",
  "serde_json",
  "serialize-to-javascript",
  "smol",
  "softbuffer",
- "sqlite",
  "strum",
  "toml",
  "tracing",
@@ -1900,6 +1904,132 @@ dependencies = [
  "nucleo-matcher",
  "serde",
  "strum",
+]
+
+[[package]]
+name = "kal-plugin-app-launcher"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "notify",
+ "notify-debouncer-mini",
+ "serde",
+ "smol",
+ "toml",
+ "tracing",
+ "windows",
+]
+
+[[package]]
+name = "kal-plugin-calculator"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "sci-calc",
+]
+
+[[package]]
+name = "kal-plugin-directory-indexer"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "serde",
+ "smol",
+ "windows",
+]
+
+[[package]]
+name = "kal-plugin-everything"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "kal-plugin-shell"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "serde",
+]
+
+[[package]]
+name = "kal-plugin-system-commands"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "rfd",
+ "serde",
+ "strum",
+ "windows",
+]
+
+[[package]]
+name = "kal-plugin-vscode-workspaces"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "dirs",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "percent-encoding",
+ "serde",
+ "serde_json",
+ "sqlite",
+ "url",
+]
+
+[[package]]
+name = "kal-plugin-workflows"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "kal-plugin",
+ "kal-utils",
+ "rfd",
+ "serde",
+ "url",
+]
+
+[[package]]
+name = "kal-utils"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serialize-to-javascript",
+ "url",
+ "windows",
 ]
 
 [[package]]

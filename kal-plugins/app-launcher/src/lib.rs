@@ -3,12 +3,11 @@ use std::sync::{Arc, Mutex};
 
 use kal_config::Config;
 use kal_plugin::{IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_utils::IteratorExt;
 use notify::RecommendedWatcher;
 use notify_debouncer_mini::Debouncer;
 use serde::{Deserialize, Serialize};
 use windows::ApplicationModel::PackageCatalog;
-
-use crate::utils::IteratorExt;
 
 #[cfg(windows)]
 mod packaged_app;

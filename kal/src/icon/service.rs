@@ -4,12 +4,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Context;
+use kal_utils::PathExt;
 use wry::http::header::CONTENT_TYPE;
 use wry::http::Request;
 use wry::WebViewId;
 
 use super::IconType;
-use crate::utils::PathExt;
 use crate::webview_window::ProtocolResult;
 
 pub struct Service {

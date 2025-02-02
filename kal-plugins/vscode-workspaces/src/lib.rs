@@ -1,13 +1,10 @@
 use std::path::PathBuf;
 
 use kal_config::Config;
+use kal_plugin::{Action, BuiltinIcon, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_utils::IteratorExt;
 use serde::Deserialize;
 use sqlite::OpenFlags;
-
-use crate::icon::{BuiltinIcon, Icon};
-use kal_plugin::PluginQueryOutput;
-use kal_plugin::{Action, IntoResultItem, ResultItem};
-use crate::utils::{self, IteratorExt};
 
 #[derive(Debug)]
 pub struct Plugin {
@@ -148,7 +145,7 @@ impl Workspace {
             secondary_text: self.path.to_string_lossy().to_string(),
             tooltip: None,
             actions: vec![Action::primary(move |_| {
-                utils::execute_with_args(
+                kal_utils::execute_with_args(
                     "code",
                     format!("--folder-uri {}", uri.as_str()),
                     false,
@@ -161,7 +158,11 @@ impl Workspace {
 }
 
 impl IntoResultItem for Workspace {
-    fn fuzzy_match(&self, query: &str, matcher: &mut kal_plugin::FuzzyMatcher) -> Option<ResultItem> {
+    fn fuzzy_match(
+        &self,
+        query: &str,
+        matcher: &mut kal_plugin::FuzzyMatcher,
+    ) -> Option<ResultItem> {
         matcher
             .fuzzy_match(&self.name, query)
             .map(|score| self.item(score))

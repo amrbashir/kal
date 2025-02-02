@@ -1,0 +1,16 @@
+[package]
+name = "kal-plugin-calculator"
+version = "0.2.0"
+description = "Calculator plugin for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+kal-config = { path = "../../kal-config" }
+kal-plugin = { path = "../../kal-plugin" }
+anyhow.workspace = true
+async-trait.workspace = true
+sci-calc = "1.0.1"
+arboard = "3.4"

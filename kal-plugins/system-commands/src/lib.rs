@@ -1,10 +1,7 @@
 use kal_config::Config;
+use kal_plugin::{Action, BuiltinIcon, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
+use kal_utils::IteratorExt;
 use strum::AsRefStr;
-
-use crate::icon::{BuiltinIcon, Icon};
-use kal_plugin::PluginQueryOutput;
-use kal_plugin::{Action, IntoResultItem, ResultItem};
-use crate::utils::IteratorExt;
 
 #[derive(Debug)]
 pub struct Plugin {

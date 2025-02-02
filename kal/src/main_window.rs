@@ -131,7 +131,7 @@ impl MainWindowState {
     ) -> Self {
         let max_results = config.general.max_results;
 
-        let mut plugin_manager = crate::plugins::all(&config);
+        let mut plugin_manager = PluginManager::all(&config);
         plugin_manager.reload(&config).await;
 
         Self {

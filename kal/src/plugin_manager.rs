@@ -115,6 +115,19 @@ impl PluginManager {
         }
     }
 
+    pub fn all(config: &Config) -> Self {
+        Self::new(vec![
+            kal_plugin_app_launcher::Plugin::new(config).into(),
+            kal_plugin_calculator::Plugin::new(config).into(),
+            kal_plugin_directory_indexer::Plugin::new(config).into(),
+            kal_plugin_everything::Plugin::new(config).into(),
+            kal_plugin_shell::Plugin::new(config).into(),
+            kal_plugin_system_commands::Plugin::new(config).into(),
+            kal_plugin_vscode_workspaces::Plugin::new(config).into(),
+            kal_plugin_workflows::Plugin::new(config).into(),
+        ])
+    }
+
     pub async fn reload(&mut self, config: &Config) {
         self.max_results = config.general.max_results;
 

@@ -1,7 +1,8 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use kal_plugin::{Action, IntoResultItem, ResultItem};
+use kal_plugin::{Action, BuiltinIcon, Icon, IntoResultItem, ResultItem};
+use kal_utils::StringExt;
 use windows::core::{w, HSTRING, PCWSTR};
 use windows::ApplicationModel::{
     Package, PackageCatalog, PackageInstallingEventArgs, PackageUninstallingEventArgs,
@@ -15,9 +16,6 @@ use windows::Win32::Storage::Packaging::Appx::{
 };
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::{SHCreateStreamOnFileEx, SHLoadIndirectString};
-
-use crate::icon::{BuiltinIcon, Icon};
-use crate::utils::{self, StringExt};
 
 const MS_RESOURCE: &str = "ms-resource:";
 
@@ -62,18 +60,18 @@ impl PackagedApp {
         let args_ = args.to_string();
         let open = Action::primary(move |_| {
             let path = format!("shell:AppsFolder\\{}", appid);
-            utils::execute_with_args(path, &args_, false, false)
+            kal_utils::execute_with_args(path, &args_, false, false)
         });
 
         let appid = self.appid.clone();
         let args_ = args.to_string();
         let open_elevated = Action::open_elevated(move |_| {
             let path = format!("shell:AppsFolder\\{}", appid);
-            utils::execute_with_args(path, &args_, true, false)
+            kal_utils::execute_with_args(path, &args_, true, false)
         });
 
         let location = self.location.clone();
-        let open_location = Action::open_location(move |_| utils::open_dir(&location));
+        let open_location = Action::open_location(move |_| kal_utils::open_dir(&location));
 
         let tooltip = format!("{}\n{}", self.name, self.location.display());
 

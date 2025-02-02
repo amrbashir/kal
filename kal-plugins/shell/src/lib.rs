@@ -1,9 +1,6 @@
 use kal_config::Config;
-use kal_plugin::{Action, PluginQueryOutput, ResultItem};
+use kal_plugin::{Action, BuiltinIcon, PluginQueryOutput, ResultItem};
 use serde::{Deserialize, Serialize};
-
-use crate::icon::BuiltinIcon;
-use crate::utils;
 
 #[derive(Debug)]
 pub struct Plugin {
@@ -106,13 +103,13 @@ impl Shell {
                     let exe = shell.exe();
                     let args = shell.args(no_exit);
                     let args = format!("{args} {}", item.primary_text);
-                    utils::execute_with_args(exe, args, false, false)
+                    kal_utils::execute_with_args(exe, args, false, false)
                 }),
                 Action::open_elevated(move |item| {
                     let exe = shell.exe();
                     let args = shell.args(no_exit);
                     let args = format!("{args} {}", item.primary_text);
-                    utils::execute_with_args(exe, args, true, false)
+                    kal_utils::execute_with_args(exe, args, true, false)
                 }),
             ],
             score: 0,

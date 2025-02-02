@@ -1,0 +1,36 @@
+[package]
+name = "kal-plugin-app-launcher"
+version = "0.2.0"
+description = "App launcher plugin for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+kal-config = { path = "../../kal-config" }
+kal-utils = { path = "../../kal-utils" }
+kal-plugin = { path = "../../kal-plugin" }
+anyhow.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+toml.workspace = true
+smol.workspace = true
+tracing.workspace = true
+notify-debouncer-mini = "0.6.0"
+notify = "8.0.0"
+
+
+[target.'cfg(target_os = "windows")'.dependencies.windows]
+workspace = true
+features = [
+  "Win32_Foundation",
+  "Win32_Storage_FileSystem",
+  "Win32_UI_Shell",
+  "Win32_System_Com",
+  "Win32_Storage_Packaging_Appx",
+  "Management_Deployment",
+  "ApplicationModel",
+  "Foundation_Collections",
+  "deprecated",
+]
