@@ -28,7 +28,7 @@ defineProps<{
       v-html="makeIconHTML(item.icon)"
     />
 
-    <div class="flex-1 flex flex-col justify-center overflow-hidden children:text-ellipsis">
+    <div class="flex-1 grid grid-rows-2 children:text-ellipsis">
       <span class="text-size-base">
         {{ item.primary_text }}
       </span>
