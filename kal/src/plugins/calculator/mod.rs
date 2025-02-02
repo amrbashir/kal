@@ -1,4 +1,3 @@
-use anyhow::Ok;
 use kal_config::Config;
 
 use crate::icon::BuiltinIcon;
@@ -53,6 +52,25 @@ impl crate::plugin::Plugin for Plugin {
         query: &str,
         _matcher: &mut crate::fuzzy_matcher::Matcher,
     ) -> anyhow::Result<PluginQueryOutput> {
+        let mut ctx = sci_calc::context::Context::new();
+
+        if let Ok(result) = sci_calc::calculate(query, &mut ctx) {
+            let item = self.item(result.to_string());
+            Ok(PluginQueryOutput::One(item))
+        } else {
+            Ok(PluginQueryOutput::None)
+        }
+    }
+
+    async fn query_direct(
+        &mut self,
+        query: &str,
+        _matcher: &mut crate::fuzzy_matcher::Matcher,
+    ) -> anyhow::Result<PluginQueryOutput> {
+        if query.is_empty() {
+            return Ok(PluginQueryOutput::One(self.item("".to_string())));
+        }
+
         let mut ctx = sci_calc::context::Context::new();
 
         let result = sci_calc::calculate(query, &mut ctx)
