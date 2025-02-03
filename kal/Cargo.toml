@@ -40,7 +40,7 @@ url = { workspace = true, features = ["serde"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 strum = { workspace = true, features = ["derive"] }
 rfd = { workspace = true, default-features = false }
-smol.workspace = true
+smol = "2.0"
 async-trait.workspace = true
 kal-plugin-app-launcher = { path = "../kal-plugins/app-launcher" }
 kal-plugin-calculator = { path = "../kal-plugins/calculator" }

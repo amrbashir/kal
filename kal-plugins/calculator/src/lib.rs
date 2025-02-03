@@ -25,7 +25,7 @@ impl Plugin {
     }
 }
 
-#[async_trait::async_trait]
+
 impl kal_plugin::Plugin for Plugin {
     fn new(_: &Config) -> Self {
         Self
@@ -44,7 +44,7 @@ impl kal_plugin::Plugin for Plugin {
         }
     }
 
-    async fn query(
+    fn query(
         &mut self,
         query: &str,
         _matcher: &mut kal_plugin::FuzzyMatcher,
@@ -59,7 +59,7 @@ impl kal_plugin::Plugin for Plugin {
         Ok(PluginQueryOutput::One(item))
     }
 
-    async fn query_direct(
+    fn query_direct(
         &mut self,
         query: &str,
         _matcher: &mut kal_plugin::FuzzyMatcher,

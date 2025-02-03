@@ -1,10 +1,10 @@
 use std::ffi::{OsStr, OsString};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use kal_plugin::{Action, Icon, IntoResultItem, ResultItem};
 use kal_utils::{ExpandEnvVars, StringExt};
-use smol::prelude::*;
 
 use super::App;
 
@@ -83,52 +83,36 @@ impl IntoResultItem for Program {
     }
 }
 
-pub async fn find_all_in_paths(paths: &[String], extensions: &[String]) -> Vec<super::App> {
-    let expanded_paths = paths.iter().map(ExpandEnvVars::expand_vars);
-
-    let entries = expanded_paths.map(|p| read_dir_by_extensions(p, extensions));
-
-    let mut entries = smol::stream::iter(entries);
-
-    let mut out = Vec::with_capacity(entries.size_hint().0);
-
-    while let Some(e) = entries.next().await {
-        let Ok(e) = e.await else { continue };
-        let programs = e
-            .into_iter()
-            .map(|e| super::App::Program(Program::new(e.path())));
-        out.extend(programs);
-    }
-
-    out
+pub fn find_all_in_paths<'a>(
+    paths: &'a [String],
+    extensions: &'a [String],
+) -> impl Iterator<Item = Program> + use<'a> {
+    paths
+        .iter()
+        .map(ExpandEnvVars::expand_vars)
+        .map(|p| read_dir_filtered_by_exts(p, extensions))
+        .flatten()
+        .flatten()
+        .map(|e| Program::new(e.path()))
 }
 
-async fn read_dir_by_extensions<P>(
-    path: P,
-    extensions: &[String],
-) -> anyhow::Result<Vec<smol::fs::DirEntry>>
+fn read_dir_filtered_by_exts<P>(path: P, extensions: &[String]) -> anyhow::Result<Vec<fs::DirEntry>>
 where
     P: AsRef<Path>,
 {
     let path = path.as_ref().to_path_buf();
     let mut filtered = Vec::new();
 
-    let mut entries = smol::fs::read_dir(path).await?;
+    for entry in fs::read_dir(path)? {
+        let entry = entry?;
 
-    while let Some(entry) = entries.try_next().await? {
-        if let Ok(metadata) = entry.metadata().await {
+        if let Ok(metadata) = entry.metadata() {
             if metadata.is_dir() {
-                let filtered_entries =
-                    Box::pin(read_dir_by_extensions(entry.path(), extensions)).await?;
-                filtered.extend(filtered_entries);
+                filtered.extend(read_dir_filtered_by_exts(entry.path(), extensions)?);
             } else {
                 let path = entry.path();
-                let extension = path
-                    .extension()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-                if extensions.contains(&extension) {
+                let ext = path.extension().and_then(|e| e.to_str());
+                if extensions.iter().any(|e| Some(e.as_str()) == ext) {
                     filtered.push(entry);
                 }
             }

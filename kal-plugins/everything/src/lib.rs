@@ -22,7 +22,7 @@ impl Plugin {
     const NAME: &'static str = "Everything";
 }
 
-#[async_trait::async_trait]
+
 impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let max_results = config.general.max_results;
@@ -47,14 +47,14 @@ impl kal_plugin::Plugin for Plugin {
         }
     }
 
-    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.max_results = config.general.max_results;
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
         self.es = config.es.unwrap_or_else(|| PathBuf::from("es"));
         Ok(())
     }
 
-    async fn query_direct(
+    fn query_direct(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,

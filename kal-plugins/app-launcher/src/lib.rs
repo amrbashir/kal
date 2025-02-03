@@ -50,23 +50,23 @@ impl Plugin {
         self.include_packaged_apps = config.include_packaged_apps;
     }
 
-    async fn find_apps(&mut self) {
-        *self.apps.lock().unwrap() =
-            program::find_all_in_paths(&self.paths, &self.extensions).await;
+    fn find_apps(&mut self) {
+        let programs = program::find_all_in_paths(&self.paths, &self.extensions).map(App::Program);
 
         #[cfg(windows)]
         if self.include_packaged_apps {
             if let Ok(packaged_apps) = packaged_app::find_all() {
-                self.apps
-                    .lock()
-                    .unwrap()
-                    .extend(packaged_apps.map(App::Packaged));
+                let mut apps = self.apps.lock().unwrap();
+                *apps = programs.chain(packaged_apps.map(App::Packaged)).collect();
+                return;
             }
         }
+
+        let mut apps = self.apps.lock().unwrap();
+        *apps = programs.collect();
     }
 }
 
-#[async_trait::async_trait]
 impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
@@ -94,9 +94,9 @@ impl kal_plugin::Plugin for Plugin {
         }
     }
 
-    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
-        self.find_apps().await;
+        self.find_apps();
         self.watch_programs()?;
 
         #[cfg(windows)]
@@ -107,7 +107,7 @@ impl kal_plugin::Plugin for Plugin {
         Ok(())
     }
 
-    async fn query(
+    fn query(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,

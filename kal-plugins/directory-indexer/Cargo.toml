@@ -13,7 +13,6 @@ kal-plugin = { path = "../../kal-plugin" }
 kal-utils = { path = "../../kal-utils" }
 anyhow.workspace = true
 async-trait.workspace = true
-smol.workspace = true
 serde.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]

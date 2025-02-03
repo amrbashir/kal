@@ -24,5 +24,4 @@ windows = "0.59"
 rfd = { version = "0.15", default-features = false }
 url = "2.5"
 serialize-to-javascript = "0.1"
-smol = "2.0"
 percent-encoding = "2.3"

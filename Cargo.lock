@@ -1918,7 +1918,6 @@ dependencies = [
  "notify",
  "notify-debouncer-mini",
  "serde",
- "smol",
  "toml",
  "tracing",
  "windows",
@@ -1946,7 +1945,6 @@ dependencies = [
  "kal-plugin",
  "kal-utils",
  "serde",
- "smol",
  "windows",
 ]
 

@@ -124,7 +124,7 @@ impl MainWindowState {
     #[cfg(not(debug_assertions))]
     const URL: &str = "kal://localhost/";
 
-    async fn new(
+    fn new(
         config: Config,
         main_thread_sender: mpsc::Sender<AppMessage>,
         event_loop_proxy: EventLoopProxy,
@@ -132,7 +132,7 @@ impl MainWindowState {
         let max_results = config.general.max_results;
 
         let mut plugin_manager = PluginManager::all(&config);
-        plugin_manager.reload(&config).await;
+        plugin_manager.reload(&config);
 
         Self {
             main_thread_sender,
@@ -153,7 +153,7 @@ impl MainWindowState {
         let state = MainWindowState::new(config, main_thread_sender, event_loop_proxy);
 
         smol::spawn(async move {
-            let state = Arc::new(state.await);
+            let state = Arc::new(state);
 
             loop {
                 if let Ok(task) = receiver.recv().await {
@@ -229,7 +229,7 @@ impl MainWindowState {
                 // it is fine to block here since only one query can be processed at a time
                 let mut plugins_store = self.plugin_manager.write().await;
 
-                let results = plugins_store.query(query).await?;
+                let results = plugins_store.query(query)?;
 
                 let config = self.config.read().await;
 
@@ -280,7 +280,7 @@ impl MainWindowState {
                 *config = Config::load_with_fallback();
 
                 let mut plugin_manager = self.plugin_manager.write().await;
-                plugin_manager.reload(&config).await;
+                plugin_manager.reload(&config);
 
                 let old_hotkey = HotKey::try_from(old_hotkey.as_str())?;
                 let new_hotkey = HotKey::try_from(config.general.hotkey.as_str())?;

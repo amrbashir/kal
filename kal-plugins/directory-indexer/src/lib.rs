@@ -1,16 +1,16 @@
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use kal_config::Config;
 use kal_plugin::{Action, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
 use kal_utils::{ExpandEnvVars, IteratorExt};
 use serde::{Deserialize, Serialize};
-use smol::stream::*;
 
 #[derive(Debug)]
 pub struct Plugin {
     paths: Vec<String>,
-    entries: Vec<DirEntry>,
+    entries: Vec<IndexedEntry>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -28,22 +28,19 @@ impl Plugin {
         self.paths = config.paths;
     }
 
-    async fn index_dirs(&mut self) {
-        self.entries.clear();
-
-        let expanded_paths = self.paths.iter().map(ExpandEnvVars::expand_vars);
-        let mut entries = smol::stream::iter(expanded_paths).map(read_dir);
-
-        while let Some(e) = entries.next().await {
-            if let Ok(e) = e.await {
-                let e = e.iter().map(|e| DirEntry::new(e.path()));
-                self.entries.extend(e);
-            }
-        }
+    fn index_dirs(&mut self) {
+        self.entries = self
+            .paths
+            .iter()
+            .map(ExpandEnvVars::expand_vars)
+            .map(read_dir)
+            .flatten()
+            .flatten()
+            .map(|e| IndexedEntry::new(e.path()))
+            .collect()
     }
 }
 
-#[async_trait::async_trait]
 impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
@@ -58,13 +55,13 @@ impl kal_plugin::Plugin for Plugin {
         Self::NAME
     }
 
-    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         self.update_config(config);
-        self.index_dirs().await;
+        self.index_dirs();
         Ok(())
     }
 
-    async fn query(
+    fn query(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,
@@ -79,14 +76,14 @@ impl kal_plugin::Plugin for Plugin {
 }
 
 #[derive(Debug)]
-struct DirEntry {
+struct IndexedEntry {
     name: OsString,
     path: PathBuf,
     is_dir: bool,
     id: String,
 }
 
-impl DirEntry {
+impl IndexedEntry {
     fn new(path: PathBuf) -> Self {
         let name = path.file_stem().unwrap_or_default().to_os_string();
         let filename = path.file_name().unwrap_or_default().to_os_string();
@@ -141,7 +138,7 @@ impl DirEntry {
     }
 }
 
-impl IntoResultItem for DirEntry {
+impl IntoResultItem for IndexedEntry {
     fn fuzzy_match(
         &self,
         query: &str,
@@ -154,29 +151,24 @@ impl IntoResultItem for DirEntry {
     }
 }
 
-async fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<smol::fs::DirEntry>> {
-    let mut entries = smol::fs::read_dir(path).await?;
-    let mut out = Vec::with_capacity(entries.size_hint().0);
-
-    while let Some(entry) = entries.try_next().await? {
+fn read_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<impl Iterator<Item = fs::DirEntry>> {
+    let entries = fs::read_dir(path)?.flatten().filter_map(|e| {
         // skip hidden files and directories on Windows
         #[cfg(windows)]
         {
             use std::os::windows::fs::MetadataExt;
 
             use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
-            if entry
-                .metadata()
-                .await
+            if e.metadata()
                 .map(|m| (m.file_attributes() & FILE_ATTRIBUTE_HIDDEN.0) != 0)
                 .unwrap_or(false)
             {
-                continue;
+                return None;
             }
         }
 
-        out.push(entry);
-    }
+        Some(e)
+    });
 
-    Ok(out)
+    Ok(entries)
 }

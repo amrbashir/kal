@@ -1,8 +1,8 @@
 use std::ops::{Deref, DerefMut};
+use std::sync::RwLock;
 
 use kal_config::Config;
 use kal_plugin::{Plugin, ResultItem};
-use smol::lock::RwLock;
 
 pub struct PluginEntry {
     pub enabled: bool,
@@ -128,7 +128,7 @@ impl PluginManager {
         ])
     }
 
-    pub async fn reload(&mut self, config: &Config) {
+    pub fn reload(&mut self, config: &Config) {
         self.max_results = config.general.max_results;
 
         for plugin in self.plugins.iter_mut() {
@@ -136,27 +136,30 @@ impl PluginManager {
 
             // reload plugin reload if enabled
             if plugin.enabled {
-                if let Err(e) = plugin.reload(config).await {
+                if let Err(e) = plugin.reload(config) {
                     tracing::error!("Failed to reload `{}`: {e}", plugin.name());
                 }
             }
         }
     }
 
-    pub async fn query(&mut self, query: &str) -> anyhow::Result<Vec<ResultItem>> {
+    pub fn query(&mut self, query: &str) -> anyhow::Result<Vec<ResultItem>> {
         let mut results = Vec::with_capacity(self.max_results);
 
         let plugins = &mut self.plugins; // mutability splitting
 
         // it is fine to block here since only one query can be processed at a time
-        let mut matcher = self.fuzzy_matcher.write().await;
+        let mut matcher = self
+            .fuzzy_matcher
+            .write()
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // check if a plugin is being invoked directly
         if let Some(plugin) = plugins.iter_mut().find(|p| p.is_direct_invoke(query)) {
             let direct_invoke_len = plugin.direct_invoke_len();
             let new_query = &query[direct_invoke_len..].trim();
 
-            match plugin.query_direct(new_query, &mut matcher).await {
+            match plugin.query_direct(new_query, &mut matcher) {
                 Ok(res) => res.extend_into(&mut results),
                 Err(err) => results.push(plugin.error_item(err.to_string())),
             }
@@ -174,7 +177,6 @@ impl PluginManager {
             for plugin in queriable_plugins {
                 let result = plugin
                     .query(trimmed_query, &mut matcher)
-                    .await
                     .map_err(|e| plugin.error_item(e.to_string()));
 
                 match result {

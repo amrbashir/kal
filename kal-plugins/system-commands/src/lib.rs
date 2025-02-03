@@ -30,7 +30,6 @@ impl Plugin {
     }
 }
 
-#[async_trait::async_trait]
 impl kal_plugin::Plugin for Plugin {
     fn new(_config: &Config) -> Self {
         Self {
@@ -51,11 +50,11 @@ impl kal_plugin::Plugin for Plugin {
         }
     }
 
-    async fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
 
-    async fn query(
+    fn query(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,
@@ -63,7 +62,7 @@ impl kal_plugin::Plugin for Plugin {
         Ok(self.all_for_query(query, matcher).into())
     }
 
-    async fn query_direct(
+    fn query_direct(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,

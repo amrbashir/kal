@@ -50,7 +50,6 @@ impl Plugin {
     }
 }
 
-#[async_trait::async_trait]
 impl kal_plugin::Plugin for Plugin {
     fn new(config: &Config) -> Self {
         let config = config.plugin_config::<PluginConfig>(Self::NAME);
@@ -77,7 +76,7 @@ impl kal_plugin::Plugin for Plugin {
         }
     }
 
-    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         let config = config.plugin_config::<PluginConfig>(self.name());
 
         self.workflows = config.workflows;
@@ -86,7 +85,7 @@ impl kal_plugin::Plugin for Plugin {
         Ok(())
     }
 
-    async fn query(
+    fn query(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,
@@ -94,7 +93,7 @@ impl kal_plugin::Plugin for Plugin {
         Ok(self.all_for_query(query, matcher).into())
     }
 
-    async fn query_direct(
+    fn query_direct(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,

@@ -2,7 +2,6 @@ use kal_config::{Config, PluginConfig};
 
 use crate::{FuzzyMatcher, PluginQueryOutput};
 
-#[async_trait::async_trait]
 pub trait Plugin: Send + Sync {
     /// Constructor for plugin.
     fn new(config: &Config) -> Self
@@ -27,13 +26,13 @@ pub trait Plugin: Send + Sync {
 
     /// Reloads the cache and configuration of the plugin
     #[allow(unused_variables)]
-    async fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, config: &Config) -> anyhow::Result<()> {
         Ok(())
     }
 
     /// Query the plugin for [`ResultItem`]s.
     #[allow(unused_variables)]
-    async fn query(
+    fn query(
         &mut self,
         query: &str,
         matcher: &mut FuzzyMatcher,
@@ -42,11 +41,11 @@ pub trait Plugin: Send + Sync {
     }
 
     /// Query the plugin for [`ResultItem`]s when directly invoked.
-    async fn query_direct(
+    fn query_direct(
         &mut self,
         query: &str,
         matcher: &mut crate::fuzzy_matcher::FuzzyMatcher,
     ) -> anyhow::Result<PluginQueryOutput> {
-        self.query(query, matcher).await
+        self.query(query, matcher)
     }
 }

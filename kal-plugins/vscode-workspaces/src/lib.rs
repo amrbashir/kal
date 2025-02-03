@@ -17,7 +17,7 @@ impl Plugin {
         "SELECT value FROM ItemTable WHERE key LIKE 'history.recentlyOpenedPathsList'";
 }
 
-#[async_trait::async_trait]
+
 impl kal_plugin::Plugin for Plugin {
     fn new(_config: &Config) -> Self {
         Self {
@@ -38,7 +38,7 @@ impl kal_plugin::Plugin for Plugin {
         }
     }
 
-    async fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
+    fn reload(&mut self, _config: &Config) -> anyhow::Result<()> {
         let Some(roaming) = dirs::data_dir() else {
             return Ok(());
         };
@@ -74,7 +74,7 @@ impl kal_plugin::Plugin for Plugin {
         Ok(())
     }
 
-    async fn query_direct(
+    fn query_direct(
         &mut self,
         query: &str,
         matcher: &mut kal_plugin::FuzzyMatcher,
