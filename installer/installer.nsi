@@ -4,7 +4,7 @@ Unicode true
 ManifestDPIAware true
 ManifestDPIAwareness PerMonitorV2
 SetCompressor /SOLID lzma
-InstallDir "$APPDATA\kal"
+InstallDir "$LOCALAPPDATA\kal"
 Icon "icon.ico"
 
 !include "MUI2.nsh"
