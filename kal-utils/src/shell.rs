@@ -116,6 +116,10 @@ mod imp {
     }
 
     pub fn open_dir(path: impl AsRef<Path>) -> anyhow::Result<()> {
+        reveal_item_in_dir_ex(path, true)
+    }
+
+    fn open_dir_shell_ex(path: impl AsRef<Path>) -> anyhow::Result<()> {
         let path = path.as_ref();
         let path = HSTRING::from(path);
 
@@ -138,33 +142,24 @@ mod imp {
     }
 
     pub fn reveal_item_in_dir<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+        reveal_item_in_dir_ex(path, false)
+    }
+
+    fn reveal_item_in_dir_ex<P: AsRef<Path>>(path: P, explore_dir: bool) -> anyhow::Result<()> {
         let _ = unsafe { CoInitialize(None) };
 
         let path = path.as_ref();
 
-        let Some(dir) = path.parent() else {
-            anyhow::bail!("{} doesn't have a parent", path.display());
-        };
-
-        let dir = HSTRING::from(dir);
-        let dir_item = unsafe { ILCreateFromPathW(PCWSTR::from_raw(dir.as_ptr())) };
-        let dir_item = ITEMIDLISTPtr(dir_item);
-
-        let path = HSTRING::from(path);
-        let path_item = unsafe { ILCreateFromPathW(PCWSTR::from_raw(path.as_ptr())) };
+        let path_hstr = HSTRING::from(path);
+        let path_item = unsafe { ILCreateFromPathW(PCWSTR::from_raw(path_hstr.as_ptr())) };
         let path_item = ITEMIDLISTPtr(path_item);
 
         unsafe {
-            if let Err(e) = SHOpenFolderAndSelectItems(dir_item.0, Some(&[path_item.0]), 0) {
+            if let Err(e) =
+                SHOpenFolderAndSelectItems(path_item.0, explore_dir.then_some(&[path_item.0]), 0)
+            {
                 if e.code().0 == ERROR_FILE_NOT_FOUND.0 as i32 {
-                    ffi::ShellExecuteW(
-                        None,
-                        w!("open"),
-                        &dir,
-                        PCWSTR::null(),
-                        PCWSTR::null(),
-                        SW_SHOWNORMAL,
-                    )?;
+                    open_dir_shell_ex(path)?;
                 } else {
                     return Err(e.into());
                 }
