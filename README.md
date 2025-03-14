@@ -1,3 +1,5 @@
+<p align="center"><img src="./kal/assets/icon.svg" width="125" /></p>
+
 # kal
 
 Keyboard-driven app launcher and productivity tool (only Windows for now).
