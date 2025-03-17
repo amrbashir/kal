@@ -17,4 +17,4 @@ New-Item -Force "dist" -Type Directory > $null
 Move-Item -Force "installer/kal.exe" "dist/kal.exe"
 Move-Item -Force "installer/kal-setup.exe" "dist/kal-setup.exe"
 
-Compress-Archive "dist/kal.exe" "dist/kal.zip"
+Compress-Archive -Update "dist/kal.exe" "dist/kal.zip"
