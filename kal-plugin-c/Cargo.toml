@@ -1,0 +1,16 @@
+[package]
+name = "kal-plugin-c"
+version = "0.2.0"
+description = "Plugin types for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+kal-config = { path = "../kal-config" }
+serde.workspace = true
+anyhow.workspace = true
+nucleo-matcher.workspace = true
+strum = { workspace = true, features = ["derive"] }
+async-trait.workspace = true

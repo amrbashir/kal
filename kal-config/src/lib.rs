@@ -35,9 +35,9 @@ impl Config {
     /// - `release`: `$HOME/.config/kal.toml`
     pub fn path() -> Result<PathBuf> {
         #[cfg(debug_assertions)]
-        return std::env::current_dir()
-            .map(|p| p.join("kal.toml"))
-            .map_err(Into::into);
+        return Ok(std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("kal.toml"));
 
         #[cfg(not(debug_assertions))]
         dirs::home_dir()

@@ -3,7 +3,6 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use kal_utils::open_url;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 #[cfg(not(debug_assertions))]
@@ -14,9 +13,11 @@ use winit::event_loop::{ControlFlow, EventLoop};
 mod app;
 #[cfg(not(debug_assertions))]
 mod embedded_assets;
+mod fuzzyer_matcher;
 mod icon;
 mod ipc;
 mod main_window;
+mod plugin;
 mod plugin_manager;
 mod webview_window;
 
@@ -34,7 +35,7 @@ pub fn run(data_dir: PathBuf) -> anyhow::Result<()> {
             .show();
 
         if res == rfd::MessageDialogResult::Ok {
-            open_url(&WEBVIEW2_DOWNLOAD_LINK.parse()?)?;
+            kal_utils::open_url(&WEBVIEW2_DOWNLOAD_LINK.parse()?)?;
         }
 
         std::process::exit(1);

@@ -1848,15 +1848,7 @@ dependencies = [
  "global-hotkey",
  "image",
  "kal-config",
- "kal-plugin",
- "kal-plugin-app-launcher",
- "kal-plugin-calculator",
- "kal-plugin-directory-indexer",
- "kal-plugin-everything",
- "kal-plugin-shell",
- "kal-plugin-system-commands",
- "kal-plugin-vscode-workspaces",
- "kal-plugin-workflows",
+ "kal-plugin-c",
  "kal-utils",
  "nucleo-matcher",
  "percent-encoding",
@@ -1924,6 +1916,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kal-plugin-c"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "kal-config",
+ "nucleo-matcher",
+ "serde",
+ "strum",
+]
+
+[[package]]
 name = "kal-plugin-calculator"
 version = "0.2.0"
 dependencies = [
@@ -1933,6 +1937,15 @@ dependencies = [
  "kal-config",
  "kal-plugin",
  "sci-calc",
+]
+
+[[package]]
+name = "kal-plugin-cc"
+version = "0.2.0"
+dependencies = [
+ "kal-config",
+ "kal-plugin-c",
+ "libloading 0.8.6",
 ]
 
 [[package]]

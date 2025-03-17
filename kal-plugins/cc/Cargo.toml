@@ -1,0 +1,17 @@
+[package]
+name = "kal-plugin-cc"
+version = "0.2.0"
+description = "App launcher plugin for kal."
+authors = ["Amr Bashir <contact@amrbashir.me>"]
+repository = "https://github.com/amrbashir/kal"
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "cc"
+crate-type = ["cdylib"]
+
+[dependencies]
+kal-config = { path = "../../kal-config" }
+kal-plugin = { package = "kal-plugin-c", path = "../../kal-plugin-c" }
+libloading = "0.8"

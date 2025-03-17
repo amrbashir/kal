@@ -16,7 +16,7 @@ kal-config = { path = "../kal-config" }
 
 [dependencies]
 kal-config = { path = "../kal-config" }
-kal-plugin = { path = "../kal-plugin" }
+kal-plugin = { package = "kal-plugin-c", path = "../kal-plugin-c" }
 kal-utils = { path = "../kal-utils" }
 wry = { git = "https://github.com/tauri-apps/wry", rev = "b3926d01db1628e521ca22861e7efbe6f30a538f" }
 winit = { git = "https://github.com/amrbashir/winit", rev = "f26f5419bac8b135ffa6996ee8293c3138683d10" }
@@ -42,14 +42,14 @@ strum = { workspace = true, features = ["derive"] }
 rfd = { workspace = true, default-features = false }
 smol = "2.0"
 async-trait.workspace = true
-kal-plugin-app-launcher = { path = "../kal-plugins/app-launcher" }
-kal-plugin-calculator = { path = "../kal-plugins/calculator" }
-kal-plugin-directory-indexer = { path = "../kal-plugins/directory-indexer" }
-kal-plugin-everything = { path = "../kal-plugins/everything" }
-kal-plugin-shell = { path = "../kal-plugins/shell" }
-kal-plugin-system-commands = { path = "../kal-plugins/system-commands" }
-kal-plugin-vscode-workspaces = { path = "../kal-plugins/vscode-workspaces" }
-kal-plugin-workflows = { path = "../kal-plugins/workflows" }
+# kal-plugin-app-launcher = { path = "../kal-plugins/app-launcher" }
+# kal-plugin-calculator = { path = "../kal-plugins/calculator" }
+# kal-plugin-directory-indexer = { path = "../kal-plugins/directory-indexer" }
+# kal-plugin-everything = { path = "../kal-plugins/everything" }
+# kal-plugin-shell = { path = "../kal-plugins/shell" }
+# kal-plugin-system-commands = { path = "../kal-plugins/system-commands" }
+# kal-plugin-vscode-workspaces = { path = "../kal-plugins/vscode-workspaces" }
+# kal-plugin-workflows = { path = "../kal-plugins/workflows" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 softbuffer = "0.4"
