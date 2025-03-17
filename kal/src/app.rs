@@ -20,6 +20,7 @@ use winit::dpi::Size;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
+use wry::WebContext;
 
 use crate::icon;
 use crate::ipc::IpcEvent;
@@ -59,6 +60,8 @@ pub struct App {
 
     #[allow(unused)]
     pub tray_icon: TrayIcon,
+
+    pub web_context: wry::WebContext,
 }
 
 impl App {
@@ -120,6 +123,14 @@ impl App {
 
         let icon_service = Arc::new(icon::Service::new(&kal_data_dir));
 
+        #[cfg(debug_assertions)]
+        let web_context = WebContext::new(None);
+        #[cfg(not(debug_assertions))]
+        let web_context = {
+            let data_directory = kal_data_dir.join("kal.exe.WebView2");
+            WebContext::new(Some(data_directory))
+        };
+
         Ok(Self {
             event_loop_proxy,
             sender,
@@ -131,6 +142,7 @@ impl App {
             previously_foreground_hwnd: HWND::default(),
             icon_service,
             tray_icon,
+            web_context,
         })
     }
 

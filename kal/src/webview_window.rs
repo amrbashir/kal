@@ -15,7 +15,7 @@ use winit::window::{Window, WindowAttributes, WindowId};
 use wry::http::{Request, Response};
 #[cfg(windows)]
 use wry::WebViewBuilderExtWindows;
-use wry::{WebView, WebViewBuilder};
+use wry::{WebContext, WebView, WebViewBuilder};
 
 use crate::app::AppMessage;
 use crate::ipc;
@@ -29,11 +29,11 @@ pub struct WebViewWindowBuilder<'a> {
     center: bool,
 }
 
-impl WebViewWindowBuilder<'_> {
-    pub fn new() -> Self {
+impl<'a> WebViewWindowBuilder<'a> {
+    pub fn new(context: &'a mut WebContext) -> Self {
         let mut window_attrs = WindowAttributes::default();
 
-        let mut webview_builder = WebViewBuilder::new()
+        let mut webview_builder = WebViewBuilder::with_web_context(context)
             .with_initialization_script(ipc::INIT_SCRIPT)
             .with_hotkeys_zoom(false);
 
