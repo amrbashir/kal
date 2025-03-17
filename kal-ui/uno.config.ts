@@ -6,7 +6,7 @@ export default defineConfig({
     presetUno(),
     presetIcons({
       collections: {
-        builtin: FileSystemIconLoader("../kal/src/icon/builtin-icons"),
+        builtin: FileSystemIconLoader("../kal/assets/builtin-icons"),
       },
     }),
   ],
