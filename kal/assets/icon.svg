@@ -6,7 +6,7 @@
    version="1.1"
    id="svg8"
    inkscape:version="1.4 (86a8ad7, 2024-10-11)"
-   sodipodi:docname="kal.svg"
+   sodipodi:docname="icon.svg"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -21,7 +21,7 @@
        id="linearGradient11"
        inkscape:collect="always">
       <stop
-         style="stop-color:#244670;stop-opacity:1;"
+         style="stop-color:#83c1a2;stop-opacity:1;"
          offset="0"
          id="stop11" />
       <stop
@@ -49,7 +49,7 @@
          offset="0"
          id="stop22" />
       <stop
-         style="stop-color:#4992d0;stop-opacity:1;"
+         style="stop-color:#81bfa3;stop-opacity:1;"
          offset="1"
          id="stop23" />
     </linearGradient>
@@ -61,7 +61,7 @@
          offset="0"
          id="stop20" />
       <stop
-         style="stop-color:#2e579a;stop-opacity:1;"
+         style="stop-color:#7fbea3;stop-opacity:1;"
          offset="1"
          id="stop21" />
     </linearGradient>
@@ -129,10 +129,10 @@
        inkscape:collect="always"
        xlink:href="#linearGradient22"
        id="linearGradient23"
-       x1="-89.758614"
-       y1="109.42797"
-       x2="-89.758614"
-       y2="210.51216"
+       x1="-127.49037"
+       y1="118.73899"
+       x2="-58.434383"
+       y2="219.98242"
        gradientUnits="userSpaceOnUse" />
     <inkscape:path-effect
        effect="fillet_chamfer"
@@ -207,10 +207,10 @@
        xlink:href="#linearGradient20"
        id="linearGradient5"
        gradientUnits="userSpaceOnUse"
-       x1="-108.32111"
-       y1="62.012573"
-       x2="-108.32111"
-       y2="213.02731" />
+       x1="-54.123329"
+       y1="55.057598"
+       x2="-171.82208"
+       y2="219.98242" />
     <inkscape:path-effect
        effect="fillet_chamfer"
        id="path-effect12-4"
@@ -255,10 +255,10 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.35355339"
-     inkscape:cx="-52.325902"
-     inkscape:cy="217.78889"
+     inkscape:cx="825.90072"
+     inkscape:cy="941.86623"
      inkscape:document-units="mm"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g27"
      inkscape:document-rotation="0"
      showgrid="false"
      showguides="false"
@@ -416,10 +416,11 @@
       <path
          id="rect10-2"
          style="display:inline;fill:url(#linearGradient21);fill-opacity:1;stroke-width:0.238311"
-         d="M -88.913459,62.18055 -181.3509,197.70352 a 14.249519,14.249519 62.148548 0 0 11.77191,22.2789 h 15.65128 a 16.317822,16.317822 152.14855 0 0 13.48059,-7.12299 l 107.633397,-157.801831 -42.619214,0 a 16.317738,16.317738 152.14855 0 0 -13.480522,7.122951 z"
+         d="M -88.913459,62.18055 -181.3509,197.70352 a 14.249519,14.249519 62.148548 0 0 11.77191,22.2789 h 15.65128 a 16.317822,16.317822 152.14855 0 0 13.48059,-7.12299 L -32.813723,55.057599 h -42.619214 a 16.317738,16.317738 152.14855 0 0 -13.480522,7.122951 z"
          inkscape:path-effect="#path-effect13"
          inkscape:original-d="M -84.05504,55.057599 -196.54688,219.98242 h 51.24132 L -32.813723,55.057599 Z"
-         inkscape:label="shadow" />
+         inkscape:label="shadow"
+         sodipodi:nodetypes="ccccc" />
       <path
          id="rect10"
          style="display:inline;fill:url(#linearGradient12);fill-opacity:1;stroke-width:0.238311"
