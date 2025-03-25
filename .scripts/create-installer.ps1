@@ -2,10 +2,6 @@ $targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { './targ
 
 $exe = "$targetDir/release/kal.exe"
 
-if (!(Test-Path $exe)) {
-  & "./.scripts/build.ps1"
-}
-
 Copy-Item -Force $exe "./installer/kal.exe"
 Copy-Item -Force "./kal/assets/icon.ico" "./installer/icon.ico"
 
