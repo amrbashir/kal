@@ -47,39 +47,57 @@ impl<T: AsRef<Path>> ExpandEnvVars for T {
 
         for c in self.as_ref().components() {
             match c {
-                std::path::Component::Normal(c) => {
+                std::path::Component::Normal(mut c) => {
+                    // Special case for `~` and `$HOME` on Windows, replace with `$Env:USERPROFILE`
+                    #[cfg(windows)]
+                    if c == OsStr::new("~") || c.eq_ignore_ascii_case("$HOME") {
+                        c = OsStr::new("$Env:USERPROFILE");
+                    }
+
+                    // Special case for `~` on Unix, replace with `$HOME`
+                    #[cfg(not(windows))]
+                    if c == OsStr::new("~") {
+                        c = OsStr::new("HOME");
+                    }
+
                     let bytes = c.as_encoded_bytes();
+
                     // %LOCALAPPDATA%
-                    if bytes[0] == b'%' && bytes[bytes.len() - 1] == b'%' {
-                        let var = &bytes[1..bytes.len() - 1];
+                    let var = if bytes[0] == b'%' && bytes[bytes.len() - 1] == b'%' {
+                        Some(&bytes[1..bytes.len() - 1])
+                    } else {
+                        // prefix length is 5 for $Env: and 1 for $
+                        // so we take the minimum of 5 and the length of the bytes
+                        let prefix = &bytes[..5.min(bytes.len())];
+                        let prefix = unsafe { OsStr::from_encoded_bytes_unchecked(prefix) };
+
+                        // $Env:LOCALAPPDATA
+                        if prefix.eq_ignore_ascii_case("$Env:") {
+                            Some(&bytes[5..])
+                        } else if bytes[0] == b'$' {
+                            // $LOCALAPPDATA
+                            Some(&bytes[1..])
+                        } else {
+                            // not a variable
+                            None
+                        }
+                    };
+
+                    // if component is a variable, get the value from the environment
+                    if let Some(var) = var {
                         let var = unsafe { OsStr::from_encoded_bytes_unchecked(var) };
                         if let Ok(value) = std::env::var(var) {
                             out.push(value);
                             continue;
                         }
-                    } else {
-                        // $Env:LOCALAPPDATA
-                        let prefix = &bytes[..5.min(bytes.len())];
-                        let prefix = unsafe { OsStr::from_encoded_bytes_unchecked(prefix) };
-                        if prefix.eq_ignore_ascii_case("$env:") {
-                            let var = &bytes[5..];
-                            let var = unsafe { OsStr::from_encoded_bytes_unchecked(var) };
-                            if let Ok(value) = std::env::var(var) {
-                                out.push(value);
-                                continue;
-                            }
-                        // $LOCALAPPDATA
-                        } else if bytes[0] == b'$' {
-                            let var = &bytes[1..];
-                            let var = unsafe { OsStr::from_encoded_bytes_unchecked(var) };
-                            if let Ok(value) = std::env::var(var) {
-                                out.push(value);
-                                continue;
-                            }
-                        }
                     }
+
+                    // if not a variable, or a value couldn't be obtained from environemnt
+                    // then push the component as is
                     out.push(c);
                 }
+
+                // other components are pushed as is
                 _ => out.push(c),
             }
         }
@@ -93,49 +111,43 @@ mod tests {
 
     use super::*;
 
-    fn os_path<P: AsRef<Path>>(p: P) -> PathBuf {
-        p.as_ref().components().collect::<PathBuf>()
-    }
-
     #[test]
     fn resolves_env_vars() {
-        let var = "VAR";
-        let val = "VALUE";
-        std::env::set_var(var, val);
+        // helper functions
+        fn path<P: AsRef<Path>>(p: P) -> PathBuf {
+            // Ensure that the path is using the correct path separator for the OS.
+            p.as_ref().components().collect::<PathBuf>()
+        }
 
-        assert_eq!(
-            Path::new("/path/%VAR%/to/dir").expand_vars(),
-            os_path("/path/VALUE/to/dir")
-        );
+        fn expand<P: AsRef<Path>>(p: P) -> PathBuf {
+            p.expand_vars()
+        }
 
-        assert_eq!(
-            Path::new("/path/$env:VAR/to/dir").expand_vars(),
-            os_path("/path/VALUE/to/dir")
-        );
+        // Set a variable for testing
+        std::env::set_var("VAR", "VALUE");
 
-        assert_eq!(
-            Path::new("/path/$EnV:VAR/to/dir").expand_vars(),
-            os_path("/path/VALUE/to/dir")
-        );
+        // %VAR% format
+        assert_eq!(expand("/path/%VAR%/to/dir"), path("/path/VALUE/to/dir"));
+        // $env:VAR format
+        assert_eq!(expand("/path/$env:VAR/to/dir"), path("/path/VALUE/to/dir"));
+        // $VAR format
+        assert_eq!(expand("/path/$VAR/to/dir"), path("/path/VALUE/to/dir"));
 
-        assert_eq!(
-            Path::new("/path/$VAR/to/dir").expand_vars(),
-            os_path("/path/VALUE/to/dir")
-        );
+        // non-existent variable
+        assert_eq!(expand("/path/%ASD%/to/d"), path("/path/%ASD%/to/d"));
+        assert_eq!(expand("/path/$env:ASD/to/d"), path("/path/$env:ASD/to/d"));
+        assert_eq!(expand("/path/$ASD/to/d"), path("/path/$ASD/to/d"));
 
-        assert_eq!(
-            Path::new("/path/%NONEXISTENTVAR%/to/dir").expand_vars(),
-            os_path("/path/%NONEXISTENTVAR%/to/dir")
-        );
+        // Set a $env:USERPROFILE variable for testing
+        #[cfg(windows)]
+        std::env::set_var("USERPROFILE", "C:\\Users\\user");
 
-        assert_eq!(
-            Path::new("/path/$env:NONEXISTENTVAR/to/dir").expand_vars(),
-            os_path("/path/$env:NONEXISTENTVAR/to/dir")
-        );
+        // Set a $HOME variable for testing
+        #[cfg(not(windows))]
+        std::env::set_var("HOME", "C:\\Users\\user");
 
-        assert_eq!(
-            Path::new("/path/$NONEXISTENTVAR/to/dir").expand_vars(),
-            os_path("/path/$NONEXISTENTVAR/to/dir")
-        );
+        // ~ and $HOME should be replaced with $Env:USERPROFILE
+        assert_eq!(expand("~"), path("C:\\Users\\user"));
+        assert_eq!(expand("$HOME"), path("C:\\Users\\user"));
     }
 }
