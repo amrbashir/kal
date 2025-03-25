@@ -9,7 +9,8 @@ $path = "kal-ui/package.json"
 (Get-Content $path) -replace "`"version`": `"[0-9].[0-9].[0-9]`"", "`"version`": `"$version`"" | Set-Content $path
 
 $path = "CHANGELOG.md"
-(Get-Content $path) -replace "## [Unreleased]", "## [$version]" | Set-Content $path
+$date = Get-Date -Format "yyyy-MM-dd"
+(Get-Content $path) -replace "## \[Unreleased\]", "## [Unreleased]`n`n## [$version] - $date" | Set-Content $path
 
 Start-Sleep -Seconds 2
 
