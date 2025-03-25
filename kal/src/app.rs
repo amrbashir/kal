@@ -8,11 +8,7 @@ use kal_config::Config;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(windows)]
-use windows::core::*;
-#[cfg(windows)]
 use windows::Win32::Foundation::*;
-#[cfg(windows)]
-use windows::Win32::System::LibraryLoader::*;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
 use winit::application::ApplicationHandler;
@@ -94,10 +90,7 @@ impl App {
 
         #[cfg(windows)]
         {
-            const ICON_ID: PCWSTR = PCWSTR(2 as _);
-            let hinst = HINSTANCE(unsafe { GetModuleHandleW(None) }?.0);
-            let hicon = unsafe { LoadIconW(Some(hinst), ICON_ID) }?;
-            let icon = tray_icon::Icon::from_handle(hicon.0 as _);
+            let icon = tray_icon::Icon::from_resource(2, Some((32, 32)))?;
             tray_icon = tray_icon.with_icon(icon);
         }
 
