@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use kal_plugin::{Action, Icon, IntoResultItem, ResultItem};
-use kal_utils::{ExpandEnvVars, StringExt};
+use kal_utils::{PathExt, StringExt};
 use smol::prelude::*;
 
 use super::App;
@@ -84,7 +84,7 @@ impl IntoResultItem for Program {
 }
 
 pub async fn find_all_in_paths(paths: &[String], extensions: &[String]) -> Vec<super::App> {
-    let expanded_paths = paths.iter().map(ExpandEnvVars::expand_vars);
+    let expanded_paths = paths.iter().map(PathExt::replace_env);
 
     let entries = expanded_paths.map(|p| read_dir_by_extensions(p, extensions));
 
@@ -178,7 +178,7 @@ impl super::Plugin {
         })?;
 
         for path in &self.paths {
-            let path = Path::new(path).expand_vars();
+            let path = Path::new(path).replace_env();
             debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
         }
 

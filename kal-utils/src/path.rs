@@ -1,12 +1,21 @@
 use std::ffi::OsStr;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub trait PathExt {
-    #[allow(unused)]
+    /// Add an extra extension to the path.
     fn with_extra_extension<S: AsRef<OsStr>>(&self, extension: S) -> PathBuf;
 
+    /// Hash the path to a string.
     fn to_hash(&self) -> String;
+
+    /// Resolve environment variables components in a path.
+    ///
+    /// Resolves the follwing formats:
+    /// - CMD: `%variable%`
+    /// - PowerShell: `$Env:variable`
+    /// - Bash: `$variable`.
+    fn replace_env(&self) -> PathBuf;
 }
 
 impl<T: AsRef<Path>> PathExt for T {
@@ -28,36 +37,16 @@ impl<T: AsRef<Path>> PathExt for T {
         path.hash(&mut hasher);
         hasher.finish().to_string()
     }
-}
 
-/// Expand environment variables components in a path.
-pub trait ExpandEnvVars {
-    /// Expand environment variables components in a path.
-    ///
-    /// Expands the follwing formats:
-    /// - CMD: `%variable%`
-    /// - PowerShell: `$Env:variable`
-    /// - Bash: `$variable`.
-    fn expand_vars(&self) -> PathBuf;
-}
-
-impl<T: AsRef<Path>> ExpandEnvVars for T {
-    fn expand_vars(&self) -> PathBuf {
+    fn replace_env(&self) -> PathBuf {
         let mut out = PathBuf::new();
 
         for c in self.as_ref().components() {
             match c {
-                std::path::Component::Normal(mut c) => {
-                    // Special case for `~` and `$HOME` on Windows, replace with `$Env:USERPROFILE`
-                    #[cfg(windows)]
+                Component::Normal(mut c) => {
+                    // Special case for ~ and $HOME, replace with $Env:USERPROFILE
                     if c == OsStr::new("~") || c.eq_ignore_ascii_case("$HOME") {
                         c = OsStr::new("$Env:USERPROFILE");
-                    }
-
-                    // Special case for `~` on Unix, replace with `$HOME`
-                    #[cfg(not(windows))]
-                    if c == OsStr::new("~") {
-                        c = OsStr::new("HOME");
                     }
 
                     let bytes = c.as_encoded_bytes();
@@ -86,7 +75,7 @@ impl<T: AsRef<Path>> ExpandEnvVars for T {
                     // if component is a variable, get the value from the environment
                     if let Some(var) = var {
                         let var = unsafe { OsStr::from_encoded_bytes_unchecked(var) };
-                        if let Ok(value) = std::env::var(var) {
+                        if let Some(value) = std::env::var_os(var) {
                             out.push(value);
                             continue;
                         }
@@ -108,46 +97,43 @@ impl<T: AsRef<Path>> ExpandEnvVars for T {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
     #[test]
     fn resolves_env_vars() {
         // helper functions
-        fn path<P: AsRef<Path>>(p: P) -> PathBuf {
+        fn expected<P: AsRef<Path>>(p: P) -> PathBuf {
             // Ensure that the path is using the correct path separator for the OS.
             p.as_ref().components().collect::<PathBuf>()
         }
 
-        fn expand<P: AsRef<Path>>(p: P) -> PathBuf {
-            p.expand_vars()
+        fn resolve<P: AsRef<Path>>(p: P) -> PathBuf {
+            p.replace_env()
         }
 
         // Set a variable for testing
         std::env::set_var("VAR", "VALUE");
 
         // %VAR% format
-        assert_eq!(expand("/path/%VAR%/to/dir"), path("/path/VALUE/to/dir"));
+        assert_eq!(resolve("/path/%VAR%/d"), expected("/path/VALUE/d"));
         // $env:VAR format
-        assert_eq!(expand("/path/$env:VAR/to/dir"), path("/path/VALUE/to/dir"));
+        assert_eq!(resolve("/path/$env:VAR/d"), expected("/path/VALUE/d"));
         // $VAR format
-        assert_eq!(expand("/path/$VAR/to/dir"), path("/path/VALUE/to/dir"));
+        assert_eq!(resolve("/path/$VAR/d"), expected("/path/VALUE/d"));
 
         // non-existent variable
-        assert_eq!(expand("/path/%ASD%/to/d"), path("/path/%ASD%/to/d"));
-        assert_eq!(expand("/path/$env:ASD/to/d"), path("/path/$env:ASD/to/d"));
-        assert_eq!(expand("/path/$ASD/to/d"), path("/path/$ASD/to/d"));
+        assert_eq!(resolve("/path/%ASD%/to/d"), expected("/path/%ASD%/to/d"));
+        assert_eq!(
+            resolve("/path/$env:ASD/to/d"),
+            expected("/path/$env:ASD/to/d")
+        );
+        assert_eq!(resolve("/path/$ASD/to/d"), expected("/path/$ASD/to/d"));
 
         // Set a $env:USERPROFILE variable for testing
-        #[cfg(windows)]
         std::env::set_var("USERPROFILE", "C:\\Users\\user");
 
-        // Set a $HOME variable for testing
-        #[cfg(not(windows))]
-        std::env::set_var("HOME", "C:\\Users\\user");
-
         // ~ and $HOME should be replaced with $Env:USERPROFILE
-        assert_eq!(expand("~"), path("C:\\Users\\user"));
-        assert_eq!(expand("$HOME"), path("C:\\Users\\user"));
+        assert_eq!(resolve("~"), expected("C:\\Users\\user"));
+        assert_eq!(resolve("$HOME"), expected("C:\\Users\\user"));
     }
 }

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use kal_config::Config;
 use kal_plugin::{Action, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
-use kal_utils::{ExpandEnvVars, IteratorExt};
+use kal_utils::{IteratorExt, PathExt};
 use serde::{Deserialize, Serialize};
 use smol::stream::*;
 
@@ -31,7 +31,7 @@ impl Plugin {
     async fn index_dirs(&mut self) {
         self.entries.clear();
 
-        let expanded_paths = self.paths.iter().map(ExpandEnvVars::expand_vars);
+        let expanded_paths = self.paths.iter().map(PathExt::replace_env);
         let mut entries = smol::stream::iter(expanded_paths).map(read_dir);
 
         while let Some(e) = entries.next().await {
