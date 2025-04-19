@@ -22,6 +22,17 @@ and [simple directory indexer](#directoryindexer) to acess some common directori
 
 Also I want to write plugins in any programming langauge and not just C# and .NET or electron and Node.js.
 
+## Install
+
+Download the installer from the [latest](https://github.com/amrbashir/komorebi-switcher/releases/latest) release.
+
+Or through PowerShell:
+
+```powershell
+irm "https://github.com/amrbashir/kal/releases/latest/download/kal-setup.exe" -OutFile "kal-setup.exe"
+& "./kal-setup.exe"
+```
+
 ## Usage
 
 By default, you can open kal by using <kbd>Alt+Space</kbd>. This can be configured in [config](#config).
