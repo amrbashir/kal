@@ -5,7 +5,7 @@
 ## Added
 
 - New icon
-- Report panicking errors in a dialog box instead of silentely closing the app.
+- Report panicking errors in a dialog box instead of silently closing the app.
 - Paths in configuration file can now use `~` and `$HOME` and will be resolved to the user home directory.
 
 ## Fixed

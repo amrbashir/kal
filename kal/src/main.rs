@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::fmt::Display;
 use std::path::PathBuf;
 
 use anyhow::Context;
@@ -19,6 +20,15 @@ mod ipc;
 mod main_window;
 mod plugin_manager;
 mod webview_window;
+
+fn error_dialog<T: Display>(error: T) {
+    rfd::MessageDialog::new()
+        .set_title("komorebi-switcher")
+        .set_description(error.to_string())
+        .set_level(rfd::MessageLevel::Error)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
 
 const WEBVIEW2_DOWNLOAD_LINK: &str = "https://go.microsoft.com/fwlink/p/?LinkId=2124703";
 
@@ -102,5 +112,16 @@ fn main() -> anyhow::Result<()> {
 
     tracing::debug!("Logger initialized");
 
-    run(data_dir).inspect_err(|e| tracing::error!("{e}"))
+    std::panic::set_hook(Box::new(|info| {
+        error_dialog(info);
+        tracing::error!("{info}");
+    }));
+
+    if let Err(e) = run(data_dir) {
+        error_dialog(&e);
+        tracing::error!("{e}");
+        std::process::exit(1);
+    }
+
+    Ok(())
 }
