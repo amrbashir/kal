@@ -11,14 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: dtolnay/rust-toolchain@stable
-
-      - run: corepack enable
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "lts/*"
-          cache: "pnpm"
-
-      - name: install NSIS
+      - name: install nsis
         run: |
           iwr -useb get.scoop.sh -outfile 'install.ps1'
           .\install.ps1 -RunAsAdmin
@@ -26,14 +19,31 @@ jobs:
           scoop bucket add extras
           scoop install nsis
 
+      - run: npm i -g corepack
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: "pnpm"
+
       - run: pnpm i
+      - run: ./.scripts/build.ps1
       - run: ./.scripts/create-installer.ps1
-      - run: mv dist/kal.exe kal-${{github.ref_name}}.exe
-      - run: mv dist/kal-setup.exe kal-${{github.ref_name}}-setup.exe
+
+      - name: generate checksums.txt
+        run: |
+          echo "$((Get-FileHash ./dist/kal.exe).Hash.ToLower())  kal.exe" >> checksums.txt
+          echo "$((Get-FileHash ./dist/kal.zip).Hash.ToLower())  kal.zip" >> checksums.txt
+          echo "$((Get-FileHash ./dist/kal-setup.exe).Hash.ToLower())  kal-setup.exe" >> checksums.txt
+
+      - name: generate release notes
+        run: ./.scripts/generate-release-notes.ps1
 
       - name: release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_NOTES.md
           files: |
-            kal-${{github.ref_name}}.exe
-            kal-${{github.ref_name}}-setup.exe
+            ./dist/*.exe
+            ./dist/*.zip
+            ./checksums.txt

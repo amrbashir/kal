@@ -109,7 +109,7 @@ struct Workspace {
 
 impl Workspace {
     fn new(uri: url::Url, icon: Icon) -> Self {
-        let name = uri.path().split('/').last().unwrap_or_default();
+        let name = uri.path().split('/').next_back().unwrap_or_default();
         let mut name = name.to_owned();
 
         let authority = uri.authority();

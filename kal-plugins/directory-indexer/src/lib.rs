@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use kal_config::Config;
 use kal_plugin::{Action, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
-use kal_utils::{ExpandEnvVars, IteratorExt};
+use kal_utils::{IteratorExt, PathExt};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl Plugin {
         self.entries = self
             .paths
             .iter()
-            .map(ExpandEnvVars::expand_vars)
+            .map(PathExt::replace_env)
             .map(read_dir)
             .flatten()
             .flatten()

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use kal_plugin::{Action, Icon, IntoResultItem, ResultItem};
-use kal_utils::{ExpandEnvVars, StringExt};
+use kal_utils::{PathExt, StringExt};
 
 use super::App;
 
@@ -89,7 +89,7 @@ pub fn find_all_in_paths<'a>(
 ) -> impl Iterator<Item = Program> + use<'a> {
     paths
         .iter()
-        .map(ExpandEnvVars::expand_vars)
+        .map(PathExt::replace_env)
         .map(|p| read_dir_filtered_by_exts(p, extensions))
         .flatten()
         .flatten()
@@ -162,7 +162,7 @@ impl super::Plugin {
         })?;
 
         for path in &self.paths {
-            let path = Path::new(path).expand_vars();
+            let path = Path::new(path).replace_env();
             debouncer.watcher().watch(&path, RecursiveMode::Recursive)?;
         }
 

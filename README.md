@@ -1,3 +1,5 @@
+<p align="center"><img src="./kal/assets/icon.svg" width="125" /></p>
+
 # kal
 
 Keyboard-driven app launcher and productivity tool (only Windows for now).
@@ -19,6 +21,17 @@ or missing a feature I need daily, for example [Workflows](#workflows)
 and [simple directory indexer](#directoryindexer) to acess some common directories and files.
 
 Also I want to write plugins in any programming langauge and not just C# and .NET or electron and Node.js.
+
+## Install
+
+[<img src='https://github.com/ycngmn/Nobook/blob/e2a7fa98e460ce8ebb241ea1e7bda2ebb33e05c0/images/get-it-on-github.png' alt='Get it on GitHub' height = "90">](https://github.com/amrbashir/kal/releases/latest)
+
+Or through PowerShell:
+
+```powershell
+irm "https://github.com/amrbashir/kal/releases/latest/download/kal-setup.exe" -OutFile "kal-setup.exe"
+& "./kal-setup.exe"
+```
 
 ## Usage
 

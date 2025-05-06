@@ -8,11 +8,7 @@ use kal_config::Config;
 use tray_icon::menu::{Menu, MenuEvent, MenuItem};
 use tray_icon::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 #[cfg(windows)]
-use windows::core::*;
-#[cfg(windows)]
 use windows::Win32::Foundation::*;
-#[cfg(windows)]
-use windows::Win32::System::LibraryLoader::*;
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::*;
 use winit::application::ApplicationHandler;
@@ -20,6 +16,7 @@ use winit::dpi::Size;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::window::WindowId;
+use wry::WebContext;
 
 use crate::icon;
 use crate::ipc::IpcEvent;
@@ -59,6 +56,8 @@ pub struct App {
 
     #[allow(unused)]
     pub tray_icon: TrayIcon,
+
+    pub web_context: wry::WebContext,
 }
 
 impl App {
@@ -91,10 +90,7 @@ impl App {
 
         #[cfg(windows)]
         {
-            const ICON_ID: PCWSTR = PCWSTR(2 as _);
-            let hinst = HINSTANCE(unsafe { GetModuleHandleW(None) }?.0);
-            let hicon = unsafe { LoadIconW(Some(hinst), ICON_ID) }?;
-            let icon = tray_icon::Icon::from_handle(hicon.0 as _);
+            let icon = tray_icon::Icon::from_resource(2, Some((32, 32)))?;
             tray_icon = tray_icon.with_icon(icon);
         }
 
@@ -120,6 +116,14 @@ impl App {
 
         let icon_service = Arc::new(icon::Service::new(&kal_data_dir));
 
+        #[cfg(debug_assertions)]
+        let web_context = WebContext::new(None);
+        #[cfg(not(debug_assertions))]
+        let web_context = {
+            let data_directory = kal_data_dir.join("kal.exe.WebView2");
+            WebContext::new(Some(data_directory))
+        };
+
         Ok(Self {
             event_loop_proxy,
             sender,
@@ -131,6 +135,7 @@ impl App {
             previously_foreground_hwnd: HWND::default(),
             icon_service,
             tray_icon,
+            web_context,
         })
     }
 

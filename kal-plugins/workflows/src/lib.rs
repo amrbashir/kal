@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use kal_config::Config;
 use kal_plugin::{Action, BuiltinIcon, Icon, IntoResultItem, PluginQueryOutput, ResultItem};
-use kal_utils::{ExpandEnvVars, IteratorExt};
+use kal_utils::{IteratorExt, PathExt};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -163,7 +163,7 @@ impl Workflow {
         for step in &self.steps {
             match step {
                 WorkflowStep::Path { path, .. } => {
-                    let path = path.expand_vars();
+                    let path = path.replace_env();
                     kal_utils::execute(path, elevated)?
                 }
                 WorkflowStep::Url { url } => kal_utils::open_url(url)?,

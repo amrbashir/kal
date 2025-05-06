@@ -58,7 +58,7 @@ impl App {
 
         let icon_service = self.icon_service.clone();
 
-        let builder = WebViewWindowBuilder::new()
+        let builder = WebViewWindowBuilder::new(&mut self.web_context)
             .with_webview_id(MainWindowState::ID)
             .url(MainWindowState::URL)
             .init_script(&init_script.into_string())

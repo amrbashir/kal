@@ -1,18 +1,24 @@
-Copy-Item -Force "kal/assets/icon.ico" "installer/icon.ico"
-
-$targetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { './target' }
-
-$exe = "$targetDir/release/kal.exe"
-
-if (!(Test-Path $exe)) {
-  & ./.scripts/build.ps1
+# Exit if kal.exe is not found in ./dist
+if (-not (Test-Path -Path "./dist/kal.exe")) {
+    Write-Host -ForegroundColor Red "Error: kal.exe not found in ./dist, run build.ps1 first"
+    exit 1
 }
 
-Copy-Item -Force $exe "installer/kal.exe"
+# Copy the kal.exe to the installer directory
+Copy-Item -Force "./dist/kal.exe" "./installer/kal.exe"
 
-makensis /V4 installer/installer.nsi
+# Copy the icon.ico to the installer directory
+Copy-Item -Force "./kal/assets/icon.ico" "./installer/icon.ico"
 
-New-Item -Force "dist" -Type Directory > $null
+# Create the installer
+makensis /V4 "./installer/installer.nsi"
 
-Move-Item -Force "installer/kal.exe" "dist/kal.exe"
-Move-Item -Force "installer/kal-setup.exe" "dist/kal-setup.exe"
+# Move the installer to the dist directory
+Move-Item -Force "./installer/kal-setup.exe" "./dist/kal-setup.exe"
+
+# Compress the kal.exe to kal.zip
+Compress-Archive -Update "./dist/kal.exe" "./dist/kal.zip"
+
+# Remove artifacts
+Remove-Item -Force "./installer/kal.exe"
+Remove-Item -Force "./installer/icon.ico"
