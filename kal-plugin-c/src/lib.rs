@@ -50,7 +50,7 @@ macro_rules! define_plugin {
         extern "C" fn query(
             this: *mut $plugin,
             query: *const c_char,
-            matcher_fn: *const $crate::UnsafeMatcherFn,
+            matcher_fn: $crate::UnsafeMatcherFn,
             len: *mut usize,
         ) -> *const $crate::CResultItem {
             let this = unsafe { &mut *this };
@@ -58,7 +58,6 @@ macro_rules! define_plugin {
             let query = unsafe { ::std::ffi::CStr::from_ptr(query) };
             let query = query.to_str().unwrap_or("");
 
-            let matcher_fn = unsafe { *matcher_fn };
             let matcher_fn = move |haystack: &str, needle: &str| -> u16 {
                 let haystack_c = ::std::ffi::CString::new(haystack).unwrap();
                 let needle_c = ::std::ffi::CString::new(needle).unwrap();
@@ -75,7 +74,7 @@ macro_rules! define_plugin {
         extern "C" fn query_direct(
             this: *mut $plugin,
             query: *const c_char,
-            matcher_fn: *const $crate::UnsafeMatcherFn,
+            matcher_fn: $crate::UnsafeMatcherFn,
             len: *mut usize,
         ) -> *const $crate::CResultItem {
             let this = unsafe { &mut *this };
@@ -83,25 +82,25 @@ macro_rules! define_plugin {
             let query = unsafe { ::std::ffi::CStr::from_ptr(query) };
             let query = query.to_str().unwrap_or("");
 
-            dbg!(3);
-            let matcher_fn = unsafe { *matcher_fn };
-            dbg!(4);
             let matcher_fn = move |haystack: &str, needle: &str| -> u16 {
-                dbg!(5);
                 let haystack_c = ::std::ffi::CString::new(haystack).unwrap();
-                dbg!(6);
                 let needle_c = ::std::ffi::CString::new(needle).unwrap();
-                dbg!(7);
                 matcher_fn(haystack_c.as_ptr(), needle_c.as_ptr())
             };
-            dbg!(8);
 
             let items = this.query_direct(query, matcher_fn);
-            dbg!(9);
+            let items = items
+                .iter()
+                .map(Into::into)
+                .collect::<Vec<$crate::CResultItem>>();
 
             unsafe { len.write(items.len()) };
-            dbg!(10);
-            ::std::boxed::Box::into_raw(items.into_boxed_slice()) as *const CResultItem
+
+            let items_ptr = items.as_ptr() as *const $crate::CResultItem;
+
+            std::mem::forget(items);
+
+            items_ptr
         }
     };
 }

@@ -26,7 +26,7 @@ pub struct ResultItem {
 }
 
 /// Represents a search result item to be displayed in the user interface.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub struct CResultItem {
     /// Unique identifier string for the result item as a C string pointer.
@@ -55,6 +55,7 @@ impl From<CResultItem> for ResultItem {
             let id = CString::from_raw(c_item.id as _)
                 .to_string_lossy()
                 .into_owned();
+
             let primary_text = CString::from_raw(c_item.primary_text as _)
                 .to_string_lossy()
                 .into_owned();
@@ -83,6 +84,8 @@ impl From<CResultItem> for ResultItem {
                 let action_slice = std::slice::from_raw_parts(c_item.actions, c_item.actions_len);
                 action_slice.iter().map(|&a| a.into()).collect()
             };
+
+            dbg!(444444);
 
             ResultItem {
                 id,
@@ -113,15 +116,18 @@ impl From<&ResultItem> for CResultItem {
         let icon = Box::new(CIcon::from(item.icon.clone()));
 
         // Convert actions to C actions
-        let c_actions: Vec<CAction> = item.actions.iter().map(Into::into).collect();
 
-        let (actions_ptr, actions_len) = if c_actions.is_empty() {
+        let (actions_ptr, actions_len) = if item.actions.is_empty() {
             (std::ptr::null(), 0)
         } else {
+            let c_actions: Vec<CAction> = item.actions.iter().map(Into::into).collect();
             let len = c_actions.len();
-            let ptr = Box::into_raw(c_actions.into_boxed_slice()) as *const CAction;
+            let ptr = c_actions.as_ptr();
+            std::mem::forget(c_actions);
             (ptr, len)
         };
+
+        dbg!(111111111);
 
         CResultItem {
             id: id_ptr,

@@ -125,8 +125,9 @@ impl From<&Action> for CAction {
             .icon
             .clone()
             .map(|icon| {
-                let c_icon = icon.into();
-                Box::into_raw(Box::new(c_icon)) as *mut CIcon
+                let c_icon: CIcon = icon.into();
+                let ptr = &c_icon as *const CIcon;
+                ptr
             })
             .unwrap_or(std::ptr::null_mut());
 
@@ -151,6 +152,8 @@ impl From<&Action> for CAction {
 
         let action = Box::into_raw(action) as *const extern "C" fn(*const CResultItem);
 
+        dbg!(222222222);
+
         CAction {
             id,
             icon,
@@ -163,36 +166,46 @@ impl From<&Action> for CAction {
 
 impl From<CAction> for Action {
     fn from(c_action: CAction) -> Self {
+        dbg!("xx33");
         let id = unsafe {
             CString::from_raw(c_action.id as _)
                 .to_string_lossy()
                 .into_owned()
         };
-        let icon = unsafe {
-            CString::from_raw(c_action.icon as _)
-                .to_string_lossy()
-                .into_owned()
+        dbg!("xx31");
+
+        let icon = if c_action.icon.is_null() {
+            None
+        } else {
+            Some(unsafe { *c_action.icon }.into())
         };
+
+        dbg!("xx32");
         let description = unsafe {
             CString::from_raw(c_action.description as _)
                 .to_string_lossy()
                 .into_owned()
         };
+        dbg!("xx34");
         let accelerator = unsafe {
             CString::from_raw(c_action.accelerator as _)
                 .to_string_lossy()
                 .into_owned()
         };
+        dbg!("xx35");
         let action: Box<fn(*const CResultItem)> = unsafe { Box::from_raw(c_action.action as _) };
+        dbg!("xx36");
+
         let action = move |item: &ResultItem| {
             let c_item = CResultItem::from(item);
             // TODO: error handling
             Ok(action(&c_item))
         };
 
+        dbg!(33333);
         Action {
             id,
-            icon: Some(Icon::builtin(icon)),
+            icon,
             description: Some(description),
             accelerator: Some(accelerator),
             action: Box::new(action),

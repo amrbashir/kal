@@ -4,7 +4,7 @@ use std::ffi::*;
 use std::mem::ManuallyDrop;
 
 use kal_plugin::{
-    define_plugin, BuiltinIcon, CResultItem, Config, Icon, ResultItem, UnsafeMatcherFn,
+    define_plugin, Action, BuiltinIcon, CResultItem, Config, Icon, ResultItem, UnsafeMatcherFn,
 };
 
 pub struct Plugin {
@@ -54,12 +54,17 @@ impl Plugin {
     }
 
     fn query_direct<F: Fn(&str, &str) -> u16>(&self, query: &str, matcher: F) -> Vec<ResultItem> {
+        matcher(query, "asd");
+
         vec![ResultItem {
             id: "21en.a".to_string(),
             primary_text: "Hello".to_string(),
             secondary_text: "World".to_string(),
             icon: BuiltinIcon::FolderOpen.icon(),
-            actions: vec![],
+            actions: vec![Action::new("qwe", |_| {
+                println!("Action triggered");
+                Ok(())
+            })],
             score: 0,
             tooltip: Some("ToolTip".to_string()),
         }]

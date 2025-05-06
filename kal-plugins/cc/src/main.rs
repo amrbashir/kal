@@ -1,5 +1,7 @@
 use std::ffi::*;
 
+use kal_plugin::{CResultItem, ResultItem};
+
 fn main() {
     let config = kal_config::Config::load().unwrap();
 
@@ -21,7 +23,7 @@ fn main() {
             .get::<unsafe extern "C" fn(
                 *const c_void,
                 *const c_char,
-                *const c_void,
+                extern "C" fn(*const c_char, *const c_char) -> u16,
                 *mut usize,
             ) -> *const c_void>(b"query_direct")
             .unwrap();
@@ -46,13 +48,20 @@ fn main() {
         let ret = query_direct(
             plugin,
             CString::new(s).unwrap().as_ptr(),
-            Box::into_raw(matcher) as *const c_void,
+            matcher_fn,
             &mut len as *mut _,
         );
 
-        dbg!(len);
-        dbg!(ret);
+        let slice = std::slice::from_raw_parts(ret as *const CResultItem, len);
+        let s = slice
+            .into_iter()
+            .map(|item| ResultItem::from(*item))
+            .collect::<Vec<_>>();
 
         destroy(plugin);
     }
+}
+
+extern "C" fn matcher_fn(query: *const c_char, needle: *const c_char) -> u16 {
+    0
 }
