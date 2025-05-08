@@ -1,5 +1,7 @@
 use std::ffi::*;
+use std::sync::Arc;
 
+use safer_ffi::option::{self, TaggedOption};
 use serde::Serialize;
 
 use crate::icon::{BuiltinIcon, Icon};
@@ -9,12 +11,12 @@ use crate::{CIcon, CResultItem};
 type ActionFn = dyn Fn(&ResultItem) -> anyhow::Result<()> + Send + Sync;
 
 /// Represents an action that can be performed by the ResultItem.
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Action {
     /// A unique identifier for the action.
     pub id: String,
-    /// An optional icon to visually represent the action in UI.
-    pub icon: Option<Icon>,
+    /// An icon to visually represent the action in UI.
+    pub icon: Icon,
     /// An optional description explaining what the action does.
     pub description: Option<String>,
     /// An optional keyboard shortcut to trigger the action.
@@ -23,7 +25,7 @@ pub struct Action {
     /// The function to execute when the action is triggered.
     /// This field is skipped during serialization.
     #[serde(skip)]
-    pub action: Box<ActionFn>,
+    pub action: Arc<ActionFn>,
 }
 
 impl std::fmt::Debug for Action {
@@ -44,15 +46,15 @@ impl Action {
     {
         Self {
             id: id.to_string(),
-            icon: None,
+            icon: BuiltinIcon::BlankFile.icon(),
             description: None,
             accelerator: None,
-            action: Box::new(action),
+            action: Arc::new(action),
         }
     }
 
     pub fn with_icon(mut self, icon: Icon) -> Self {
-        self.icon = Some(icon);
+        self.icon = icon;
         self
     }
 
@@ -101,114 +103,68 @@ impl Action {
 }
 
 /// Represents an action that can be performed by the ResultItem.
-#[derive(Clone, Copy)]
+#[safer_ffi::derive_ReprC]
+#[derive(Clone)]
 #[repr(C)]
 pub struct CAction {
     /// A unique identifier for this action, as a C string pointer
     pub id: *const c_char,
     /// The icon associated with this action, as a C string pointer
-    pub icon: *const CIcon,
+    pub icon: CIcon,
     /// Description of what this action does, as a C string pointer
     pub description: *const c_char,
     /// Keyboard shortcut definition for this action, as a C string pointer
     /// for example "Ctrl+Shift+P"
     pub accelerator: *const c_char,
     /// Function pointer that will be executed when this action is triggered
-    pub action: *const extern "C" fn(*const CResultItem),
+    pub action: safer_ffi::closure::ArcDynFn1<(), *const c_void>,
 }
 
-impl From<&Action> for CAction {
-    fn from(action: &Action) -> Self {
-        let id = CString::new(action.id.clone()).unwrap().into_raw();
+impl From<&CAction> for Action {
+    fn from(c_action: &CAction) -> Self {
+        let id = unsafe { std::ffi::CStr::from_ptr(c_action.id) }
+            .to_string_lossy()
+            .into_owned();
 
-        let icon = action
-            .icon
-            .clone()
-            .map(|icon| {
-                let c_icon: CIcon = icon.into();
-                let ptr = &c_icon as *const CIcon;
-                ptr
-            })
-            .unwrap_or(std::ptr::null_mut());
-
-        let description = action
-            .description
-            .clone()
-            .map(|s| CString::new(s).unwrap().into_raw())
-            .unwrap_or(std::ptr::null_mut());
-
-        let accelerator = action
-            .accelerator
-            .clone()
-            .map(|s| CString::new(s).unwrap().into_raw())
-            .unwrap_or(std::ptr::null_mut());
-
-        let action = action.action.as_ref();
-        let action = Box::new(|item: *const CResultItem| {
-            let item = unsafe { *item };
-            let item = ResultItem::from(item);
-            (action)(&item);
-        });
-
-        let action = Box::into_raw(action) as *const extern "C" fn(*const CResultItem);
-
-        dbg!(222222222);
-
-        CAction {
-            id,
-            icon,
-            description,
-            accelerator,
-            action,
-        }
-    }
-}
-
-impl From<CAction> for Action {
-    fn from(c_action: CAction) -> Self {
-        dbg!("xx33");
-        let id = unsafe {
-            CString::from_raw(c_action.id as _)
-                .to_string_lossy()
-                .into_owned()
-        };
-        dbg!("xx31");
-
-        let icon = if c_action.icon.is_null() {
+        let description = if c_action.description.is_null() {
             None
         } else {
-            Some(unsafe { *c_action.icon }.into())
+            Some(
+                unsafe { std::ffi::CStr::from_ptr(c_action.description) }
+                    .to_string_lossy()
+                    .into_owned(),
+            )
         };
 
-        dbg!("xx32");
-        let description = unsafe {
-            CString::from_raw(c_action.description as _)
-                .to_string_lossy()
-                .into_owned()
-        };
-        dbg!("xx34");
-        let accelerator = unsafe {
-            CString::from_raw(c_action.accelerator as _)
-                .to_string_lossy()
-                .into_owned()
-        };
-        dbg!("xx35");
-        let action: Box<fn(*const CResultItem)> = unsafe { Box::from_raw(c_action.action as _) };
-        dbg!("xx36");
-
-        let action = move |item: &ResultItem| {
-            let c_item = CResultItem::from(item);
-            // TODO: error handling
-            Ok(action(&c_item))
+        let accelerator = if c_action.accelerator.is_null() {
+            None
+        } else {
+            Some(
+                unsafe { std::ffi::CStr::from_ptr(c_action.accelerator) }
+                    .to_string_lossy()
+                    .into_owned(),
+            )
         };
 
-        dbg!(33333);
-        Action {
-            id,
-            icon,
-            description: Some(description),
-            accelerator: Some(accelerator),
-            action: Box::new(action),
+        let action = c_action.action.clone();
+
+        unsafe {
+            Action {
+                id,
+                icon: c_action.icon.into(),
+                description,
+                accelerator,
+                action: Arc::new(move |item: &ResultItem| {
+                    let Some(item) = &item.c_item else {
+                        return Err(anyhow::anyhow!(
+                            "This is was not contstructed from a C ResultItem "
+                        ));
+                    };
+                    let item = item as *const CResultItem as *const c_void;
+                    action.call(item);
+                    Ok(())
+                }),
+            }
         }
     }
 }

@@ -3,9 +3,7 @@
 use std::ffi::*;
 use std::mem::ManuallyDrop;
 
-use kal_plugin::{
-    define_plugin, Action, BuiltinIcon, CResultItem, Config, Icon, ResultItem, UnsafeMatcherFn,
-};
+use kal_plugin::{Action, BuiltinIcon, CResultItem, Config, Icon, ResultItem};
 
 pub struct Plugin {
     s: String,
@@ -50,6 +48,7 @@ impl Plugin {
             actions: vec![],
             score: 0,
             tooltip: Some("ToolTip".to_string()),
+            c_item: None,
         }]
     }
 
@@ -67,8 +66,7 @@ impl Plugin {
             })],
             score: 0,
             tooltip: Some("ToolTip".to_string()),
+            c_item: None,
         }]
     }
 }
-
-define_plugin!(Plugin);

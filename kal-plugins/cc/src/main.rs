@@ -45,23 +45,6 @@ fn main() {
 
         let mut len = 0_usize;
 
-        let ret = query_direct(
-            plugin,
-            CString::new(s).unwrap().as_ptr(),
-            matcher_fn,
-            &mut len as *mut _,
-        );
-
-        let slice = std::slice::from_raw_parts(ret as *const CResultItem, len);
-        let s = slice
-            .into_iter()
-            .map(|item| ResultItem::from(*item))
-            .collect::<Vec<_>>();
-
         destroy(plugin);
     }
-}
-
-extern "C" fn matcher_fn(query: *const c_char, needle: *const c_char) -> u16 {
-    0
 }

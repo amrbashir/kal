@@ -166,7 +166,8 @@ impl From<BuiltinIcon> for Icon {
 }
 
 /// Represents an icon resource.
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug, Copy)]
+#[safer_ffi::derive_ReprC]
 #[repr(C)]
 pub struct CIcon {
     /// Raw data of the icon as a C-style string.
@@ -204,45 +205,16 @@ pub struct CIcon {
     /// - `5 -> Url`: Icon data is a url to an icon.
     pub r#type: u8,
 }
-impl From<Icon> for CIcon {
-    fn from(icon: Icon) -> Self {
-        // Convert String to CString and leak the raw pointer
-        // This will need proper memory management by the caller
-        let c_str = CString::new(icon.data).unwrap_or_default();
-        let data = c_str.into_raw();
-
-        Self {
-            data,
-            r#type: icon.r#type as u8,
-        }
-    }
-}
 
 impl From<CIcon> for Icon {
     fn from(c_icon: CIcon) -> Self {
-        let data = if c_icon.data.is_null() {
-            String::new()
-        } else {
-            unsafe {
-                CString::from_raw(c_icon.data as _)
+        Self {
+            data: unsafe {
+                std::ffi::CStr::from_ptr(c_icon.data)
                     .to_string_lossy()
                     .into_owned()
-            }
-        };
-
-        let icon_type = match c_icon.r#type {
-            0 => IconType::Path,
-            1 => IconType::ExtractFromPath,
-            2 => IconType::Overlay,
-            3 => IconType::Svg,
-            4 => IconType::Builtin,
-            5 => IconType::Url,
-            _ => IconType::Builtin, // Default case
-        };
-
-        Self {
-            data,
-            r#type: icon_type,
+            },
+            r#type: unsafe { std::mem::transmute(c_icon.r#type) },
         }
     }
 }
