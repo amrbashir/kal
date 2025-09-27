@@ -9,15 +9,7 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: dtolnay/rust-toolchain@stable
-      - name: install nsis
-        run: |
-          iwr -useb get.scoop.sh -outfile 'install.ps1'
-          .\install.ps1 -RunAsAdmin
-          scoop update
-          scoop bucket add extras
-          scoop install nsis
+      - uses: actions/checkout@v4
 
       - run: npm i -g corepack
       - run: corepack enable
@@ -25,6 +17,16 @@ jobs:
         with:
           node-version: "lts/*"
           cache: "pnpm"
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: install nsis
+        run: |
+          iwr -useb get.scoop.sh -outfile 'install.ps1'
+          .\install.ps1 -RunAsAdmin
+          scoop update
+          scoop bucket add extras
+          scoop install nsis
 
       - run: pnpm i
       - run: ./.scripts/build.ps1
