@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-09-27
+
 ### Added
 
 - New icon

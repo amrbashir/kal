@@ -1857,7 +1857,7 @@ dependencies = [
 
 [[package]]
 name = "kal"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1902,7 +1902,7 @@ dependencies = [
 
 [[package]]
 name = "kal-config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "schemars",
@@ -1914,7 +1914,7 @@ dependencies = [
 
 [[package]]
 name = "kal-plugin"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "kal-utils"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "serde",

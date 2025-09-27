@@ -1,6 +1,6 @@
 [package]
 name = "kal-plugin"
-version = "0.2.0"
+version = "0.3.0"
 description = "Plugin types for kal."
 authors = ["Amr Bashir <contact@amrbashir.me>"]
 repository = "https://github.com/amrbashir/kal"
