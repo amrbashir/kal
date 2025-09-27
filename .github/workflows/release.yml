@@ -27,6 +27,7 @@ jobs:
           scoop update
           scoop bucket add extras
           scoop install nsis
+          echo "$env:USERPROFILE\scoop\apps\nsis\current" >> $env:GITHUB_PATH
 
       - run: pnpm i
       - run: ./.scripts/build.ps1
