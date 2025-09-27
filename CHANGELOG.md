@@ -12,6 +12,7 @@
 
 - Fix jumping text when a result item's primary text is empty
 - Fix explorer navigation expanding when opening directories
+- Fix panics when typing uppercase letters
 
 ### Changed
 
