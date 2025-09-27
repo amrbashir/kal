@@ -11,6 +11,6 @@ edition = "2021"
 kal-config = { path = "../kal-config" }
 serde.workspace = true
 anyhow.workspace = true
-nucleo-matcher.workspace = true
+nucleo = "0.4"
 strum = { workspace = true, features = ["derive"] }
 async-trait.workspace = true

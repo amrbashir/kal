@@ -1,6 +1,6 @@
 #[derive(Default, Debug)]
 pub struct FuzzyMatcher {
-    inner: nucleo_matcher::Matcher,
+    inner: nucleo::Matcher,
 }
 
 impl FuzzyMatcher {
@@ -8,8 +8,8 @@ impl FuzzyMatcher {
         let mut haystack_buf = Vec::new();
         let mut needle_buf = Vec::new();
 
-        let haystack = nucleo_matcher::Utf32Str::new(haystack, &mut haystack_buf);
-        let needle = nucleo_matcher::Utf32Str::new(needle, &mut needle_buf);
+        let haystack = nucleo::Utf32Str::new(haystack, &mut haystack_buf);
+        let needle = nucleo::Utf32Str::new(needle, &mut needle_buf);
 
         self.inner.fuzzy_match(haystack, needle)
     }
