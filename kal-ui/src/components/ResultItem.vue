@@ -15,7 +15,7 @@ defineProps<{
   <div
     class="w-full flex bg-transparent hover:bg-white/5 last:children:hover:flex rd-1 relative"
     :class="{
-      'bg-white/5 before:content-[\'\'] before:w-3px before:bg-[var(--accent)] before:rd-1':
+      'bg-white/5 before:content-empty before:w-3px before:bg-[var(--accent)] before:rd-1':
         selected,
       'before:absolute before:h-40% before:translate-y--50% before:top-50%': selected,
     }"

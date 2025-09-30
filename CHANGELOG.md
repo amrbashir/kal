@@ -6,6 +6,7 @@
 
 - Fix pressing Tab doesn't select action buttons even if `tabThroughActionButtons` is set to true.
 - Fix broken layout when result items has a long text, now it will clip the long text to retain the same layout.
+- Fix broken indicator on the left of selected result item
 
 ## [0.3.0] - 2025-09-27
 
