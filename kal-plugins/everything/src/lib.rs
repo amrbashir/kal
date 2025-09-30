@@ -64,7 +64,9 @@ impl kal_plugin::Plugin for Plugin {
         }
 
         let mut cmd = std::process::Command::new(&self.es);
-        cmd.arg(query).arg("-n").arg(self.max_results.to_string());
+        cmd.arg("-max-results")
+            .arg(self.max_results.to_string())
+            .arg(query);
 
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         cmd.creation_flags(CREATE_NO_WINDOW);
