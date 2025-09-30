@@ -286,7 +286,7 @@ impl Debug for WebViewWindow {
 impl WebViewWindow {
     /// Magic number accounting for top and bottom border
     /// for undecorated window with shadows
-    pub const MAGIC_BORDERS: u32 = 2;
+    pub const MAGIC_BORDERS: u32 = 1;
 
     #[inline(always)]
     pub fn id(&self) -> WindowId {
