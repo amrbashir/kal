@@ -11,5 +11,6 @@ const { horizontal = true, vertical } = defineProps<{
       'h-1px w-full': horizontal,
       'w-1px h-full': vertical,
     }"
+    class="bg-[var(--divider)]"
   ></div>
 </template>

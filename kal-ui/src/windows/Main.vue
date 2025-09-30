@@ -199,7 +199,7 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
     >
     </SearchBox>
 
-    <Divider class="bg-[var(--divider)]"></Divider>
+    <Divider />
 
     <ul
       ref="items-container-ref"
