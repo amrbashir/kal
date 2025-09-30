@@ -13,7 +13,7 @@ defineProps<{
 
 <template>
   <div
-    class="bg-transparent w-full flex last:children:hover:flex hover:bg-white/5 rd-1 relative"
+    class="w-full flex bg-transparent hover:bg-white/5 last:children:hover:flex rd-1 relative"
     :class="{
       'bg-white/5 before:content-[\'\'] before:w-3px before:bg-[var(--accent)] before:rd-1':
         selected,
@@ -24,11 +24,13 @@ defineProps<{
     :title="item.tooltip ? item.tooltip : `${item.primary_text}\n${item.secondary_text}`"
   >
     <div
-      class="flex w-10% justify-center items-center children:h-50% children:aspect-ratio-square"
+      class="w-10% flex justify-center items-center children:h-50% children:aspect-ratio-square"
       v-html="makeIconHTML(item.icon)"
     />
 
-    <div class="flex-1 grid grid-rows-2 children:text-ellipsis">
+    <div
+      class="flex-1 flex flex-col justify-center gap-1 overflow-hidden children:text-nowrap children:text-ellipsis"
+    >
       <span class="text-size-base">
         {{ item.primary_text }}
       </span>
