@@ -3,16 +3,17 @@ import { useTemplateRef } from "vue";
 
 defineProps<{ placeholder?: string; reloading?: boolean }>();
 defineEmits(["keydown"]);
+defineExpose({ focus, select });
 
 const inputRef = useTemplateRef("input-ref");
+
 function focus() {
   inputRef?.value?.focus();
 }
+
 function select() {
   inputRef?.value?.select();
 }
-
-defineExpose({ focus, select });
 
 const model = defineModel();
 </script>

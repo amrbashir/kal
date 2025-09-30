@@ -46,13 +46,7 @@ const currentSelection = ref(0);
 const currentSelectedItem = computed(() => results.value[currentSelection.value]);
 const currentSelectedAction = ref(0);
 
-watchDebounced(
-  currentQuery,
-  (query) => {
-    query ? runQuery(query) : resetQuery();
-  },
-  { debounce: 50 },
-);
+watchDebounced(currentQuery, (query) => (query ? runQuery(query) : resetQuery()), { debounce: 50 });
 
 async function runQuery(query: string) {
   const response: ResultItem[] = await window.KAL.ipc.invoke(IpcCommand.Query, query);
@@ -196,8 +190,7 @@ const itemsContainerHeight = computed(() => `calc(100% - ${inputHeight.value})`)
       :style="{ height: inputHeight }"
       v-model="currentQuery"
       @keydown="onInputKeyDown"
-    >
-    </SearchBox>
+    />
 
     <Divider />
 
