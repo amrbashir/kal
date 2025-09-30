@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-09-30
+
 ### Fixed
 
 - Fix pressing Tab doesn't select action buttons even if `tabThroughActionButtons` is set to true.
