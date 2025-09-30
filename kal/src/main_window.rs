@@ -224,12 +224,12 @@ impl MainWindowState {
         match ipc_command {
             IpcCommand::Query => {
                 let body = request.body();
-                let query = std::str::from_utf8(body)?.to_lowercase();
+                let query = std::str::from_utf8(body)?;
 
                 // it is fine to block here since only one query can be processed at a time
                 let mut plugins_store = self.plugin_manager.write().await;
 
-                let results = plugins_store.query(&query).await?;
+                let results = plugins_store.query(query).await?;
 
                 let config = self.config.read().await;
 
