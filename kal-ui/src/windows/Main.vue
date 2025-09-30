@@ -102,7 +102,7 @@ function updateSelection(e: KeyboardEvent) {
   }
 
   if (e.key === "Tab" && !e.shiftKey) {
-    if (!config.value.general.tabThroughContextButtons) {
+    if (!config.value.general.tabThroughActionButtons) {
       selectNextItem();
     } else if (currentSelectedAction.value == currentSelectedItem.value.actions.length - 1) {
       selectNextItem();
@@ -112,7 +112,7 @@ function updateSelection(e: KeyboardEvent) {
   }
 
   if (e.key === "Tab" && e.shiftKey) {
-    if (!config.value.general.tabThroughContextButtons) {
+    if (!config.value.general.tabThroughActionButtons) {
       selectPrevItem();
     } else if (currentSelectedAction.value == 0) {
       selectPrevItem();
