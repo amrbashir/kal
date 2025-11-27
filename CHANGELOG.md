@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-11-27
+
 ## Fixed
 
 - _`[System Commands]`_ Fix confirm dialog sometimes showing behind the app.
