@@ -16,6 +16,7 @@ async-trait.workspace = true
 rfd = { workspace = true, default-features = false }
 strum.workspace = true
 serde.workspace = true
+raw-window-handle = "0.6"
 
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]

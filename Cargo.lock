@@ -2002,6 +2002,7 @@ dependencies = [
  "kal-config",
  "kal-plugin",
  "kal-utils",
+ "raw-window-handle",
  "rfd",
  "serde",
  "strum",

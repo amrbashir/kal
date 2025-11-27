@@ -155,12 +155,35 @@ impl SystemCommand {
 
     #[cfg(windows)]
     fn execute(&self) -> anyhow::Result<()> {
+        use std::num::NonZeroIsize;
         use std::process::Command;
 
+        use raw_window_handle::*;
+        use windows::Win32::Foundation::HWND;
         use windows::Win32::System::Power::SetSuspendState;
         use windows::Win32::System::Shutdown::LockWorkStation;
+        use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 
+        struct Hwnd(HWND);
+        impl HasWindowHandle for Hwnd {
+            fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+                let hwnd = NonZeroIsize::new(self.0 .0 as isize).ok_or(HandleError::Unavailable)?;
+                let handle = Win32WindowHandle::new(hwnd);
+                let handle = RawWindowHandle::Win32(handle);
+                Ok(unsafe { WindowHandle::borrow_raw(handle) })
+            }
+        }
+
+        impl HasDisplayHandle for Hwnd {
+            fn display_handle(&self) -> Result<DisplayHandle<'_>, HandleError> {
+                Err(HandleError::Unavailable)
+            }
+        }
+
+        let foreground = unsafe { GetForegroundWindow() };
+        let foreground = Hwnd(foreground);
         let res = rfd::MessageDialog::new()
+            .set_parent(&foreground)
             .set_title("Please confirm")
             .set_description(format!(
                 "You are about to {}, are you sure?",
