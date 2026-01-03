@@ -33,12 +33,6 @@ jobs:
       - run: ./.scripts/build.ps1
       - run: ./.scripts/create-installer.ps1
 
-      - name: generate checksums.txt
-        run: |
-          echo "$((Get-FileHash ./dist/kal.exe).Hash.ToLower())  kal.exe" >> checksums.txt
-          echo "$((Get-FileHash ./dist/kal.zip).Hash.ToLower())  kal.zip" >> checksums.txt
-          echo "$((Get-FileHash ./dist/kal-setup.exe).Hash.ToLower())  kal-setup.exe" >> checksums.txt
-
       - name: generate release notes
         run: ./.scripts/generate-release-notes.ps1
 
@@ -48,5 +42,3 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             ./dist/*.exe
-            ./dist/*.zip
-            ./checksums.txt

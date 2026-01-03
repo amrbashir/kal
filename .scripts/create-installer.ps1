@@ -16,9 +16,6 @@ makensis /V4 "./installer/installer.nsi"
 # Move the installer to the dist directory
 Move-Item -Force "./installer/kal-setup.exe" "./dist/kal-setup.exe"
 
-# Compress the kal.exe to kal.zip
-Compress-Archive -Update "./dist/kal.exe" "./dist/kal.zip"
-
 # Remove artifacts
 Remove-Item -Force "./installer/kal.exe"
 Remove-Item -Force "./installer/icon.ico"

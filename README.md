@@ -26,11 +26,11 @@ Also I want to write plugins in any programming langauge and not just C# and .NE
 
 [<img src='https://github.com/ycngmn/Nobook/blob/e2a7fa98e460ce8ebb241ea1e7bda2ebb33e05c0/images/get-it-on-github.png' alt='Get it on GitHub' height = "90">](https://github.com/amrbashir/kal/releases/latest)
 
-Or through PowerShell:
+Or using scoop:
 
 ```powershell
-irm "https://github.com/amrbashir/kal/releases/latest/download/kal-setup.exe" -OutFile "kal-setup.exe"
-& "./kal-setup.exe"
+scoop bucket add amrbashir https://github.com/amrbashir/scoop-bucket
+scoop install kal
 ```
 
 ## Usage
